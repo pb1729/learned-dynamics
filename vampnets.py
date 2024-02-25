@@ -126,8 +126,9 @@ class KoopmanModel:
             trans_0, trans_1, K = vamp_score(chi_0, chi_1, mode="all")
             trans_0, trans_1, K = trans_0.detach(), trans_1.detach(), K.detach()
         U, S, Vh = torch.linalg.svd(K)
-        trans_0 = Affine( Vh @ trans_0.W, trans_0.mu)
-        trans_1 = Affine(U.T @ trans_1.W, trans_1.mu)
+        dim, = S.shape
+        trans_0 = Affine( (Vh @ trans_0.W)[:dim], trans_0.mu[:dim])
+        trans_1 = Affine((U.T @ trans_1.W)[:dim], trans_1.mu[:dim])
         return KoopmanModel(model.inp_dim, model.out_dim, model, trans_0, trans_1, S)
     @staticmethod
     def load(path):

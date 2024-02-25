@@ -26,7 +26,7 @@ def main(nm, *dims):
     scores = kmod.eval_score(dataset_poly)
     sdim, = kmod.S.shape
     col = cmap(i/10.)
-    plt.scatter(np.arange(1, 1 + sdim), scores.cpu().numpy(), marker=".", color=col, label="d=%d evaluation score" % sz)
+    #plt.scatter(np.arange(1, 1 + sdim), scores.cpu().numpy(), marker=".", color=col, label="d=%d evaluation score" % sz)
     plt.scatter(np.arange(1, 1 + sdim), kmod.S.cpu().numpy(), marker="o", color=col, label="d=%d learned" % sz)
   for i in range(0, polymer_length):
     height = tica_theory(i)
