@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import itertools
 
-from configs import Config, Condition
+from config import Config, Condition
 
 
 # This is the architecture source file for training a VAE on the distribution of system states.

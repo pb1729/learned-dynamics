@@ -2,7 +2,8 @@ import torch
 
 from sims import dataset_gen
 from run_visualization import TensorBoard
-from configs import Config, Condition, load, save, makenew, configs
+from config import Config, Condition, load, save, makenew
+from configs import configs
 
 
 def batchify(dataset_gen, batchsz):
@@ -39,18 +40,22 @@ def train(vae, save_path):
     #if i >= 2047: break # end training here
 
 
+def training_run(save_path, src):
+  if isinstance(src, Config): # create new from config
+    model = makenew(src)
+  elif isinstance(src, str): # load from path
+    model = load(src)
+  train(model, save_path)
 
-def main(save_path, load_path=None):
-  if load_path is None:
-    config = configs["cosine coords vae res"]
-    vae = makenew(config)
-  else:
-    vae = load(load_path)
-  train(vae, save_path)
 
+def main(save_path, src):
+  if src in configs:
+    src = configs[src]
+  training_run(save_path, src)
 
 if __name__ == "__main__":
   from sys import argv
   main(*argv[1:])
+
 
 

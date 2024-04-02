@@ -1,4 +1,4 @@
-from configs import load
+from config import load
 
 
 def main(modelpath):

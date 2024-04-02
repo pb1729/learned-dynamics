@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-from configs import load
+from config import load
 from sims import sims, get_dataset
 from polymer_util import rouse
 

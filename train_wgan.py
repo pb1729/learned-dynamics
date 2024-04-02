@@ -2,7 +2,8 @@ import torch
 
 from sims import dataset_gen
 from run_visualization import TensorBoard
-from configs import Config, Condition, load, save, makenew, configs
+from config import Config, Condition, load, save, makenew, config
+from configs import configs
 
 
 def batchify(dataset_gen, batchsz):
@@ -42,17 +43,22 @@ def train(gan, save_path):
 
 
 
-def main(save_path, load_path=None):
-  if load_path is None:
-    config = configs["cosine coords"]
-    gan = makenew(config)
-  else:
-    gan = load(load_path)
-  train(gan, save_path)
+def training_run(save_path, src):
+  if isinstance(src, Config): # create new from config
+    model = makenew(src)
+  elif isinstance(src, str): # load from path
+    model = load(src)
+  train(model, save_path)
 
+
+def main(save_path, src):
+  if src in configs:
+    src = configs[src]
+  training_run(save_path, src)
 
 if __name__ == "__main__":
   from sys import argv
   main(*argv[1:])
+
 
 

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from configs import Config, Condition
+from config import Config, Condition
 
 
 # BASE SOURCE CODE FOR CONDITIONAL WGAN
