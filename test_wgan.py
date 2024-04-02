@@ -8,6 +8,8 @@ from polymer_util import rouse
 
 
 ITERATIONS = 1
+ROUSE_BASIS = True
+SHOW_REALSPACE_SAMPLES = 10
 
 
 
@@ -46,19 +48,30 @@ def compare_predictions_x(x_init, x_predicted, x_actual):
   x_init = x_init.cpu().numpy()
   x_actual = x_actual.cpu().numpy()
   x_predicted = x_predicted.cpu().numpy()
+  if SHOW_REALSPACE_SAMPLES > 0:
+    plt.plot(x_init[0], marker=".", color="black")
+    for i in range(SHOW_REALSPACE_SAMPLES):
+      plt.plot(x_actual[i], marker=".", color="blue", alpha=0.7)
+      plt.plot(x_predicted[i], marker=".", color="orange", alpha=0.7)
+    plt.show()
   fig = plt.figure(figsize=(20, 12))
   axes = []
   for n in range(12): # TODO: leave polymer length as a variable???
-    w_x = rouse(n, 12)[None]
-    x_init_n = (w_x*x_init).sum(1)
-    x_actual_n = (w_x*x_actual).sum(1)
-    x_predicted_n = (w_x*x_predicted).sum(1)
+    if ROUSE_BASIS:
+      w_x = rouse(n, 12)[None]
+      x_init_n = (w_x*x_init).sum(1)
+      x_actual_n = (w_x*x_actual).sum(1)
+      x_predicted_n = (w_x*x_predicted).sum(1)
+    else:
+      x_init_n = x_init[:, n]
+      x_actual_n = x_actual[:, n]
+      x_predicted_n = x_predicted[:, n]
     axes.append(fig.add_subplot(3, 4, n + 1))
     axes[-1].hist(x_actual_n,    range=(-20., 20.), bins=200, alpha=0.7)
     axes[-1].hist(x_predicted_n, range=(-20., 20.), bins=200, alpha=0.7)
     axes[-1].scatter([x_init_n], [0], color="black") # show starting point...
     axes[-1].scatter([x_actual_n.mean()], [0], color="blue")
-    axes[-1].scatter([x_predicted_n.mean()], [0], color="brown")
+    axes[-1].scatter([x_predicted_n.mean()], [0], color="orange")
   plt.show()
   #plt.savefig("figures/direct1/%d.png" % np.random.randint(0, 10000))
   #plt.close()

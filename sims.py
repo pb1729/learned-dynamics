@@ -87,6 +87,22 @@ def get_polymer_a(k, n, dim=3):
         return ans.reshape(-1, n*dim)
     return a
 
+def get_polymer_a_cos_potential(k, n, A, p, dim=3):
+    """ Get an acceleration function defining a polymer system with n atoms and spring constant k
+    All atoms are in a cosine wave potential with amplitude A and wavenumber p
+    Shapes:
+    x: (batch, n*dim)
+    a: (batch, n*dim)
+    A: ()
+    p: (dim) """
+    def a(x):
+        x = x.reshape(-1, n, dim)
+        ans = (A*p*torch.sin((p*x).sum(-1)))[:, :, None]
+        ans[:, 1:] += k*(x[:, :-1] - x[:, 1:])
+        ans[:, :-1] += k*(x[:, 1:] - x[:, :-1])
+        return ans.reshape(-1, n*dim)
+    return a
+
 
 sims = {
     "SHO, Langevin": TrajectorySim(
@@ -113,6 +129,12 @@ sims = {
     ),
     "1D Polymer, Ornstein Uhlenbeck, medium": TrajectorySim(
         get_polymer_a(1.0, 12, dim=1),
+        torch.tensor([10.]*12, dtype=torch.float64), 1.0,
+        97.0, 16*97, # tune the delta_t so that slowest mode decays by about 1/2
+        metadata={"poly_len": 12}
+    ),
+    "1D Polymer, Ornstein Uhlenbeck, medium, cosine": TrajectorySim(
+        get_polymer_a_cos_potential(1.0, 12, 1.0, torch.tensor([3.0], dtype=torch.float64, device="cuda"), dim=1),
         torch.tensor([10.]*12, dtype=torch.float64), 1.0,
         97.0, 16*97, # tune the delta_t so that slowest mode decays by about 1/2
         metadata={"poly_len": 12}
@@ -164,7 +186,7 @@ def dataset_gen(sim, N, L, t_eql=0, subtract_cm=0, x_only=False):
 # x' = v = -x/drag
 # x = exp(-t/drag)
 def get_ou_eigen_1d():
-  sim = sims["1D Ornstein Uhlenbeck"]
+  sim = sims["SHO, Ornstein Uhlenbeck"]
   return torch.exp(-sim.delta_t/sim.drag[0]).item()
 
 # similar, but now v is -kx/drag, where k is associated with a Rouse mode
@@ -176,6 +198,8 @@ def get_poly_eigen_1d():
 if __name__ == "__main__":
   print("Linear eigenstate decay per time delta_t for 1D Ornstein Uhlenbeck:", get_ou_eigen_1d())
   print("Linear eigenstate decay per time delta_t for Polymer (assuming reference of k=1):", get_poly_eigen_1d())
+  # TODO: delete the following lines:
+  dataset = get_dataset(sims["1D Polymer, Ornstein Uhlenbeck, medium, cosine"], 10, 10)
 
 
 

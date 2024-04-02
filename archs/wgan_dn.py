@@ -15,7 +15,8 @@ lr_g = 0.0003   # learning rate for generator
 beta_1 = 0.5    # Adam parameter
 beta_2 = 0.99   # Adam parameter
 k_L = 1.        # Lipschitz constant
-in_str = 0.2    # Strength of Instance-Noise
+in_str_g = 0.2  # Strength of Instance-Noise on generated data
+in_str_r = 0.3  # Strength of Instance-Noise on real data
 
 nz = 100        # Size of z latent vector (i.e. size of generator input)
 ngf = 128       # Size of feature maps in generator
@@ -199,11 +200,11 @@ class GANTrainer:
   def disc_step(self, data, cond):
     self.optim_d.zero_grad()
     # train on real data (with instance noise)
-    r_data = data + in_str*torch.randn_like(data) # instance noise
+    r_data = data + in_str_r*torch.randn_like(data) # instance noise
     y_r = self.disc(r_data, cond)
     # train on generated data (with instance noise)
     g_data = self.gen(self.get_latents(cond.shape[0]), cond)
-    g_data = g_data + in_str*torch.randn_like(g_data) # instance noise
+    g_data = g_data + in_str_g*torch.randn_like(g_data) # instance noise
     y_g = self.disc(g_data, cond)
     # sample-delta penalty on interpolated data
     mix_factors1 = torch.rand(cond.shape[0], 1, device=self.config.device)
@@ -226,7 +227,7 @@ class GANTrainer:
   def gen_step(self, cond):
     self.optim_g.zero_grad()
     g_data = self.gen(self.get_latents(cond.shape[0]), cond)
-    g_data = g_data + in_str*torch.randn_like(g_data) # instance noise
+    g_data = g_data + in_str_g*torch.randn_like(g_data) # instance noise
     y_g = self.disc(g_data, cond)
     loss = y_g.mean()
     loss.backward()
