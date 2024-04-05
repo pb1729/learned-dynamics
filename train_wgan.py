@@ -5,6 +5,7 @@ from run_visualization import TensorBoard
 from config import Config, Condition, load, save, makenew, config
 from configs import configs
 
+# TODO: adapt to the new data generator format
 
 def batchify(dataset_gen, batchsz):
   for dataset in dataset_gen:

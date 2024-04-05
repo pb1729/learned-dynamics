@@ -23,17 +23,6 @@ def rouse_block(length):
   ], axis=-1)
 
 
-if __name__ == "__main__":
-  poly_len = 12
-  # decay rate of slowest mode:
-  print(tica_theory(1, poly_len), np.exp(-1))
-  # test functionality by plotting the rouse modes...
-  import matplotlib.pyplot as plt
-  x = np.arange(0, poly_len)
-  for n in range(poly_len):
-    plt.scatter(x, rouse(n, poly_len))
-    plt.show()
-
 
 # ARBITRARY QUANTA THEORY (THE IDEALISTIC THEORY)
 def get_log_expected_singular_values(log_vals, n, show_ans_tups=False):
@@ -74,6 +63,28 @@ def get_log_expected_singular_values(log_vals, n, show_ans_tups=False):
 def get_n_quanta_theory(num_values, polymer_length):
     log_lin_S = np.log(tica_theory(np.arange(1, polymer_length), polymer_length))
     return np.exp(get_log_expected_singular_values(log_lin_S, num_values))
+
+
+def squarish_factorize(n):
+  """ plotting utility function, gives as close to a square factorization of n as possible.
+      returns integers x, y with x >= y """
+  best_y = 1
+  for y in range(2, int(np.sqrt(n)) + 1):
+    if n % y == 0:
+      best_y = y
+  return n//best_y, best_y
+
+
+if __name__ == "__main__":
+  poly_len = 12
+  # decay rate of slowest mode:
+  print(tica_theory(1, poly_len), np.exp(-1))
+  # test functionality by plotting the rouse modes...
+  import matplotlib.pyplot as plt
+  x = np.arange(0, poly_len)
+  for n in range(poly_len):
+    plt.scatter(x, rouse(n, poly_len))
+    plt.show()
 
 
 

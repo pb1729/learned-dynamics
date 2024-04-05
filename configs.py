@@ -33,6 +33,22 @@ configs = {
         "beta_1": 0.5, "beta_2": 0.99,
         "nf": 128
       }),
+  "coords mu fast": Config("1D Polymer, Ornstein Uhlenbeck", "meanpred",
+    cond=Condition.COORDS, x_only=True,
+    batch=8, simlen=16, t_eql=4,
+    arch_specific={
+        "lr": 0.0008,
+        "beta_1": 0.5, "beta_2": 0.99,
+        "nf": 128
+      }),
+  "coords mu 10": Config("1D Polymer, Ornstein Uhlenbeck, 10", "meanpred",
+    cond=Condition.COORDS, x_only=True, subtract_mean=1,
+    batch=8, simlen=16, t_eql=4,
+    arch_specific={
+        "lr": 0.0008,
+        "beta_1": 0.5, "beta_2": 0.99,
+        "nf": 128
+      }),
 }
 
 

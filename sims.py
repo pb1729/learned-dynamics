@@ -119,27 +119,61 @@ sims = {
         get_polymer_a(1.0, 12, dim=1),
         torch.tensor([10.]*12, dtype=torch.float64), 1.0,
         1.0, 20,
-        metadata={"poly_len": 12}
+        metadata={"poly_len": 12, "space_dim": 1}
     ),
     "1D Polymer, Ornstein Uhlenbeck, long": TrajectorySim(
         get_polymer_a(1.0, 12, dim=1),
         torch.tensor([10.]*12, dtype=torch.float64), 1.0,
         140.0, 20*140, # tune the delta_t to equal a time constant for the slowest mode
-        metadata={"poly_len": 12}
+        metadata={"poly_len": 12, "space_dim": 1}
     ),
     "1D Polymer, Ornstein Uhlenbeck, medium": TrajectorySim(
         get_polymer_a(1.0, 12, dim=1),
         torch.tensor([10.]*12, dtype=torch.float64), 1.0,
         97.0, 16*97, # tune the delta_t so that slowest mode decays by about 1/2
-        metadata={"poly_len": 12}
+        metadata={"poly_len": 12, "space_dim": 1}
+    ),
+    "1D Polymer, Ornstein Uhlenbeck, 10": TrajectorySim(
+        get_polymer_a(1.0, 12, dim=1),
+        torch.tensor([10.]*12, dtype=torch.float64), 1.0,
+        10.0, 16*10,
+        metadata={"poly_len": 12, "space_dim": 1}
     ),
     "1D Polymer, Ornstein Uhlenbeck, medium, cosine": TrajectorySim(
         get_polymer_a_cos_potential(1.0, 12, 1.0, torch.tensor([3.0], dtype=torch.float64, device="cuda"), dim=1),
         torch.tensor([10.]*12, dtype=torch.float64), 1.0,
         97.0, 16*97, # tune the delta_t so that slowest mode decays by about 1/2
-        metadata={"poly_len": 12}
+        metadata={"poly_len": 12, "space_dim": 1}
+    ),
+    "1D Polymer 12, Ornstein Uhlenbeck, t10": TrajectorySim(
+        get_polymer_a(1.0, 12, dim=1),
+        torch.tensor([10.]*12, dtype=torch.float64), 1.0,
+        10.0, 16*10,
+        metadata={"poly_len": 12, "space_dim": 1}
+    ),
+    "1D Polymer 24, Ornstein Uhlenbeck, t10": TrajectorySim(
+        get_polymer_a(1.0, 24, dim=1),
+        torch.tensor([10.]*24, dtype=torch.float64), 1.0,
+        10.0, 16*10,
+        metadata={"poly_len": 24, "space_dim": 1}
+    ),
+    "1D Polymer 36, Ornstein Uhlenbeck, t10": TrajectorySim(
+        get_polymer_a(1.0, 36, dim=1),
+        torch.tensor([10.]*36, dtype=torch.float64), 1.0,
+        10.0, 16*10,
+        metadata={"poly_len": 36, "space_dim": 1}
     ),
 }
+
+
+for l in [12, 24, 36, 48]:
+  for t in [3, 10, 30, 100]:
+    sims["ou_poly_l%d_t%d" % (l, t)] = TrajectorySim(
+        get_polymer_a(1.0, l, dim=1),
+        torch.tensor([10.]*l, dtype=torch.float64), 1.0,
+        float(t), 16*t,
+        metadata={"poly_len": l, "space_dim": 1}
+      )
 
 
 # DATASET GENERATION
@@ -167,17 +201,29 @@ def get_dataset(sim, N, L, t_eql=0, subtract_cm=0, x_only=False, x_init=None, v_
 
 def dataset_gen(sim, N, L, t_eql=0, subtract_cm=0, x_only=False):
   """ generate many datasets in a separate thread
-      t_eql, subtract_cm, x_only all do the same thing as they do in get_dataset() """
+      t_eql, subtract_cm, x_only all do the same thing as they do in get_dataset()
+      one should use the send() method for controlling this generator, calling
+      send(True) if more data will be required and send(False) otherwise """
   data_queue = Queue(maxsize=32) # we set a maxsize to control the number of items taking up memory on GPU
+  control_queue = Queue()
   def thread_main():
     while True: # queue maxsize stops us from going crazy here
-      data_queue.put(get_dataset(sim, N, L, t_eql=t_eql, subtract_cm=subtract_cm, x_only=x_only).to(torch.float32))
+      next_dataset = get_dataset(sim, 128*N, L, t_eql=t_eql, subtract_cm=subtract_cm, x_only=x_only).to(torch.float32)
+      for i in range(0, 128*N, N):
+        if not control_queue.empty():
+          command = control_queue.get_nowait()
+          if command == "halt":
+            return
+        data_queue.put(next_dataset[i:i+N])
   t = Thread(target=thread_main)
   t.start()
   while True:
     data = data_queue.get()
-    yield data
-
+    halt = yield data # "keep going" is encoded as None, since python requires the first send() to be passed a None anyway
+    if halt is not None:
+      control_queue.put("halt")
+      yield None
+      break
 
 
 # COMPUTE THE THEORETICAL EIGENVALUE #1 FOR THE 1D PROCESS
