@@ -13,6 +13,7 @@ class Condition:
   COORDS = 1
   ROUSE = 2
   KOOPMODEL = 3
+  VAEMODEL = 4
 
 
 
@@ -21,7 +22,7 @@ class Config:
   def __init__(self, sim_name, arch_name,
                cond=Condition.COORDS, x_only=False, subtract_mean=0, device="cuda",
                batch=16, simlen=16, t_eql=0,
-               koopman_model_path=None, n_rouse_modes=None,
+               koopman_model_path=None, n_rouse_modes=None, vae_model_path=None,
                arch_specific=None):
     self.sim_name = sim_name
     self.arch_name = arch_name
@@ -45,6 +46,9 @@ class Config:
     elif cond == Condition.KOOPMODEL:
       assert koopman_model_path is not None, "must specify a path to obtain the Koopman model from"
       self.cond_koopman(koopman_model_path)
+    elif cond == Condition.VAEMODEL:
+      assert vae_model_path is not None, "must specify a path to obtain the VAE model from"
+      self.cond_vae(vae_model_path)
     else:
       assert False, "condition not recognized!"
     self.modelclass = self.get_modelclass()
@@ -65,6 +69,16 @@ class Config:
       return ans.detach()
     self.cond = get_cond_koopman
     self.cond_dim = kmod.out_dim
+  def cond_vae(self, model_path):
+    """ given a VAE, the condition is given by encoding the system state with the VAE """
+    self.vae_model_path = model_path
+    model = load(model_path)
+    def get_cond_vae(data):
+      with torch.no_grad():
+        ans = model.encode(data)
+      return ans.detach()
+    self.cond = get_cond_vae
+    self.cond_dim = model.config["nz"]
   def cond_rouse(self, n_modes):
     assert self.x_only, "Rouse modes with v not implemented! x_only should be True"
     assert hasattr(self.sim, "poly_len"), "simulation should specify a polymer length"
@@ -93,7 +107,7 @@ class Config:
         "t_eql": self.t_eql,
         "arch_specific": self.arch_specific,
       }
-    for attr in ["koopman_model_path", "n_rouse_modes"]:
+    for attr in ["koopman_model_path", "n_rouse_modes", "vae_model_path"]:
       if hasattr(self, attr):
         kwargs[attr] = getattr(self, attr)
     return args, kwargs
@@ -112,6 +126,8 @@ class Config:
   def __getitem__(self, key):
     """ allows architectures to access arch_specific configuration using the indexing operator """
     return self.arch_specific[key]
+  def __setitem__(self, key, value):
+    self.arch_specific[key] = value
     
 
 

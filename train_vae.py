@@ -1,18 +1,10 @@
 import torch
+import itertools
 
 from sims import dataset_gen
 from run_visualization import TensorBoard
 from config import Config, Condition, load, save, makenew
 from configs import configs
-
-# TODO: adapt to the new data generator format
-
-def batchify(dataset_gen, batchsz):
-  for dataset in dataset_gen:
-    N, L, state_dim = dataset.shape
-    assert N % batchsz == 0
-    for i in range(0, N, batchsz):
-      yield dataset[i:i+batchsz]
 
 
 def train(vae, save_path):
@@ -25,20 +17,20 @@ def train(vae, save_path):
   print(vae.config)
   board = TensorBoard(run_name)
   config = vae.config # configuration for this run...
-  data_generator = dataset_gen(config.sim, 128*config.batch, config.simlen,
+  data_generator = dataset_gen(config.sim, config.batch, config.simlen,
     t_eql=config.t_eql, subtract_cm=config.subtract_mean, x_only=config.x_only)
-  for i, trajs in enumerate(batchify(data_generator, config.batch)):
+  for i in itertools.count():
+    trajs = data_generator.send(None if i < 65536 else True)
+    if trajs is None: break
     N, L, state_dim = trajs.shape
     data = trajs.reshape(N*L, state_dim)
     loss = vae.train_step(data)
     print(f"{i}\t ℒ = {loss:05.6f}")
     board.scalar("loss", i, loss)
-    if i % 512 == 511:
+    if (i + 1) % 512 == 0:
       print("\nsaving...")
       save(vae, save_path)
       print("saved.\n")
-    if i >= 65535: break # end training here
-    #if i >= 2047: break # end training here
 
 
 def training_run(save_path, src):

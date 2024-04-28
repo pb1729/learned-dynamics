@@ -23,8 +23,9 @@ def train(gan, save_path):
     trajs = data_generator.send(None if i < 65536 else True)
     if trajs is None: break
     N, L, state_dim = trajs.shape
-    cond = config.cond(trajs[:, :-1].reshape(N*(L - 1), state_dim))
-    data = trajs[:, 1:].reshape(N*(L - 1), state_dim)
+    encoded_traj = config.cond(trajs.reshape(N*L, state_dim)).reshape(N, L, config.cond_dim)
+    cond = encoded_traj[:, :-1].reshape(N*(L - 1), config.cond_dim)
+    data = encoded_traj[:,  1:].reshape(N*(L - 1), config.cond_dim)
     loss_d, loss_g = gan.train_step(data, cond)
     print(f"{i}\t ℒᴰ = {loss_d:05.6f}\t ℒᴳ = {loss_g:05.6f}")
     board.scalar("loss_d", i, loss_d)

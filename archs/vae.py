@@ -12,7 +12,6 @@ from config import Config, Condition
 lr = 0.0008     # Learning rate
 beta_1 = 0.5    # Adam parameter
 beta_2 = 0.99   # Adam parameter
-nz = 60         # Size of z latent vector
 nf = 128        # number of features in nets
 w_rec = 800.    # reconstruction weight
 
@@ -26,6 +25,35 @@ def get_input_preproc_layers(config):
     else:
       layer_list.append(SubtractMeanPos(config.state_dim, config.subtract_mean))
   return layer_list
+
+class SubtractMean(nn.Module):
+  """ given position coordinates as input, subtracts the mean """
+  def __init__(self, state_dim, space_dim=1):
+    super(SubtractMean, self).__init__()
+    self.x_sz = state_dim
+    self.space_dim = space_dim # number of spatial dimensions
+    assert self.x_sz % self.space_dim == 0
+  def forward(self, x):
+    batch, state_dim = x.shape
+    x = x.reshape(batch, -1, self.space_dim)
+    x = x - x.mean(1, keepdim=True)
+    return x.reshape(batch, self.x_sz)
+
+class SubtractMeanPos(nn.Module):
+  """ given position and velocity coordinates as input,
+      subtracts the mean from the position coordinates only """
+  def __init__(self, state_dim, space_dim=1):
+    super(SubtractMeanPos, self).__init__()
+    self.x_sz = state_dim // 2
+    self.space_dim = space_dim # number of spatial dimensions
+    assert self.x_sz % self.space_dim == 0
+  def forward(self, xv):
+    batch, state_dim = xv.shape
+    x = xv[:, :self.x_sz].reshape(batch, -1, self.space_dim)
+    x = x - x.mean(1, keepdim=True)
+    return torch.cat([
+      x.reshape(batch, self.x_sz),
+      xv[:, self.x_sz:]], dim=1)
 
 
 class Encoder(nn.Module):
@@ -47,12 +75,12 @@ class Encoder(nn.Module):
     self.mu_head = nn.Sequential(
       nn.Linear(nf, nf),
       nn.LeakyReLU(0.2, inplace=True),
-      nn.Linear(nf, nz, bias=False),
+      nn.Linear(nf, config["nz"], bias=False),
     )
     self.log_sigma_head = nn.Sequential(
       nn.Linear(nf, nf),
       nn.LeakyReLU(0.2, inplace=True),
-      nn.Linear(nf, nz),
+      nn.Linear(nf, config["nz"]),
     )
   def forward(self, state):
     """ encoder forward pass. returns mu, sigma for latent vector z """
@@ -66,7 +94,7 @@ class Decoder(nn.Module):
   def __init__(self, config):
     super(Decoder, self).__init__()
     self.layers = nn.Sequential(
-      nn.Linear(nz, nf),
+      nn.Linear(config["nz"], nf),
       nn.LeakyReLU(0.2, inplace=True),
       nn.Linear(nf, nf),
       nn.BatchNorm1d(nf),

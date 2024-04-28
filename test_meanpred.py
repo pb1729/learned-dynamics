@@ -56,7 +56,7 @@ def compare_predictions_x(x_init, x_predicted, x_actual, config):
   fig = plt.figure(figsize=(20, 12))
   axes = []
   plt_w, plt_h = squarish_factorize(config.sim.poly_len)
-  for n in range(config.sim.poly_len): # TODO: leave polymer length as a variable???
+  for n in range(config.sim.poly_len):
     if ROUSE_BASIS:
       w_x = rouse(n, config.sim.poly_len)[None]
       x_init_n = (w_x*x_init).sum(1)

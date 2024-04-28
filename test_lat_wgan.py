@@ -35,11 +35,12 @@ def get_continuation_dataset(N, contins, config, iterations=1):
 def get_sample_step(model):
   """ given a model and current state, predict the next state """
   model.set_eval(True)
+  vae_model = load(model.config.vae_model_path)
   def sample_step(state):
     batch, _ = state.shape
     latents = model.get_latents(batch)
     with torch.no_grad():
-      state_fin = model.gen(latents, model.config.cond(state))
+      state_fin = vae_model.decode(model.gen(latents, model.config.cond(state)))
     return state_fin
   return sample_step
 

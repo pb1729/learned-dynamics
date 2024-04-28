@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 from config import load
 from sims import sims, get_dataset
-from polymer_util import rouse
+from polymer_util import rouse, squarish_factorize
 
 
 SHOW_REALSPACE_SAMPLES = 1
@@ -24,7 +24,7 @@ def get_reencode(model):
   return reencode
 
 
-def compare_encoded_x(x_actual, x_encoded):
+def compare_encoded_x(x_actual, x_encoded, config):
   x_actual = x_actual.cpu().numpy()
   x_encoded = x_encoded.cpu().numpy()
   if SHOW_REALSPACE_SAMPLES > 0:
@@ -35,15 +35,16 @@ def compare_encoded_x(x_actual, x_encoded):
   for rouse_basis in [False, True]:
     fig = plt.figure(figsize=(20, 12))
     axes = []
-    for n in range(12): # TODO: leave polymer length as a variable???
+    plt_w, plt_h = squarish_factorize(config.sim.poly_len)
+    for n in range(config.sim.poly_len):
       if rouse_basis:
-        w_x = rouse(n, 12)[None]
+        w_x = rouse(n, config.sim.poly_len)[None]
         x_actual_n = (w_x*x_actual).sum(1)
         x_encoded_n = (w_x*x_encoded).sum(1)
       else:
         x_actual_n = x_actual[:, n]
         x_encoded_n = x_encoded[:, n]
-      axes.append(fig.add_subplot(3, 4, n + 1))
+      axes.append(fig.add_subplot(plt_h, plt_w, n + 1))
       axes[-1].hist(x_actual_n,  range=(-20., 20.), bins=200, alpha=0.7)
       axes[-1].hist(x_encoded_n, range=(-20., 20.), bins=200, alpha=0.7)
       axes[-1].scatter([x_actual_n.mean()], [0], color="blue")
@@ -53,9 +54,9 @@ def compare_encoded_x(x_actual, x_encoded):
     #plt.close()
 
 
-def eval_reencode(reencode, x_actual):
+def eval_reencode(reencode, x_actual, config):
   x_encoded = reencode(x_actual)
-  compare_encoded_x(x_actual, x_encoded)
+  compare_encoded_x(x_actual, x_encoded, config)
 
 
 def main(fpath):
@@ -68,7 +69,7 @@ def main(fpath):
   # get comparison data
   dataset = make_dataset(N, vae.config).reshape(N*vae.config.simlen, -1).to(torch.float32)
   # compare!
-  eval_reencode(reencode, dataset)
+  eval_reencode(reencode, dataset, vae.config)
 
 
 

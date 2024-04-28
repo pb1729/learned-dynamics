@@ -1,7 +1,18 @@
-from config import load
+from config import load, save
 
 
-def main(modelpath):
+def main(modelpath, command=None, *args):
+  if command == "--setstr":
+    key, val = args
+    model = load(modelpath)
+    model.config[key] = val
+    save(model, modelpath)
+  if command == "--setint":
+    key, val = args
+    val = int(val)
+    model = load(modelpath)
+    model.config[key] = val
+    save(model, modelpath)
   model = load(modelpath)
   print(model.config)
 
