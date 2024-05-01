@@ -55,6 +55,7 @@ class Meanpred(nn.Module):
     super(Meanpred, self).__init__()
     assert config.x_only, "still need to implement having absolute velocity, so can't do x_only=False yet"
     nf = config["nf"]
+    assert config.sim.space_dim == 1
     self.layers = nn.Sequential(
       ToAtomCoords(1),
       nn.Conv1d(1, nf, 5, padding="same"),

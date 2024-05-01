@@ -7,6 +7,10 @@ from config import Config, Condition, load, save, makenew
 from configs import configs
 
 
+N_TRSTEPS = 2048 # 65536
+SAVE_EVERY = 512
+assert N_TRSTEPS % SAVE_EVERY == 0
+
 def train(model, save_path):
   """ train a GAN. inputs:
     gan       - a model to be fed training data
@@ -20,7 +24,7 @@ def train(model, save_path):
   data_generator = dataset_gen(config.sim, config.batch, config.simlen,
     t_eql=config.t_eql, subtract_cm=config.subtract_mean, x_only=config.x_only)
   for i in itertools.count():
-    trajs = data_generator.send(None if i < 65536 else True)
+    trajs = data_generator.send(None if i < N_TRSTEPS else True)
     if trajs is None: break
     N, L, state_dim = trajs.shape
     cond = config.cond(trajs[:, :-1].reshape(N*(L - 1), state_dim))
@@ -28,7 +32,7 @@ def train(model, save_path):
     loss = model.train_step(data, cond)
     print(f"{i}\t ℒ = {loss:05.6f}")
     board.scalar("loss", i, loss)
-    if (i + 1) % 512 == 0:
+    if (i + 1) % SAVE_EVERY == 0:
       print("\nsaving...")
       save(model, save_path)
       print("saved.\n")
