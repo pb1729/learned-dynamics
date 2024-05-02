@@ -27,10 +27,6 @@ for l in L_LIST:
         }))
   for t in T_LIST:
     if TRAIN_WGAN:
-      tr_wgan("models/1_wgan_dn_fsp_l%d_t%d.wgan_dn_fsp.pt" % (l, t),
-        Config("ou_poly_l%d_t%d" % (l, t), "wgan_dn_fsp",
-          cond=Condition.COORDS, x_only=True, subtract_mean=1,
-          batch=8, simlen=16, t_eql=4))
       tr_wgan("models/1_wgan_dn_conv_l%d_t%d.wgan_dn_conv.pt" % (l, t),
         Config("ou_poly_l%d_t%d" % (l, t), "wgan_dn_conv",
           cond=Condition.COORDS, x_only=True, subtract_mean=1,

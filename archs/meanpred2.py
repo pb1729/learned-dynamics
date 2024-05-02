@@ -62,7 +62,7 @@ class Residual(nn.Module):
       )
     self.end_map = nn.Linear(dim, dim, bias=False)
   def forward(self, x):
-    return self.end_map(self.layers(x))
+    return x + self.end_map(self.layers(x))
   def self_init(self):
     nn.init.constant_(self.end_map.weight.data, 0.0)
 

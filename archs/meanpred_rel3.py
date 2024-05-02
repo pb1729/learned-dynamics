@@ -23,7 +23,7 @@ class ResidualConv1d(nn.Module):
         nn.BatchNorm1d(dim),
       )
   def forward(self, x):
-    return self.layers(x)
+    return x + self.layers(x)
 
 
 class ToAtomCoords(nn.Module):
