@@ -3,15 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from config import Config, Condition
+from grouping import param_group_to_condition, get_grouped_parameters, FastParamsConv1d
 
-
-# BASE SOURCE CODE FOR CONDITIONAL WGAN
-#  * Uses CIFAR-10
-#  * Conditions on average color of the image
 
 
 lr_d = 0.0008   # learning rate for discriminator
 lr_g = 0.0003   # learning rate for generator
+lr_fast = 0.001 # learning rate for fast parameters
 beta_1 = 0.5    # Adam parameter
 beta_2 = 0.99   # Adam parameter
 k_L = 1.        # Lipschitz constant
@@ -21,21 +19,27 @@ in_str_r = 0.3  # Strength of Instance-Noise on real data
 nz = 100        # Size of z latent vector (i.e. size of generator input)
 ngf = 64        # Size of feature maps in generator
 ndf = 64        # Size of feature maps in discriminator
+# Size of generator fast parameters
+fp_sz = 768 # yes, this was determined by running the file and looking at what it printed
 
 
 class ResidualConv1d(nn.Module):
   def __init__(self, dim):
     super().__init__()
-    self.layers = nn.Sequential(
+    self.layers0 = nn.Sequential(
         nn.Conv1d(dim, dim, 5, padding="same"),
         nn.LeakyReLU(0.2, inplace=True),
-        nn.BatchNorm1d(dim),
-        nn.Conv1d(dim, dim, 5, padding="same"),
+        nn.BatchNorm1d(dim))
+    self.conv_1 = nn.Conv1d(dim, dim, 5, padding="same")
+    self.fsp_1  = FastParamsConv1d(dim, dim//8, dim, 3)
+    self.layers1 = nn.Sequential(
         nn.LeakyReLU(0.2, inplace=True),
         nn.BatchNorm1d(dim),
       )
   def forward(self, x):
-    return x + self.layers(x)
+    y0 = self.layers0(x)
+    y1 = self.conv_1(y0) + self.fsp_1(y0)
+    return x + self.layers1(y1)
 
 
 class ToAtomCoords(nn.Module):
@@ -68,6 +72,72 @@ class StateEnc(nn.Module):
   def forward(self, state):
     return self.layers(state)
 
+class FPEnc(nn.Module):
+  """ encode a state """
+  def __init__(self, chan):
+    super().__init__()
+    self.layers = nn.Linear(fp_sz, chan)
+  def forward(self, fp):
+    return self.layers(fp)[:, :, None]
+
+class DiscBlock(nn.Module):
+  """ accepts tuple containing: (x0, x1, fp, nn_vec) where x0, x1 are encoded states,
+      and fp is the tensor containing the generator's fast parameters.
+      outputs same kind of tuple """
+  def __init__(self, config):
+    super().__init__()
+    self.enc0 = StateEnc(1, ndf)
+    self.enc1 = StateEnc(1, ndf)
+    self.enc_fp = FPEnc(ndf)
+    self.lin_pre = nn.Conv1d(ndf, ndf, 3, padding="same")
+    self.layers = nn.Sequential(
+      ResidualConv1d(ndf),
+      ResidualConv1d(ndf),
+      ResidualConv1d(ndf),
+      nn.BatchNorm1d(ndf))
+  def forward(self, tup):
+    x0, x1, fp, nn_vec = tup
+    y = self.lin_pre(nn_vec) + self.enc0(x0) + self.enc1(x1) + self.enc_fp(fp)
+    return x0, x1, fp, self.layers(y)
+
+class DiscHead(nn.Module):
+  """ accepts tuple containing: (x0, x1, fp, nn_vec) where x0, x1 are encoded states,
+      and fp is the tensor containing the generator's fast parameters.
+      outputs a scalar """
+  def __init__(self, config):
+    super().__init__()
+    self.lin_pre = nn.Conv1d(ndf, 2*ndf, 1)
+    self.layers = nn.Sequential(
+      nn.BatchNorm1d(2*ndf),
+      nn.Linear(2*ndf, 2*ndf),
+      nn.LeakyReLU(0.2, inplace=True),
+      nn.Linear(2*ndf, 2*ndf),
+      nn.LeakyReLU(0.2, inplace=True),
+      nn.Linear(2*ndf, 1))
+  def forward(self, tup):
+    x0, x1, fp, nn_vec = tup
+    y = self.lin_pre(nn_vec)
+    return self.layers(y.sum(2))
+
+class Discriminator(nn.Module):
+  def __init__(self, config):
+    super(Discriminator, self).__init__()
+    state_dim, cond_dim = config.state_dim, config.cond_dim
+    assert config.sim.space_dim == 1 # make net arch equivariant before allowing larger numbers, also unhardcode the 1's below
+    assert config.cond_type == Condition.COORDS
+    self.to_atom_coords = ToAtomCoords(1)
+    self.enc_delta = StateEnc(1, ndf)
+    self.blocks = nn.Sequential(
+      DiscBlock(config),
+      DiscBlock(config),
+      DiscBlock(config),
+      DiscBlock(config),
+      DiscHead(config))
+  def forward(self, inp, cond, fp):
+    x0, x1 = self.to_atom_coords(cond), self.to_atom_coords(inp)
+    tup = (x0, x1, fp, self.enc_delta(x1 - x0))
+    return self.blocks(tup)
+
 class Block(nn.Module):
   """ accepts tuple containing: (x0, x1, nn_vec) where x0, x1 are encoded states
       outputs same kind of tuple """
@@ -85,43 +155,6 @@ class Block(nn.Module):
     x0, x1, nn_vec = tup
     y = self.lin_pre(nn_vec) + self.enc0(x0) + self.enc1(x1)
     return x0, x1, self.layers(y)
-
-class DiscHead(nn.Module):
-  """ accepts tuple containing: (x0, x1, nn_vec) where x0, x1 are encoded states
-      outputs a scalar """
-  def __init__(self, config):
-    super().__init__()
-    self.lin_pre = nn.Conv1d(ndf, 2*ndf, 1)
-    self.layers = nn.Sequential(
-      nn.BatchNorm1d(2*ndf),
-      nn.Linear(2*ndf, 2*ndf),
-      nn.LeakyReLU(0.2, inplace=True),
-      nn.Linear(2*ndf, 2*ndf),
-      nn.LeakyReLU(0.2, inplace=True),
-      nn.Linear(2*ndf, 1))
-  def forward(self, tup):
-    x0, x1, nn_vec = tup
-    y = self.lin_pre(nn_vec)
-    return self.layers(y.sum(2))
-
-class Discriminator(nn.Module):
-  def __init__(self, config):
-    super(Discriminator, self).__init__()
-    state_dim, cond_dim = config.state_dim, config.cond_dim
-    assert config.sim.space_dim == 1 # make net arch equivariant before allowing larger numbers, also unhardcode the 1's below
-    assert config.cond_type == Condition.COORDS
-    self.to_atom_coords = ToAtomCoords(1)
-    self.enc_delta = StateEnc(1, ndf)
-    self.blocks = nn.Sequential(
-      Block(config),
-      Block(config),
-      Block(config),
-      Block(config),
-      DiscHead(config))
-  def forward(self, inp, cond):
-    x0, x1 = self.to_atom_coords(cond), self.to_atom_coords(inp)
-    tup = (x0, x1, self.enc_delta(x1 - x0))
-    return self.blocks(tup)
 
 class GenHead(nn.Module):
   """ accepts tuple containing: (x0, x1, nn_vec) where x0, x1 are encoded states
@@ -171,7 +204,12 @@ class GANTrainer:
     self.init_optim()
   def init_optim(self):
     self.optim_d = torch.optim.Adam(self.disc.parameters(), lr_d, (beta_1, beta_2))
-    self.optim_g = torch.optim.Adam(self.gen.parameters(),  lr_g, (beta_1, beta_2))
+    self.gen_params = get_grouped_parameters(self.gen, as_lists=True)
+    self.optim_g = torch.optim.Adam([
+        {"params": self.gen_params["default"]},
+        {"params": self.gen_params["fast"], "lr": lr_fast}],
+      lr_g, (beta_1, beta_2))
+    print("total size of fast parameters:", sum([torch.numel(param.data) for param in self.gen_params["fast"]]))
   @staticmethod
   def load_from_dict(states, config):
     disc, gen = Discriminator(config).to(config.device), Generator(config).to(config.device)
@@ -195,20 +233,22 @@ class GANTrainer:
     return loss_d, loss_g
   def disc_step(self, data, cond):
     self.optim_d.zero_grad()
+    # get fast params of generator
+    g_fp = param_group_to_condition(self.gen_params["fast"])
     # train on real data (with instance noise)
     r_data = data + in_str_r*torch.randn_like(data) # instance noise
-    y_r = self.disc(r_data, cond)
+    y_r = self.disc(r_data, cond, g_fp)
     # train on generated data (with instance noise)
     g_data = self.gen(self.get_latents(cond.shape[0]), cond)
     g_data = g_data + in_str_g*torch.randn_like(g_data) # instance noise
-    y_g = self.disc(g_data, cond)
+    y_g = self.disc(g_data, cond, g_fp)
     # sample-delta penalty on interpolated data
     mix_factors1 = torch.rand(cond.shape[0], 1, device=self.config.device)
     mixed_data1 = mix_factors1*g_data + (1 - mix_factors1)*r_data
-    y_mixed1 = self.disc(mixed_data1, cond)
+    y_mixed1 = self.disc(mixed_data1, cond, g_fp)
     mix_factors2 = torch.rand(cond.shape[0], 1, device=self.config.device)
     mixed_data2 = mix_factors2*g_data + (1 - mix_factors2)*r_data
-    y_mixed2 = self.disc(mixed_data2, cond)
+    y_mixed2 = self.disc(mixed_data2, cond, g_fp)
     ep_penalty = (self.endpoint_penalty(r_data, g_data, y_r, y_g)
                 + self.endpoint_penalty(mixed_data1, r_data, y_mixed1, y_r)
                 + self.endpoint_penalty(g_data, mixed_data1, y_g, y_mixed1)
@@ -222,9 +262,12 @@ class GANTrainer:
     return loss.item()
   def gen_step(self, cond):
     self.optim_g.zero_grad()
+    # get fast params of generator
+    g_fp = param_group_to_condition(self.gen_params["fast"])
+    # generate and train
     g_data = self.gen(self.get_latents(cond.shape[0]), cond)
     g_data = g_data + in_str_g*torch.randn_like(g_data) # instance noise
-    y_g = self.disc(g_data, cond)
+    y_g = self.disc(g_data, cond, g_fp)
     loss = y_g.mean()
     loss.backward()
     self.optim_g.step()
@@ -240,6 +283,8 @@ class GANTrainer:
     return (
       torch.randn(batchsz, nz, device=self.config.device),
       20.*torch.randn(batchsz, self.config.state_dim, device=self.config.device))
+  def get_fp_condition():
+    """ get the fast params to condition on  """
   def set_eval(self, bool_eval):
     if bool_eval:
       self.disc.eval()
