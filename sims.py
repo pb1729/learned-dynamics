@@ -103,6 +103,23 @@ def get_polymer_a_cos_potential(k, n, A, p, dim=3):
         return ans.reshape(-1, n*dim)
     return a
 
+def get_polymer_a_quart(k, n, dim=3):
+    """ Get an acceleration function defining a polymer system with n atoms and a quartic bond potential
+        the potential is given by the quartic (k/8)(x**2 - 1)**2
+    Shapes:
+    x: (batch, n*dim)
+    a: (batch, n*dim) """
+    def bond_force(delta_x):
+      return 0.5*k*((delta_x**2).sum(2, keepdim=True) - 1)*delta_x
+    def a(x):
+        x = x.reshape(-1, n, dim)
+        ans = torch.zeros_like(x)
+        F = bond_force(x[:, :-1] - x[:, 1:])
+        ans[:, 1:]  += F
+        ans[:, :-1] -= F
+        return ans.reshape(-1, n*dim)
+    return a
+
 
 sims = {
     "SHO, Langevin": TrajectorySim(
@@ -163,6 +180,12 @@ sims = {
         10.0, 16*10,
         metadata={"poly_len": 36, "space_dim": 1}
     ),
+    "test_quart": TrajectorySim(
+      lambda x: -x*(x**2 - 1),
+      torch.tensor([1.0], dtype=torch.float64), 1.0,
+      1.0, 16*1,
+      metadata={"poly_len": 1, "space_dim": 1}
+    ),
 }
 
 
@@ -174,6 +197,20 @@ for l in [12, 24, 36, 48]:
         float(t), 16*t,
         metadata={"poly_len": l, "space_dim": 1}
       )
+    sims["cos_ou_poly_l%d_t%d" % (l, t)] = TrajectorySim(
+        get_polymer_a_cos_potential(1.0, l, 2.0, torch.tensor([2.0], dtype=torch.float64, device="cuda"), dim=1),
+        torch.tensor([10.]*l, dtype=torch.float64), 1.0,
+        float(t), 16*t,
+        metadata={"poly_len": l, "space_dim": 1}
+      )
+    sims["quart_ou_poly_l%d_t%d" % (l, t)] = TrajectorySim(
+        get_polymer_a_quart(4.0, l, dim=1),
+        torch.tensor([10.]*l, dtype=torch.float64), 1.0,
+        #float(t), 16*t,
+        1.0, 32,
+        metadata={"poly_len": l, "space_dim": 1}
+      )
+
 
 
 # DATASET GENERATION
