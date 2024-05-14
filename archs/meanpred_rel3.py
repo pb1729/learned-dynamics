@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from config import Config, Condition
-from layers_common import ResidualConv1d, ToAtomCoords, FromAtomCoords
+from layers_common import weights_init, ResidualConv1d, ToAtomCoords, FromAtomCoords
 
 
 # This is the architecture source file for training a simple mean predictor
@@ -32,18 +32,6 @@ class Meanpred(nn.Module):
   def forward(self, z):
     """ decoder forward pass. returns estimated mean value of state """
     return z + self.layers(z) # estimate is relative to current values
-
-
-
-def weights_init(m):
-  """ custom weights initialization """
-  cls = m.__class__
-  if hasattr(cls, "self_init"):
-    m.self_init()
-  classname = cls.__name__
-  if classname.find('BatchNorm') != -1:
-    nn.init.normal_(m.weight.data, 1.0, 0.02)
-    nn.init.constant_(m.bias.data, 0)
 
 
 

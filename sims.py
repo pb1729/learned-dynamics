@@ -274,13 +274,13 @@ def get_ou_eigen_1d():
 
 # similar, but now v is -kx/drag, where k is associated with a Rouse mode
 # we'll let the user of this function worry about the value of k, though
-def get_poly_eigen_1d():
-  sim = sims["1D Polymer, Ornstein Uhlenbeck"]
+def get_poly_eigen_1d(sim):
   return torch.exp(-sim.delta_t/sim.drag[0]).item()
 
 if __name__ == "__main__":
   print("Linear eigenstate decay per time delta_t for 1D Ornstein Uhlenbeck:", get_ou_eigen_1d())
-  print("Linear eigenstate decay per time delta_t for Polymer (assuming reference of k=1):", get_poly_eigen_1d())
+  print("Linear eigenstate decay per time delta_t for Polymer (assuming reference of k=1):",
+    get_poly_eigen_1d(sims["1D Polymer, Ornstein Uhlenbeck, medium, cosine"]))
   # TODO: delete the following lines:
   dataset = get_dataset(sims["1D Polymer, Ornstein Uhlenbeck, medium, cosine"], 10, 10)
 

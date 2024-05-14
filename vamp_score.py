@@ -1,30 +1,10 @@
 import torch
 import numpy as np
 
+from utils import batched_2_moment, batched_xy_moment
 
-# DECORRELATION
 
-def batched_2_moment(x, batch=64000):
-    """ compute expected (outer product) square of tensor in batches
-        x: (instances, dim)
-        ans: (dim, dim) """
-    instances, _ = x.shape
-    ans = 0.
-    for i in range(0, instances, batch):
-        ans += torch.einsum("ix, iy -> xy", x[i:i+batch], x[i:i+batch])
-    return ans/(instances - 1)
-
-def batched_xy_moment(x, y, batch=64000):
-    """ compute product moment of two tensors in batches
-        x: (instances, dim1)
-        y: (instances, dim2)
-        ans: (dim1, dim2)"""
-    instances, _ = x.shape
-    assert y.shape[0] == instances
-    ans = 0.
-    for i in range(0, instances, batch):
-        ans += torch.einsum("ix, iy -> xy", x[i:i+batch], y[i:i+batch])
-    return ans/(instances - 1)
+# DECORRELATION:
 
 class Affine:
     """ Class representing an affine transformation in n-dimensional space """
@@ -60,7 +40,8 @@ def decorr(x, with_transform=True, epsilon=1e-6):
     return y
 
 
-# VAMP SCORE
+# VAMP SCORE:
+
 def vamp_score(chi_0, chi_1, mode="score", epsilon=1e-6):
     """ function computing the VAMP-2 score, implemented in torch for differentiability
     chi_0 - right feature vector, shape is (batch, featuredim)

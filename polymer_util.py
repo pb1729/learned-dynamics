@@ -11,8 +11,9 @@ def rouse_k(n, length):
   """ get spring constant for nth Rouse mode for polymer of given length """
   return 4*(np.sin(0.5*np.pi*n/length))**2
 
-def tica_theory(n, length):
-  return np.exp(np.log(get_poly_eigen_1d())*rouse_k(n, length))
+def tica_theory(sim):
+  n = np.arange(1, sim.poly_len)
+  return np.exp(np.log(get_poly_eigen_1d(sim))*rouse_k(n, sim.poly_len))
 
 def rouse_block(length):
   """ get the entire block of rouse mode coefficients for a given polymer length
@@ -60,8 +61,8 @@ def get_log_expected_singular_values(log_vals, n, show_ans_tups=False):
         for tup in ans_tups: print(tup)
     return [H(tup) for tup in ans_tups]
 
-def get_n_quanta_theory(num_values, polymer_length):
-    log_lin_S = np.log(tica_theory(np.arange(1, polymer_length), polymer_length))
+def get_n_quanta_theory(num_values, sim):
+    log_lin_S = np.log(tica_theory(sim))
     return np.exp(get_log_expected_singular_values(log_lin_S, num_values))
 
 
@@ -77,8 +78,6 @@ def squarish_factorize(n):
 
 if __name__ == "__main__":
   poly_len = 12
-  # decay rate of slowest mode:
-  print(tica_theory(1, poly_len), np.exp(-1))
   # test functionality by plotting the rouse modes...
   import matplotlib.pyplot as plt
   x = np.arange(0, poly_len)

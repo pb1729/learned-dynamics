@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 from config import Config, Condition
 from gan_common import GANTrainer
-from layers_common import ResidualConv1d, ToAtomCoords, FromAtomCoords
+from layers_common import weights_init, ResidualConv1d, ToAtomCoords, FromAtomCoords
 
 
 # BASE SOURCE CODE FOR CONDITIONAL WGAN
@@ -65,7 +65,6 @@ class Discriminator(nn.Module):
   def __init__(self, config):
     super(Discriminator, self).__init__()
     ndf = config["ndf"]
-    state_dim, cond_dim = config.state_dim, config.cond_dim
     assert config.sim.space_dim == 1 # make net arch equivariant before allowing larger numbers, also unhardcode the 1's below
     assert config.cond_type == Condition.COORDS
     self.to_atom_coords = ToAtomCoords(1)
@@ -96,7 +95,6 @@ class Generator(nn.Module):
   def __init__(self, config):
     super(Generator, self).__init__()
     ngf = config["ngf"]
-    state_dim, cond_dim = config.state_dim, config.cond_dim
     assert config.sim.space_dim == 1
     assert config.cond_type == Condition.COORDS
     self.to_atom_coords = ToAtomCoords(1)
@@ -112,14 +110,6 @@ class Generator(nn.Module):
     x0, x1 = self.to_atom_coords(cond), self.to_atom_coords(noised)
     tup = (x0, x1, self.enc_delta(x1 - x0))
     return noised - self.from_atom_coords(self.blocks(tup))
-
-
-# custom weights initialization called on ``netG`` and ``netD``
-def weights_init(m):
-  classname = m.__class__.__name__
-  if classname.find('BatchNorm') != -1:
-    nn.init.normal_(m.weight.data, 1.0, 0.02)
-    nn.init.constant_(m.bias.data, 0)
 
 
 class GAN:

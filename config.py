@@ -2,7 +2,6 @@ import torch
 import importlib
 
 from sims import sims
-from vampnets import KoopmanModel
 from polymer_util import rouse_block
 
 
@@ -65,7 +64,7 @@ class Config:
     """ given a KoopmanModel, the condition is given by that model """
     assert not self.subtract_mean, "should not subtract mean if we're using the Koopman eigenfunctions"
     self.koopman_model_path = model_path
-    kmod = KoopmanModel.load(model_path)
+    kmod = load(model_path)
     def get_cond_koopman(data):
       with torch.no_grad():
         ans = kmod.eigenfn_0(data)
