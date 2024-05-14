@@ -3,62 +3,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from config import Config, Condition
+from gan_common import GANTrainer
+from layers_common import ResidualConv1d, ToAtomCoords, FromAtomCoords
 
 
 # BASE SOURCE CODE FOR CONDITIONAL WGAN
 #  * Uses CIFAR-10
 #  * Conditions on average color of the image
 
-
-lr_d = 0.0008   # learning rate for discriminator
-lr_g = 0.0003   # learning rate for generator
-beta_1 = 0.5    # Adam parameter
-beta_2 = 0.99   # Adam parameter
 k_L = 1.        # Lipschitz constant
-in_str_g = 0.2  # Strength of Instance-Noise on generated data
-in_str_r = 0.3  # Strength of Instance-Noise on real data
-
-nz = 100        # Size of z latent vector (i.e. size of generator input)
-ngf = 64        # Size of feature maps in generator
-ndf = 64        # Size of feature maps in discriminator
 
 
-class ResidualConv1d(nn.Module):
-  def __init__(self, dim):
-    super().__init__()
-    self.layers = nn.Sequential(
-        nn.Conv1d(dim, dim, 5, padding="same"),
-        nn.LeakyReLU(0.2, inplace=True),
-        nn.BatchNorm1d(dim),
-        nn.Conv1d(dim, dim, 5, padding="same"),
-        nn.LeakyReLU(0.2, inplace=True),
-        nn.BatchNorm1d(dim),
-      )
-  def forward(self, x):
-    return x + self.layers(x)
 
-
-class ToAtomCoords(nn.Module):
-  def __init__(self, space_dim):
-    super().__init__()
-    self.space_dim = space_dim
-  def forward(self, x):
-    """ x: (batch, n_atoms*space_dim) """
-    batch, state_dim = x.shape
-    assert state_dim % self.space_dim == 0
-    n_atoms = state_dim // self.space_dim
-    y = x.reshape(batch, n_atoms, self.space_dim)
-    return y.transpose(1, 2)
-
-class FromAtomCoords(nn.Module):
-  def __init__(self, space_dim):
-    super().__init__()
-    self.space_dim = space_dim
-  def forward(self, x):
-    """ x: (batch, space_dim, n_atoms) """
-    batch, space_dim, n_atoms = x.shape
-    assert space_dim == self.space_dim
-    return x.transpose(2, 1).reshape(batch, n_atoms*space_dim)
 
 class StateEnc(nn.Module):
   """ encode a state """
@@ -71,16 +27,16 @@ class StateEnc(nn.Module):
 class Block(nn.Module):
   """ accepts tuple containing: (x0, x1, nn_vec) where x0, x1 are encoded states
       outputs same kind of tuple """
-  def __init__(self, config):
+  def __init__(self, df):
     super().__init__()
-    self.enc0 = StateEnc(1, ndf)
-    self.enc1 = StateEnc(1, ndf)
-    self.lin_pre = nn.Conv1d(ndf, ndf, 3, padding="same")
+    self.enc0 = StateEnc(1, df)
+    self.enc1 = StateEnc(1, df)
+    self.lin_pre = nn.Conv1d(df, df, 3, padding="same")
     self.layers = nn.Sequential(
-      ResidualConv1d(ndf),
-      ResidualConv1d(ndf),
-      ResidualConv1d(ndf),
-      nn.BatchNorm1d(ndf))
+      ResidualConv1d(df),
+      ResidualConv1d(df),
+      ResidualConv1d(df),
+      nn.BatchNorm1d(df))
   def forward(self, tup):
     x0, x1, nn_vec = tup
     y = self.lin_pre(nn_vec) + self.enc0(x0) + self.enc1(x1)
@@ -91,6 +47,7 @@ class DiscHead(nn.Module):
       outputs a scalar """
   def __init__(self, config):
     super().__init__()
+    ndf = config["ndf"]
     self.lin_pre = nn.Conv1d(ndf, 2*ndf, 1)
     self.layers = nn.Sequential(
       nn.BatchNorm1d(2*ndf),
@@ -107,16 +64,17 @@ class DiscHead(nn.Module):
 class Discriminator(nn.Module):
   def __init__(self, config):
     super(Discriminator, self).__init__()
+    ndf = config["ndf"]
     state_dim, cond_dim = config.state_dim, config.cond_dim
     assert config.sim.space_dim == 1 # make net arch equivariant before allowing larger numbers, also unhardcode the 1's below
     assert config.cond_type == Condition.COORDS
     self.to_atom_coords = ToAtomCoords(1)
     self.enc_delta = StateEnc(1, ndf)
     self.blocks = nn.Sequential(
-      Block(config),
-      Block(config),
-      Block(config),
-      Block(config),
+      Block(ndf),
+      Block(ndf),
+      Block(ndf),
+      Block(ndf),
       DiscHead(config))
   def forward(self, inp, cond):
     x0, x1 = self.to_atom_coords(cond), self.to_atom_coords(inp)
@@ -128,7 +86,8 @@ class GenHead(nn.Module):
       outputs an estimate of the noise (has same shape as a state) """
   def __init__(self, config):
     super().__init__()
-    self.lin_out = nn.Conv1d(ndf, 1, 5, padding="same")
+    ngf = config["ngf"]
+    self.lin_out = nn.Conv1d(ngf, 1, 5, padding="same")
   def forward(self, tup):
     x0, x1, nn_vec = tup
     return self.lin_out(nn_vec)
@@ -136,20 +95,20 @@ class GenHead(nn.Module):
 class Generator(nn.Module):
   def __init__(self, config):
     super(Generator, self).__init__()
+    ngf = config["ngf"]
     state_dim, cond_dim = config.state_dim, config.cond_dim
     assert config.sim.space_dim == 1
     assert config.cond_type == Condition.COORDS
     self.to_atom_coords = ToAtomCoords(1)
     self.from_atom_coords = FromAtomCoords(1)
-    self.enc_delta = StateEnc(1, ndf)
+    self.enc_delta = StateEnc(1, ngf)
     self.blocks = nn.Sequential(
-      Block(config),
-      Block(config),
-      Block(config),
-      Block(config),
+      Block(ngf),
+      Block(ngf),
+      Block(ngf),
+      Block(ngf),
       GenHead(config))
-  def forward(self, input, cond):
-    z_vec, noised = input
+  def forward(self, noised, cond):
     x0, x1 = self.to_atom_coords(cond), self.to_atom_coords(noised)
     tup = (x0, x1, self.enc_delta(x1 - x0))
     return noised - self.from_atom_coords(self.blocks(tup))
@@ -163,27 +122,28 @@ def weights_init(m):
     nn.init.constant_(m.bias.data, 0)
 
 
-class GANTrainer:
+class GAN:
   def __init__(self, disc, gen, config):
     self.disc = disc
     self.gen  = gen
     self.config = config
     self.init_optim()
   def init_optim(self):
-    self.optim_d = torch.optim.Adam(self.disc.parameters(), lr_d, (beta_1, beta_2))
-    self.optim_g = torch.optim.Adam(self.gen.parameters(),  lr_g, (beta_1, beta_2))
+    betas = (self.config["beta_1"], self.config["beta_2"])
+    self.optim_d = torch.optim.Adam(self.disc.parameters(), self.config["lr_d"], betas)
+    self.optim_g = torch.optim.Adam(self.gen.parameters(),  self.config["lr_g"], betas)
   @staticmethod
   def load_from_dict(states, config):
     disc, gen = Discriminator(config).to(config.device), Generator(config).to(config.device)
     disc.load_state_dict(states["disc"])
     gen.load_state_dict(states["gen"])
-    return GANTrainer(disc, gen, config)
+    return GAN(disc, gen, config)
   @staticmethod
   def makenew(config):
     disc, gen = Discriminator(config).to(config.device), Generator(config).to(config.device)
     disc.apply(weights_init)
     gen.apply(weights_init)
-    return GANTrainer(disc, gen, config)
+    return GAN(disc, gen, config)
   def save_to_dict(self):
     return {
         "disc": self.disc.state_dict(),
@@ -196,13 +156,15 @@ class GANTrainer:
   def disc_step(self, data, cond):
     self.optim_d.zero_grad()
     # train on real data (with instance noise)
-    r_data = data + in_str_r*torch.randn_like(data) # instance noise
+    instance_noise_r = self.config["inst_noise_str_r"]*torch.randn_like(data)
+    r_data = data + instance_noise_r # instance noise
     y_r = self.disc(r_data, cond)
     # train on generated data (with instance noise)
     g_data = self.gen(self.get_latents(cond.shape[0]), cond)
-    g_data = g_data + in_str_g*torch.randn_like(g_data) # instance noise
+    instance_noise_g = self.config["inst_noise_str_g"]*torch.randn_like(g_data)
+    g_data = g_data + instance_noise_g # instance noise
     y_g = self.disc(g_data, cond)
-    # sample-delta penalty on interpolated data
+    # endpoint penalty on interpolated data
     mix_factors1 = torch.rand(cond.shape[0], 1, device=self.config.device)
     mixed_data1 = mix_factors1*g_data + (1 - mix_factors1)*r_data
     y_mixed1 = self.disc(mixed_data1, cond)
@@ -223,7 +185,8 @@ class GANTrainer:
   def gen_step(self, cond):
     self.optim_g.zero_grad()
     g_data = self.gen(self.get_latents(cond.shape[0]), cond)
-    g_data = g_data + in_str_g*torch.randn_like(g_data) # instance noise
+    instance_noise_g = self.config["inst_noise_str_g"]*torch.randn_like(g_data)
+    g_data = g_data + instance_noise_g # instance noise
     y_g = self.disc(g_data, cond)
     loss = y_g.mean()
     loss.backward()
@@ -237,9 +200,7 @@ class GANTrainer:
     return torch.sqrt(dist)*penalty
   def get_latents(self, batchsz):
     """ sample latents for generator """
-    return (
-      torch.randn(batchsz, nz, device=self.config.device),
-      20.*torch.randn(batchsz, self.config.state_dim, device=self.config.device))
+    return self.config["z_scale"]*torch.randn(batchsz, self.config.state_dim, device=self.config.device)
   def set_eval(self, bool_eval):
     if bool_eval:
       self.disc.eval()
@@ -250,8 +211,9 @@ class GANTrainer:
 
 
 
-# export model class:
-modelclass = GANTrainer
+# export model class and trainer class:
+modelclass   = GAN
+trainerclass = GANTrainer
 
 
 

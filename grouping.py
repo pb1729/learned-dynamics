@@ -49,10 +49,10 @@ class FastParamsLinear(nn.Module):
   def __init__(self, ch_in, ch_middle, ch_out):
     super().__init__()
     self.lin_in = nn.Linear(ch_in, ch_middle, bias=False)
-    self.w_mid = nn.Parameter(torch.randn(ch_middle, ch_middle))
+    self.w_mid = nn.Parameter(torch.randn(ch_middle))
     self.lin_out = nn.Linear(ch_middle, ch_out, bias=False)
   def forward(self, x):
-    return self.lin_out(self.lin_in(x) @ self.w_mid)
+    return self.lin_out(self.lin_in(x) * self.w_mid)
   def list_groups(self):
     return (DEFAULT, "fast")
   def grouped_parameters(self, group):
@@ -70,10 +70,10 @@ class FastParamsConv1d(nn.Module):
   def __init__(self, ch_in, ch_middle, ch_out, kernsz):
     super().__init__()
     self.conv_in = nn.Conv1d(ch_in, ch_middle, kernsz, padding="same", bias=False)
-    self.w_mid = nn.Parameter(torch.randn(ch_middle, ch_middle))
+    self.w_mid = nn.Parameter(torch.randn(ch_middle, 1))
     self.conv_out = nn.Conv1d(ch_middle, ch_out, kernsz, padding="same", bias=False)
   def forward(self, x):
-    return self.conv_out(torch.einsum("bcx, cd -> bdx", self.conv_in(x), self.w_mid))
+    return self.conv_out(self.conv_in(x) * self.w_mid)
   def list_groups(self):
     return (DEFAULT, "fast")
   def grouped_parameters(self, group):

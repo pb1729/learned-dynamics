@@ -21,7 +21,7 @@ class Config:
   """ configuration class for training runs """
   def __init__(self, sim_name, arch_name,
                cond=Condition.COORDS, x_only=False, subtract_mean=0, device="cuda",
-               batch=16, simlen=16, t_eql=0,
+               batch=16, simlen=16, t_eql=0, nsteps=65536, save_every=512,
                koopman_model_path=None, n_rouse_modes=None, vae_model_path=None,
                arch_specific=None):
     self.sim_name = sim_name
@@ -34,6 +34,9 @@ class Config:
     self.batch = batch
     self.simlen = simlen
     self.t_eql = t_eql
+    self.nsteps = nsteps
+    self.save_every = save_every
+    assert nsteps % save_every == 0
     if self.x_only:
       self.state_dim = self.sim.dim
     else:
@@ -51,7 +54,7 @@ class Config:
       self.cond_vae(vae_model_path)
     else:
       assert False, "condition not recognized!"
-    self.modelclass = self.get_modelclass()
+    self.modelclass, self.trainerclass = self.get_model_and_trainer_classes()
     if arch_specific is None: arch_specific={}
     self.arch_specific = arch_specific # should be a dictionary of strings and ints
   def cond_coords(self):
@@ -91,9 +94,9 @@ class Config:
       return data @ blk # (batch, poly_len) @ (poly_len, n_modes)
     self.cond = get_cond_rouse
     self.cond_dim = blk.shape[1] # due to subtract_mean, can *not* use n_modes here
-  def get_modelclass(self):
+  def get_model_and_trainer_classes(self):
     arch_module = importlib.import_module(ARCH_PREFIX + self.arch_name)
-    return arch_module.modelclass
+    return arch_module.modelclass, arch_module.trainerclass
   def get_args_and_kwargs(self):
     """ find the args and kwargs that one would need to reconstruct this config """
     args = [self.sim_name, self.arch_name]
@@ -105,6 +108,8 @@ class Config:
         "batch": self.batch,
         "simlen": self.simlen,
         "t_eql": self.t_eql,
+        "nsteps": self.nsteps,
+        "save_every": self.save_every,
         "arch_specific": self.arch_specific,
       }
     for attr in ["koopman_model_path", "n_rouse_modes", "vae_model_path"]:

@@ -3,51 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from config import Config, Condition
+from layers_common import ResidualConv1d, ToAtomCoords, FromAtomCoords
 
 
 # This is the architecture source file for training a simple mean predictor
 # Architecture style is Convolutional ResNet
 # (convolutions are 1d and go along the length of the polymer)
 # Predictions are of the relative change in position compared to current position
-
-
-class ResidualConv1d(nn.Module):
-  def __init__(self, dim):
-    super().__init__()
-    self.layers = nn.Sequential(
-        nn.Conv1d(dim, dim, 5, padding="same"),
-        nn.LeakyReLU(0.2, inplace=True),
-        nn.BatchNorm1d(dim),
-        nn.Conv1d(dim, dim, 5, padding="same"),
-        nn.LeakyReLU(0.2, inplace=True),
-        nn.BatchNorm1d(dim),
-      )
-  def forward(self, x):
-    return x + self.layers(x)
-
-
-class ToAtomCoords(nn.Module):
-  def __init__(self, space_dim):
-    super().__init__()
-    self.space_dim = space_dim
-  def forward(self, x):
-    """ x: (batch, n_atoms*space_dim) """
-    batch, state_dim = x.shape
-    assert state_dim % self.space_dim == 0
-    n_atoms = state_dim // self.space_dim
-    y = x.reshape(batch, n_atoms, self.space_dim)
-    return y.transpose(1, 2)
-
-class FromAtomCoords(nn.Module):
-  def __init__(self, space_dim):
-    super().__init__()
-    self.space_dim = space_dim
-  def forward(self, x):
-    """ x: (batch, space_dim, n_atoms) """
-    batch, space_dim, n_atoms = x.shape
-    assert space_dim == self.space_dim
-    return x.transpose(2, 1).reshape(batch, n_atoms*space_dim)
-
 
 
 class Meanpred(nn.Module):
@@ -85,7 +47,7 @@ def weights_init(m):
 
 
 
-class MeanpredTrainer:
+class MeanpredModel:
   def __init__(self, meanpred, config):
     self.meanpred = meanpred
     self.config = config
@@ -96,12 +58,12 @@ class MeanpredTrainer:
   def load_from_dict(states, config):
     meanpred = Meanpred(config).to(config.device)
     meanpred.load_state_dict(states["meanpred"])
-    return MeanpredTrainer(meanpred, config)
+    return MeanpredModel(meanpred, config)
   @staticmethod
   def makenew(config):
     meanpred = Meanpred(config).to(config.device)
     meanpred.apply(weights_init)
-    return MeanpredTrainer(meanpred, config)
+    return MeanpredModel(meanpred, config)
   def save_to_dict(self):
     return {
         "meanpred": self.meanpred.state_dict(),
@@ -123,8 +85,22 @@ class MeanpredTrainer:
     else:
       raise NotImplementedError("Setting mode to un-evaluation is not implemented.")
 
+class MeanpredTrainer:
+  def __init__(self, model, board):
+    self.model = model
+    self.board = board
+  def step(self, i, trajs):
+    N, L, state_dim = trajs.shape
+    cond = self.model.config.cond(trajs[:, :-1].reshape(N*(L - 1), state_dim))
+    data = trajs[:, 1:].reshape(N*(L - 1), state_dim)
+    loss = self.model.train_step(data, cond)
+    print(f"{i}\t ℒ = {loss:05.6f}")
+    self.board.scalar("loss", i, loss)
 
-modelclass = MeanpredTrainer
+
+# export model class and trainer class:
+modelclass   = MeanpredModel
+trainerclass = MeanpredTrainer
 
 
 
