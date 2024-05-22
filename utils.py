@@ -1,6 +1,18 @@
 import torch
 
 
+
+class _MustBe:
+  """ class for asserting that a dimension must have a certain value.
+      the class itself is private, one should import a particular object,
+      "must_be" in order to use the functionality. example code:
+      `batch, chan, mustbe[32], mustbe[32] = image.shape` """
+  def __setitem__(self, key, value):
+    assert key == value, "must_be[%d] does not match dimension %d" % (key, value)
+must_be = _MustBe()
+
+# batched evaluation:
+
 def batched_2_moment(x, batch=64000):
   """ compute expected (outer product) square of tensor in batches
       x: (instances, dim)
