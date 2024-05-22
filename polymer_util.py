@@ -66,15 +66,6 @@ def get_n_quanta_theory(num_values, sim):
     return np.exp(get_log_expected_singular_values(log_lin_S, num_values))
 
 
-def squarish_factorize(n):
-  """ plotting utility function, gives as close to a square factorization of n as possible.
-      returns integers x, y with x >= y """
-  best_y = 1
-  for y in range(2, int(np.sqrt(n)) + 1):
-    if n % y == 0:
-      best_y = y
-  return n//best_y, best_y
-
 
 if __name__ == "__main__":
   poly_len = 12

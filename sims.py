@@ -206,9 +206,20 @@ for l in [12, 24, 36, 48]:
     sims["quart_ou_poly_l%d_t%d" % (l, t)] = TrajectorySim(
         get_polymer_a_quart(4.0, l, dim=1),
         torch.tensor([10.]*l, dtype=torch.float64), 1.0,
-        #float(t), 16*t,
-        1.0, 32,
+        float(t), 32*t,
         metadata={"poly_len": l, "space_dim": 1}
+      )
+    sims["2d_ou_poly_l%d_t%d" % (l, t)] = TrajectorySim(
+        get_polymer_a(1.0, l, dim=2),
+        torch.tensor([10.]*l*2, dtype=torch.float64), 1.0,
+        float(t), 16*t,
+        metadata={"poly_len": l, "space_dim": 2}
+      )
+    sims["3d_ou_poly_l%d_t%d" % (l, t)] = TrajectorySim(
+        get_polymer_a(1.0, l, dim=3),
+        torch.tensor([10.]*l*3, dtype=torch.float64), 1.0,
+        float(t), 16*t,
+        metadata={"poly_len": l, "space_dim": 3}
       )
 
 

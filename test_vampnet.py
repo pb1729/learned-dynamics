@@ -44,7 +44,7 @@ def main(path, abs_scale=False):
   plt.ylabel("eigenvalue")
   plt.legend()
   plt.show()
-  n_tica12_plots = int(input("how many tica1 x tica2 plots should we compare? "))
+  n_tica12_plots = int(input("how many tica1 x tica2 plots should we show? "))
   # do comparison with tica1 and tica2 plots
   rouse1, rouse2 = torch.tensor(rouse(1, polymer_length)).to("cuda", torch.float32), torch.tensor(rouse(2, polymer_length)).to("cuda", torch.float32)
   def tica1(x):

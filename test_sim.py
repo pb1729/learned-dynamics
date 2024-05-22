@@ -4,10 +4,12 @@ import matplotlib.pyplot as plt
 
 from config import load
 from sims import sims, get_dataset
-from polymer_util import rouse, squarish_factorize
+from plotting_common import Plotter, basis_transform_coords, basis_transform_rouse, basis_transform_neighbours
 
 
-ROUSE_BASIS = False
+# for basis, pick one of:
+# basis_transform_coords, basis_transform_rouse, basis_transform_neighbours
+BASIS = basis_transform_neighbours
 SHOW_REALSPACE_SAMPLES = 10
 
 
@@ -30,38 +32,17 @@ def get_continuation_dataset(N, contins, sim, iterations=1, x_only=True):
     return initial_states[:, :state_dim//2], xv_fin[:, :, :, :state_dim//2]
   return initial_states, xv_fin
 
-
-def compare_predictions_x(x_init, x_actual, sim, show_histogram=True, flash_plot=False):
-  x_init = x_init.cpu().numpy()
-  x_actual = x_actual.cpu().numpy()
-  if SHOW_REALSPACE_SAMPLES > 0:
-    for i in range(SHOW_REALSPACE_SAMPLES):
-      plt.plot(x_actual[i], marker=".", color="blue", alpha=0.7)
-    plt.plot(x_init[0], marker=".", color="black")
-    plt.ylim(-5., 5.)
-    if flash_plot:
-      plt.show(block=False)
-      plt.pause(0.7)
-      plt.close()
-    else:
-      plt.show()
-  if not show_histogram: return
-  fig = plt.figure(figsize=(20, 12))
-  axes = []
-  plt_w, plt_h = squarish_factorize(sim.poly_len)
-  for n in range(sim.poly_len):
-    if ROUSE_BASIS:
-      w_x = rouse(n, sim.poly_len)[None]
-      x_init_n = (w_x*x_init).sum(1)
-      x_actual_n = (w_x*x_actual).sum(1)
-    else:
-      x_init_n = x_init[:, n] - x_init[:, (n+1)%sim.poly_len]
-      x_actual_n = x_actual[:, n] - x_actual[:, (n+1)%sim.poly_len]
-    axes.append(fig.add_subplot(plt_h, plt_w, n + 1))
-    axes[-1].hist(x_actual_n, range=(-2., 2.), bins=100, alpha=0.7)
-    axes[-1].scatter([x_init_n], [0], color="black") # show starting point...
-    axes[-1].scatter([x_actual_n.mean()], [0], color="blue")
-  plt.show()
+def compare_predictions_x(x_init, x_actual, sim, show_histogram=True):
+  x_init = x_init.cpu().numpy().reshape(-1, sim.poly_len, sim.space_dim)
+  x_actual = x_actual.cpu().numpy().reshape(-1, sim.poly_len, sim.space_dim)
+  plotter = Plotter(BASIS, samples_subset_size=SHOW_REALSPACE_SAMPLES)
+  plotter.plot_samples(x_actual)
+  plotter.plot_samples_ic(x_init)
+  plotter.show()
+  if show_histogram:
+    plotter.plot_hist(x_actual)
+    plotter.plot_hist_ic(x_init)
+    plotter.show()
 
 
 def eval_sample_step(init_states, fin_statess, sim):
