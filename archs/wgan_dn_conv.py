@@ -7,10 +7,7 @@ from gan_common import GANTrainer
 from layers_common import weights_init, ResidualConv1d, ToAtomCoords, FromAtomCoords
 
 
-# BASE SOURCE CODE FOR CONDITIONAL WGAN
-#  * Uses CIFAR-10
-#  * Conditions on average color of the image
-
+# constants:
 k_L = 1.        # Lipschitz constant
 
 
@@ -113,6 +110,7 @@ class Generator(nn.Module):
 
 
 class GAN:
+  is_gan = True
   def __init__(self, disc, gen, config):
     self.disc = disc
     self.gen  = gen
@@ -150,7 +148,7 @@ class GAN:
     r_data = data + instance_noise_r # instance noise
     y_r = self.disc(r_data, cond)
     # train on generated data (with instance noise)
-    g_data = self.gen(self.get_latents(cond.shape[0]), cond)
+    g_data = self.gen(self.get_latents(cond.shape[0]), cond) # note that we noise from 0 rather than starting from cond...
     instance_noise_g = self.config["inst_noise_str_g"]*torch.randn_like(g_data)
     g_data = g_data + instance_noise_g # instance noise
     y_g = self.disc(g_data, cond)
@@ -198,6 +196,11 @@ class GAN:
     else:
       self.disc.train()
       self.gen.train()
+  def predict(self, cond):
+    batch = cond.shape[0]
+    return self.gen(self.get_latents(batch), cond)
+
+
 
 
 

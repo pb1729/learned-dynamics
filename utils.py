@@ -1,6 +1,11 @@
 import torch
 
 
+def compare_tensors(t1, t2):
+  def largest_elem(t):
+    return abs(t).max().item()
+  print("magnitude:", max(largest_elem(t1), largest_elem(t2)), "  difference:", largest_elem(t1 - t2))
+
 
 class _MustBe:
   """ class for asserting that a dimension must have a certain value.

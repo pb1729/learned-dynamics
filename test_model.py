@@ -14,9 +14,8 @@ SHOW_REALSPACE_SAMPLES = 10
 # override number of steps we're looking at
 ITERATIONS = 1
 
-
 def is_gan(model):
-  return hasattr(model, "get_latents")
+  return hasattr(model, "is_gan") and model.is_gan
 
 
 def get_continuation_dataset(N, contins, config, iterations=1):
@@ -41,20 +40,11 @@ def get_continuation_dataset(N, contins, config, iterations=1):
 def get_sample_step(model):
   """ given a model and current state, predict the next state """
   model.set_eval(True)
-  if is_gan(model):
-    def sample_step(state):
-      batch, _ = state.shape
-      latents = model.get_latents(batch)
-      with torch.no_grad():
-        state_fin = model.gen(latents, model.config.cond(state))
-      return state_fin
-    return sample_step
-  else:
-    def sample_step(state):
-      with torch.no_grad():
-        state_fin = model.predict(model.config.cond(state))
-      return state_fin
-    return sample_step
+  def sample_step(state):
+    with torch.no_grad():
+      state_fin = model.predict(model.config.cond(state))
+    return state_fin
+  return sample_step
 
 
 def compare_predictions_x(x_init, x_predicted, x_actual, sim, show_histogram=True):
