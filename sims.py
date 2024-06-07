@@ -3,6 +3,8 @@ from queue import Queue
 
 import torch
 
+from utils import must_be
+
 
 
 def vvel_lng_batch(x, v, a, drag, T, dt, nsteps, device="cuda"):
@@ -56,22 +58,41 @@ class TrajectorySim:
         if metadata is not None:
           for key in metadata:
             setattr(self, key, metadata[key])
-    def generate_trajectory(self, batch, N, x=None, v=None):
+    def generate_trajectory(self, x, v, time):
         """ generate trajectory from initial conditions x, v
             WARNING: initial condition tensors *will* be overwritten
             x: (batch, self.dim)
             v: (batch, self.dim)
-            x_traj: (batch, N, self.dim)
-            v_traj: (batch, N, self.dim) """
-        x_traj = torch.zeros((batch, N, self.dim), device="cuda", dtype=torch.float64)
-        v_traj = torch.zeros((batch, N, self.dim), device="cuda", dtype=torch.float64)
-        if x is None: x = torch.zeros((batch,) + self.drag.shape, dtype=torch.float64, device="cuda")
-        if v is None: v = torch.zeros((batch,) + self.drag.shape, dtype=torch.float64, device="cuda")
-        for i in range(N):
+            x_traj: (batch, time, self.dim)
+            v_traj: (batch, time, self.dim) """
+        batch,          must_be[self.dim] = x.shape
+        must_be[batch], must_be[self.dim] = v.shape
+        x_traj = torch.zeros((batch, time, self.dim), device="cuda", dtype=torch.float64)
+        v_traj = torch.zeros((batch, time, self.dim), device="cuda", dtype=torch.float64)
+        for i in range(time):
             vvel_lng_batch(x, v, self.acc_fn, self.drag, self.T, self.dt, self.t_res)
             x_traj[:, i] = x
             v_traj[:, i] = v
         return x_traj, v_traj
+    def sample_equilibrium(self, batch, iterations, t_noise=None, t_ballistic=None,
+            drag_const=20.): # TODO: come up with a better way to pick the drag constant?
+        """ Do our best to sample from the equilibrium distribution by alternately setting drag to be high/zero. """
+        if t_noise is None:
+            t_noise = self.delta_t
+        if t_ballistic is None:
+            t_ballistic = self.delta_t
+        high_drag = torch.zeros_like(self.drag) + drag_const
+        zero_drag = torch.zeros_like(self.drag)
+        # start from 0:
+        x = torch.zeros((batch,) + self.drag.shape, dtype=torch.float64, device="cuda")
+        v = torch.zeros((batch,) + self.drag.shape, dtype=torch.float64, device="cuda")
+        # do several iterations:
+        for i in range(iterations):
+            vvel_lng_batch(x, v, self.acc_fn, high_drag, self.T, self.dt, int(t_noise/self.dt))
+            vvel_lng_batch(x, v, self.acc_fn, zero_drag, self.T, self.dt, int(t_ballistic/self.dt))
+        # then cooldown with the regular amount of drag for a bit:
+        vvel_lng_batch(x, v, self.acc_fn, self.drag, self.T, self.dt, self.t_res)
+        return x, v
 
 
 def get_polymer_a(k, n, dim=3):
@@ -82,22 +103,6 @@ def get_polymer_a(k, n, dim=3):
     def a(x):
         x = x.reshape(-1, n, dim)
         ans = torch.zeros_like(x)
-        ans[:, 1:] += k*(x[:, :-1] - x[:, 1:])
-        ans[:, :-1] += k*(x[:, 1:] - x[:, :-1])
-        return ans.reshape(-1, n*dim)
-    return a
-
-def get_polymer_a_cos_potential(k, n, A, p, dim=3):
-    """ Get an acceleration function defining a polymer system with n atoms and spring constant k
-    All atoms are in a cosine wave potential with amplitude A and wavenumber p
-    Shapes:
-    x: (batch, n*dim)
-    a: (batch, n*dim)
-    A: ()
-    p: (dim) """
-    def a(x):
-        x = x.reshape(-1, n, dim)
-        ans = (A*p*torch.sin((p*x).sum(-1)))[:, :, None]
         ans[:, 1:] += k*(x[:, :-1] - x[:, 1:])
         ans[:, :-1] += k*(x[:, 1:] - x[:, :-1])
         return ans.reshape(-1, n*dim)
@@ -132,60 +137,6 @@ sims = {
         torch.tensor([10.], dtype=torch.float64), 1.0,
         3.0, 60
     ),
-    "1D Polymer, Ornstein Uhlenbeck": TrajectorySim(
-        get_polymer_a(1.0, 12, dim=1),
-        torch.tensor([10.]*12, dtype=torch.float64), 1.0,
-        1.0, 20,
-        metadata={"poly_len": 12, "space_dim": 1}
-    ),
-    "1D Polymer, Ornstein Uhlenbeck, long": TrajectorySim(
-        get_polymer_a(1.0, 12, dim=1),
-        torch.tensor([10.]*12, dtype=torch.float64), 1.0,
-        140.0, 20*140, # tune the delta_t to equal a time constant for the slowest mode
-        metadata={"poly_len": 12, "space_dim": 1}
-    ),
-    "1D Polymer, Ornstein Uhlenbeck, medium": TrajectorySim(
-        get_polymer_a(1.0, 12, dim=1),
-        torch.tensor([10.]*12, dtype=torch.float64), 1.0,
-        97.0, 16*97, # tune the delta_t so that slowest mode decays by about 1/2
-        metadata={"poly_len": 12, "space_dim": 1}
-    ),
-    "1D Polymer, Ornstein Uhlenbeck, 10": TrajectorySim(
-        get_polymer_a(1.0, 12, dim=1),
-        torch.tensor([10.]*12, dtype=torch.float64), 1.0,
-        10.0, 16*10,
-        metadata={"poly_len": 12, "space_dim": 1}
-    ),
-    "1D Polymer, Ornstein Uhlenbeck, medium, cosine": TrajectorySim(
-        get_polymer_a_cos_potential(1.0, 12, 1.0, torch.tensor([3.0], dtype=torch.float64, device="cuda"), dim=1),
-        torch.tensor([10.]*12, dtype=torch.float64), 1.0,
-        97.0, 16*97, # tune the delta_t so that slowest mode decays by about 1/2
-        metadata={"poly_len": 12, "space_dim": 1}
-    ),
-    "1D Polymer 12, Ornstein Uhlenbeck, t10": TrajectorySim(
-        get_polymer_a(1.0, 12, dim=1),
-        torch.tensor([10.]*12, dtype=torch.float64), 1.0,
-        10.0, 16*10,
-        metadata={"poly_len": 12, "space_dim": 1}
-    ),
-    "1D Polymer 24, Ornstein Uhlenbeck, t10": TrajectorySim(
-        get_polymer_a(1.0, 24, dim=1),
-        torch.tensor([10.]*24, dtype=torch.float64), 1.0,
-        10.0, 16*10,
-        metadata={"poly_len": 24, "space_dim": 1}
-    ),
-    "1D Polymer 36, Ornstein Uhlenbeck, t10": TrajectorySim(
-        get_polymer_a(1.0, 36, dim=1),
-        torch.tensor([10.]*36, dtype=torch.float64), 1.0,
-        10.0, 16*10,
-        metadata={"poly_len": 36, "space_dim": 1}
-    ),
-    "test_quart": TrajectorySim(
-      lambda x: -x*(x**2 - 1),
-      torch.tensor([1.0], dtype=torch.float64), 1.0,
-      1.0, 16*1,
-      metadata={"poly_len": 1, "space_dim": 1}
-    ),
 }
 
 
@@ -193,12 +144,6 @@ for l in [2, 5, 12, 24, 36, 48]:
   for t in [3, 10, 30, 100]:
     sims["ou_poly_l%d_t%d" % (l, t)] = TrajectorySim(
         get_polymer_a(1.0, l, dim=1),
-        torch.tensor([10.]*l, dtype=torch.float64), 1.0,
-        float(t), 16*t,
-        metadata={"poly_len": l, "space_dim": 1}
-      )
-    sims["cos_ou_poly_l%d_t%d" % (l, t)] = TrajectorySim(
-        get_polymer_a_cos_potential(1.0, l, 2.0, torch.tensor([2.0], dtype=torch.float64, device="cuda"), dim=1),
         torch.tensor([10.]*l, dtype=torch.float64), 1.0,
         float(t), 16*t,
         metadata={"poly_len": l, "space_dim": 1}
@@ -231,53 +176,36 @@ for l in [2, 5, 12, 24, 36, 48]:
 
 
 # DATASET GENERATION
-def get_dataset(sim, N, L, t_eql=0, subtract_cm=0, x_only=False, x_init=None, v_init=None):
-  """ generate data from a simulation sim.
-      generates N trajectories of length L, ans has shape (N, L, 2*system_dim)
-      t_eql is the number of delta_t to wait to system to equilibriate, data before this is thrown away
-      subtract_cm: 0 means don't subtract center of mass, positive number n means subtract center of mass
-      and assume spatial dimension is n
-      x_only: only return the x coordinate and not velocity
-      initial_state: x_init, v_init: (N, state_dim)
-      if these are not None, then te  """
-  x_traj, v_traj = sim.generate_trajectory(N, L+t_eql, x=x_init, v=v_init)
-  x_traj, v_traj = x_traj[:, t_eql:], v_traj[:, t_eql:]
-  if subtract_cm > 0:
-    x_tmp = x_traj.reshape(N, L, -1, subtract_cm)
+
+def equilibrium_sample(config, batch):
+  """ sample from eql. dist of config.sim
+      return: tuple(x, v)
+      x, v: (batch, dim) """
+  return config.sim.sample_equilibrium(batch, config.t_eql)
+
+def get_dataset(config, xv_init, L):
+  """ generate data from a simulation. creates a batch of trajectories of length L.
+      xv_init: tuple(x_init, v_init)
+      x_init: (batch, dim)
+      v_init: (batch, dim)
+      return x_traj: (batch, L, dim)
+      we use the config's "subtract_cm" field to determine the function's behaviour.
+      subtract_cm: False means don't subtract center of mass, True means subtract center
+      of mass. (requires sim to define a space_dim) """
+  x_init, v_init = xv_init
+  batch,          must_be[config.sim.dim] = x_init.shape
+  must_be[batch], must_be[config.sim.dim] = v_init.shape
+  x, v = x_init.clone(), v_init.clone() # prevent ourselves from overwriting inital condition tensors!
+  x_traj, v_traj = config.sim.generate_trajectory(x, v, L)
+  if config.subtract_mean:
+    x_tmp = x_traj.reshape(batch, L, config.sim.poly_len, config.sim.space_dim)
     x_tmp = x_tmp - x_tmp.mean(2, keepdim=True)
-    x_traj = x_tmp.reshape(N, L, -1)
-  if x_only: return x_traj
-  return torch.cat([
-      x_traj,
-      v_traj
-    ], dim=2)
-
-
-def dataset_gen(sim, N, L, t_eql=0, subtract_cm=0, x_only=False):
-  """ generate many datasets in a separate thread
-      t_eql, subtract_cm, x_only all do the same thing as they do in get_dataset()
-      one should use the send() method for controlling this generator, calling
-      send(True) if more data will be required and send(False) otherwise """
-  data_queue = Queue(maxsize=32) # we set a maxsize to control the number of items taking up memory on GPU
-  control_queue = Queue()
-  def thread_main():
-    while True: # queue maxsize stops us from going crazy here
-      next_dataset = get_dataset(sim, 128*N, L, t_eql=t_eql, subtract_cm=subtract_cm, x_only=x_only).to(torch.float32)
-      for i in range(0, 128*N, N):
-        if not control_queue.empty():
-          command = control_queue.get_nowait()
-          if command == "halt":
-            return
-        data_queue.put(next_dataset[i:i+N])
-  t = Thread(target=thread_main)
-  t.start()
-  while True:
-    data = data_queue.get()
-    halt = yield data # "keep going" is encoded as None, since python requires the first send() to be passed a None anyway
-    if halt is not None:
-      control_queue.put("halt")
-      yield None
-      break
+    x_traj = x_tmp.reshape(batch, L, -1)
+  if config.x_only:
+    return x_traj
+  else:
+    assert False, "Returning velocity trajectory no longer implemented!"
+    # Could return (x_traj, v_traj) here but we don't need this for now, and tis better not to complicate the client code
 
 
 # COMPUTE THE THEORETICAL EIGENVALUE #1 FOR THE 1D PROCESS
@@ -294,12 +222,6 @@ def get_ou_eigen_1d():
 def get_poly_eigen_1d(sim):
   return torch.exp(-sim.delta_t/sim.drag[0]).item()
 
-if __name__ == "__main__":
-  print("Linear eigenstate decay per time delta_t for 1D Ornstein Uhlenbeck:", get_ou_eigen_1d())
-  print("Linear eigenstate decay per time delta_t for Polymer (assuming reference of k=1):",
-    get_poly_eigen_1d(sims["1D Polymer, Ornstein Uhlenbeck, medium, cosine"]))
-  # TODO: delete the following lines:
-  dataset = get_dataset(sims["1D Polymer, Ornstein Uhlenbeck, medium, cosine"], 10, 10)
 
 
 

@@ -15,11 +15,10 @@ class Condition:
   VAEMODEL = 4
 
 
-
 class Config:
   """ configuration class for training runs """
   def __init__(self, sim_name, arch_name,
-               cond=Condition.COORDS, x_only=False, subtract_mean=0, device="cuda",
+               cond=Condition.COORDS, x_only=False, subtract_mean=False, device="cuda",
                batch=16, simlen=16, t_eql=0, nsteps=65536, save_every=512,
                koopman_model_path=None, n_rouse_modes=None, vae_model_path=None,
                arch_specific=None):
@@ -28,7 +27,7 @@ class Config:
     self.sim = sims[self.sim_name]
     self.cond_type = cond
     self.x_only = x_only
-    self.subtract_mean = subtract_mean # 0 if we don't subtract mean, otherwise is the number of dimensions that an individual particle moves in
+    self.subtract_mean = subtract_mean
     self.device = device
     self.batch = batch
     self.simlen = simlen

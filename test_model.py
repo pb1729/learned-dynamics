@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from config import load
-from sims import sims, get_dataset
+from sims import equilibrium_sample, get_dataset
 from plotting_common import Plotter, basis_transform_coords, basis_transform_rouse, basis_transform_neighbours
 
 
@@ -20,23 +20,19 @@ def is_gan(model):
   return hasattr(model, "is_gan") and model.is_gan
 
 
-def get_continuation_dataset(N, contins, config, iterations=1):
+def get_continuation_dataset(batch, contins, config, iterations=1):
   """ get a dataset of many possible continued trajectories from each of N initial states """
   print("creating initial states...")
-  initial_states = get_dataset(config.sim, N, 1, t_eql=config.t_eql, subtract_cm=config.subtract_mean)[:, 0]
-  print("created.")
+  x_init, v_init = equilibrium_sample(config, batch)
   # expand along another dim to enumerate continuations
-  state_dim = initial_states.shape[-1] # this should include velocity, so we can't use config.state_dim, which may be x only
-  xv_init = initial_states[:, None].expand(N, contins, state_dim).clone() # will be written to, so clone
-  xv_init = xv_init.reshape(N*contins, state_dim)
-  print("calculating continuations from initial states...")
-  xv_fin = get_dataset(config.sim, N*contins, iterations, subtract_cm=config.subtract_mean,
-    x_init=xv_init[:, :state_dim//2], v_init=xv_init[:, state_dim//2:])[:, -1]
+  x = x_init[:, None].expand(batch, contins, config.sim.dim).clone() # will be written to, so clone
+  v = v_init[:, None].expand(batch, contins, config.sim.dim).clone() # will be written to, so clone
+  x = x.reshape(batch*contins, -1)
+  v = v.reshape(batch*contins, -1)
+  print("created. calculating continuations from initial states...")
+  x_fin = get_dataset(config, [x, v], iterations)
   print("done.")
-  xv_fin = xv_fin.reshape(N, contins, state_dim)
-  if config.x_only:
-    return initial_states[:, :state_dim//2], xv_fin[:, :, :state_dim//2]
-  return initial_states, xv_fin
+  return x_init, x_fin.reshape(batch, contins, iterations, config.sim.dim)
 
 
 def get_sample_step(model):

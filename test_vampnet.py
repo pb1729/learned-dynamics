@@ -4,7 +4,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 from config import load
-from sims import sims, get_dataset
+from sims import equilibrium_sample, get_dataset
 from polymer_util import rouse, tica_theory, get_n_quanta_theory
 
 
@@ -31,7 +31,8 @@ def main(path, abs_scale=False):
   plt.scatter(np.arange(n_theory), get_n_quanta_theory(n_theory, config.sim), color="black", marker="o", label="theory (any # of quanta)")
   # generate a new dataset for testing
   print("generating polymer dataset...")
-  dataset = get_dataset(config.sim, 6000, config.simlen, t_eql=config.t_eql, subtract_cm=config.subtract_mean, x_only=config.x_only).to(torch.float32)
+  x_init, v_init = equilibrium_sample(config, 6000)
+  dataset = get_dataset(config, [x_init, v_init], config.simlen).to(torch.float32)
   print("done.")
   # evaluate model
   scores = model.eval_score(dataset)

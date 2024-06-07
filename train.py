@@ -1,9 +1,35 @@
 import itertools
 
 from run_visualization import TensorBoard
-from sims import dataset_gen
+from sims import equilibrium_sample, get_dataset
 from config import Config, load, save, makenew
 
+
+def dataset_gen(config):
+  """ generate many datasets in a separate thread
+      one should use the send() method for controlling this generator, calling
+      send(True) if more data will be required and send(False) otherwise """
+  data_queue = Queue(maxsize=32) # we set a maxsize to control the number of items taking up memory on GPU
+  control_queue = Queue()
+  def thread_main():
+    while True: # queue maxsize stops us from going crazy here
+      xv_init = equilibrium_sample(config, 128*config.batch)
+      next_dataset = get_dataset(config, xv_init, config.simlen).to(torch.float32)
+      for i in range(0, 128*config.batch, config.batch):
+        if not control_queue.empty():
+          command = control_queue.get_nowait()
+          if command == "halt":
+            return
+        data_queue.put(next_dataset[i:i+config.batch])
+  t = Thread(target=thread_main)
+  t.start()
+  while True:
+    data = data_queue.get()
+    halt = yield data # "keep going" is encoded as None, since python requires the first send() to be passed a None anyway
+    if halt is not None:
+      control_queue.put("halt")
+      yield None
+      break
 
 
 def train(model, save_path):

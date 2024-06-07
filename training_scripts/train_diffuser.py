@@ -29,7 +29,7 @@ for l in L_LIST:
       Config(sim_name, ARCH,
         cond=Condition.COORDS, x_only=True,
         batch=8, simlen=6, t_eql=4,
-        nsteps=8192, save_every=512,
+        nsteps=65536, save_every=512,
         arch_specific=arch_specific))
 
 

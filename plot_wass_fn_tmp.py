@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 from utils import must_be
 from config import load
-from sims import sims, get_dataset
+from sims import get_dataset
 from wass_utils import *
 
 
@@ -28,7 +28,7 @@ def proj(x):
   return delta[:, 0], r_perp
 
 
-def get_continuation_dataset_x_only(sim, contins, x_init, v_init=None):
+def get_continuation_dataset_with_init_cond(config, contins, x_init, v_init=None):
   """ get a dataset of many possible continued trajectories from an initial state
       contins: int
       x_init: (batch, q_dim)
@@ -39,16 +39,13 @@ def get_continuation_dataset_x_only(sim, contins, x_init, v_init=None):
   # expand along another dim to enumerate continuations
   batch,          q_dim          = x_init.shape
   must_be[batch], must_be[q_dim] = v_init.shape
-  xv_init = torch.cat([x_init, v_init], dim=1) # (batch, 2*q_dim)
-  xv_init = xv_init[:, None].expand(batch, contins, 2*q_dim) # (batch, contins, 2*q_dim)
-  xv_init = xv_init.clone() # will be written to, so clone
-  xv_init = xv_init.reshape(batch*contins, 2*q_dim)
+  x = x_init[:, None].expand(batch, contins, config.sim.dim).clone() # will be written to, so clone
+  v = v_init[:, None].expand(batch, contins, config.sim.dim).clone() # will be written to, so clone
+  x = x.reshape(batch*contins, -1)
+  v = v.reshape(batch*contins, -1)
   # calculate the continuations:
-  xv_fin = get_dataset(sim, batch*contins, 1,
-    x_init=xv_init[:, :q_dim], v_init=xv_init[:, q_dim:])
-    # (batch*contins, 1, 2*q_dim)
-  xv_fin = xv_fin.reshape(batch, contins, 2*q_dim)
-  return xv_fin[:, :, :q_dim]
+  x_fin = get_dataset(config, [x, v], 1)
+  return x_fin.reshape(batch, contins, q_dim)
 
 
 def main(fpath):
@@ -61,7 +58,7 @@ def main(fpath):
     gens = gen(model, initial_state.expand(80000, -1, -1))
     gens = gens - gens.mean(1, keepdim=True) # not invariant, but it only zeros out the COM mode, which is decoupled
     z_gens = disc(model, initial_state.expand(80000, -1, -1), gens).detach()
-    reals = get_continuation_dataset_x_only(model.config.sim, 80000, initial_state.reshape(1, -1).to(torch.float64))
+    reals = get_continuation_dataset_with_init_cond(model.config, 80000, initial_state.reshape(1, -1).to(torch.float64))
     reals = reals.reshape(-1, model.config.sim.poly_len, model.config.sim.space_dim)
     reals = reals - reals.mean(1, keepdim=True) # not invariant, but it only zeros out the COM mode, which is decoupled
   x_gens, y_gens = proj(gens)
