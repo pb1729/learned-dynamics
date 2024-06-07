@@ -39,34 +39,44 @@ def squarish_factorize(n):
 
 
 class Plotter:
-  def __init__(self, hist_transform=basis_transform_coords, flash_plot=False, samples_subset_size=20):
+  def __init__(self, hist_transform=basis_transform_coords, flash_plot=False, samples_subset_size=20, title=None):
     self.hist_transform = hist_transform
     self.flash_plot = flash_plot
     self.samples_subset_size = samples_subset_size
     self.fig = None
     self.axes = None
     self.col_idx = 0
+    self.title = title
   def _init_hist(self, poly_len, space_dim):
     self.fig = plt.figure(figsize=(20, 12))
     plt_w, plt_h = squarish_factorize(poly_len*space_dim)
     self.axes = [self.fig.add_subplot(plt_h, plt_w, n + 1) for n in range(poly_len*space_dim)]
+    self.hist_ranges = []
   def plot_hist(self, samples):
     """ samples: (batch, poly_len, space_dim) """
     batch, poly_len, space_dim = samples.shape
     if self.fig is None: self._init_hist(poly_len, space_dim)
-    samples = self.hist_transform(samples).reshape(batch, poly_len*space_dim)
-    hists_range = (np.min(samples), np.max(samples))
-    for i, ax in enumerate(self.axes):
-      ax.hist(samples[:, i], range=hists_range, bins=100, color=self._get_color(), alpha=0.7)
-      ax.scatter([samples[:, i].mean()], [0.0], marker="d", facecolors=self._get_color(), edgecolors='black', s=[100], zorder=10)
+    samples = self.hist_transform(samples)
+    for i in range(poly_len):
+      hist_range = (np.min(samples[:, i]), np.max(samples[:, i]))
+      if len(self.hist_ranges) <= i: # hist ranges will be filled in once, by the first call to this function
+        self.hist_ranges.append((np.min(samples[:, i]), np.max(samples[:, i])))
+      for j in range(space_dim):
+        ax = self.axes[space_dim*i + j]
+        ax.hist(samples[:, i, j], range=self.hist_ranges[i], bins=100, color=self._get_color(), alpha=0.7)
+        ax.scatter([samples[:, i, j].mean()], [0.0], marker="d", facecolors=self._get_color(), edgecolors='black', s=[100], zorder=10)
     self.col_idx += 1
   def plot_hist_ic(self, ic):
     """ ic: (1, poly_len, space_dim) """
     _, poly_len, space_dim = ic.shape
     if self.fig is None: self._init_hist(poly_len, space_dim)
-    samples = self.hist_transform(ic).reshape(1, poly_len*space_dim)
-    for i, ax in enumerate(self.axes):
-      ax.scatter([samples[0, i]], [0.0], marker="d", facecolors="grey", edgecolors='black', s=[100], zorder=20)
+    samples = self.hist_transform(ic)
+    for i in range(poly_len):
+      for j in range(space_dim):
+        ax = self.axes[space_dim*i + j]
+        ax.scatter([samples[0, i, j]], [0.0], marker="d", facecolors="grey", edgecolors='black', s=[100], zorder=20)
+        # make visual grouping of subplots obvious by supply a color cue:
+        ax.set_facecolor(["#f0d0d0", "#d0f0d0", "#d0d0f0"][i % 3])
   def _init_samples(self, poly_len, space_dim):
     self.fig = plt.figure(figsize=(20, 12))
     if space_dim == 1:
@@ -97,6 +107,8 @@ class Plotter:
   def _get_color(self):
     return colormaps["tab10"](self.col_idx/9.5)
   def show(self):
+    if self.title is not None:
+      self.fig.suptitle(self.title)
     if self.flash_plot:
       self.fig.show(block=False)
       self.fig.pause(0.7)
