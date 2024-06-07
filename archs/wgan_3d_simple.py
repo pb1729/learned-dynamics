@@ -244,7 +244,7 @@ class WGAN3D:
     batch, must_be[3*self.graph.n_nodes] = cond.shape
     with torch.no_grad():
       ans = self.gen(cond.reshape(batch, self.graph.n_nodes, 3), self.get_latents(batch), self.graph)
-      return ans.reshape(-1, 36)
+      return ans.reshape(batch, 3*self.graph.n_nodes)
 
 
 
