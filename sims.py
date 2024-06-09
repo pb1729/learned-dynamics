@@ -172,6 +172,12 @@ for l in [2, 5, 12, 24, 36, 48]:
         float(t), 32*t,
         metadata={"poly_len": l, "space_dim": 3}
       )
+    sims["3d_ballistic_poly_l%d_t%d" % (l, t)] = TrajectorySim(
+        get_polymer_a(1.0, l, dim=3),
+        torch.tensor([0.]*l*3, dtype=torch.float64), 1.0,
+        float(t), 16*t,
+        metadata={"poly_len": l, "space_dim": 3}
+      )
 
 
 

@@ -38,7 +38,7 @@ def eval_sample_step(init_states, fin_statess, sim):
 
 def main(sim_nm):
   # get comparison data
-  test_config = Config(sim_nm, "none", x_only=True)
+  test_config = Config(sim_nm, "none", x_only=True, t_eql=4)
   init_states, fin_states = get_continuation_dataset(10, 10000, test_config)
   init_states, fin_states = init_states.to(torch.float32), fin_states.to(torch.float32)
   print(fin_states.shape, init_states.shape)
