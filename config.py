@@ -141,6 +141,10 @@ class Config:
 # * .save_to_dict()                 records the model states into a dictionary
 # * @staticmethod .makenew()        creates a new instance of the model
 
+def load_config(path):
+  data = torch.load(path)
+  return Config(*data["args"], **data["kwargs"])
+
 def load(path):
   data = torch.load(path)
   config = Config(*data["args"], **data["kwargs"])

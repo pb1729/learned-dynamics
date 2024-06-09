@@ -1,6 +1,3 @@
-from threading import Thread
-from queue import Queue
-
 import torch
 
 from utils import must_be

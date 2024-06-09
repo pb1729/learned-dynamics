@@ -1,4 +1,8 @@
 import itertools
+from threading import Thread
+from queue import Queue
+
+import torch
 
 from run_visualization import TensorBoard
 from sims import equilibrium_sample, get_dataset
@@ -39,8 +43,7 @@ def train(model, save_path):
   print(model.config)
   board = TensorBoard(run_name)
   config = model.config # configuration for this run...
-  data_generator = dataset_gen(config.sim, config.batch, config.simlen,
-    t_eql=config.t_eql, subtract_cm=config.subtract_mean, x_only=config.x_only)
+  data_generator = dataset_gen(config)
   trainer = config.trainerclass(model, board)
   for i in itertools.count():
     trajs = data_generator.send(None if i < config.nsteps else True)

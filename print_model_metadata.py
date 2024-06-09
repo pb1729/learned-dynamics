@@ -1,4 +1,4 @@
-from config import load, save
+from config import load_config, load, save
 
 
 def main(modelpath, command=None, *args):
@@ -13,8 +13,8 @@ def main(modelpath, command=None, *args):
     model = load(modelpath)
     model.config[key] = val
     save(model, modelpath)
-  model = load(modelpath)
-  print(model.config)
+  config = load_config(modelpath)
+  print(config)
 
 
 if __name__ == "__main__":
