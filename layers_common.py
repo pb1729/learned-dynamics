@@ -327,7 +327,7 @@ class NodeRelativeEmbedMLP(nn.Module):
       nn.Linear(adim, adim),
       nn.LeakyReLU(0.2, inplace=True),
       nn.Linear(adim, adim))
-  def forward(self, pos_0, pos_1, graph):
+  def forward(self, pos_0, pos_1, graph=None):
     """ pos0: (batch, node, 3)
         pos1: (batch, node, 3)
         return: tuple(a_out, v_out)
