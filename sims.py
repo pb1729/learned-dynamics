@@ -15,10 +15,10 @@ def vvel_lng_batch(x, v, a, drag, T, dt, nsteps, device="cuda"):
     T is the temperature in units of energy.
     dt is the timestep size.
     Shapes:
-    x: (batch, coorddim)
-    v: (batch, coorddim)
-    drag: (coorddim,)
-    a: (-1, coorddim) -> (-1, coorddim)
+    x: (batch, coorddim)                  [L]
+    v: (batch, coorddim)                  [L/T]
+    drag: (coorddim,)                     [/T]
+    a: (-1, coorddim) -> (-1, coorddim)   [L/TT]
     return = x:(batch, coorddim), v:(batch, coorddim)"""
     assert nsteps >= 1
     assert x.shape == v.shape and drag.shape == x.shape[1:]
@@ -95,8 +95,9 @@ class TrajectorySim:
 def get_polymer_a(k, n, dim=3):
     """ Get an acceleration function defining a polymer system with n atoms and spring constant k
     Shapes:
-    x: (batch, n*dim)
-    a: (batch, n*dim) """
+    k: ()             [/TT]
+    x: (batch, n*dim) [L]
+    a: (batch, n*dim) [L/TT] """
     def a(x):
         x = x.reshape(-1, n, dim)
         ans = torch.zeros_like(x)
@@ -109,8 +110,8 @@ def get_polymer_a_quart(k, n, dim=3):
     """ Get an acceleration function defining a polymer system with n atoms and a quartic bond potential
         the potential is given by the quartic (k/8)(x**2 - 1)**2
     Shapes:
-    x: (batch, n*dim)
-    a: (batch, n*dim) """
+    x: (batch, n*dim) [L]
+    a: (batch, n*dim) [L/TT] """
     def bond_force(delta_x):
       return 0.5*k*((delta_x**2).sum(2, keepdim=True) - 1)*delta_x
     def a(x):
@@ -143,7 +144,7 @@ for l in [2, 5, 12, 24, 36, 48]:
         get_polymer_a(1.0, l, dim=1),
         torch.tensor([10.]*l, dtype=torch.float64), 1.0,
         float(t), 16*t,
-        metadata={"poly_len": l, "space_dim": 1}
+        metadata={"poly_len": l, "space_dim": 1, "k": 1.0}
       )
     sims["quart_ou_poly_l%d_t%d" % (l, t)] = TrajectorySim(
         get_polymer_a_quart(4.0, l, dim=1),
@@ -161,7 +162,7 @@ for l in [2, 5, 12, 24, 36, 48]:
         get_polymer_a(1.0, l, dim=3),
         torch.tensor([10.]*l*3, dtype=torch.float64), 1.0,
         float(t), 16*t,
-        metadata={"poly_len": l, "space_dim": 3}
+        metadata={"poly_len": l, "space_dim": 3, "k": 1.0}
       )
     sims["3d_quart_ou_poly_l%d_t%d" % (l, t)] = TrajectorySim(
         get_polymer_a_quart(4.0, l, dim=3),
@@ -207,25 +208,24 @@ def get_dataset(config, xv_init, L):
   if config.x_only:
     return x_traj
   else:
-    assert False, "Returning velocity trajectory no longer implemented!"
-    # Could return (x_traj, v_traj) here but we don't need this for now, and tis better not to complicate the client code
+    return torch.cat([x_traj, v_traj], dim=2)
 
 
-# COMPUTE THE THEORETICAL EIGENVALUE #1 FOR THE 1D PROCESS
-# v' = -x - drag*v + noise
-# if we average out the noise, and set v' = 0, we get: v = -x/drag
-# x' = v = -x/drag
-# x = exp(-t/drag)
-def get_ou_eigen_1d():
-  sim = sims["SHO, Ornstein Uhlenbeck"]
-  return torch.exp(-sim.delta_t/sim.drag[0]).item()
-
-# similar, but now v is -kx/drag, where k is associated with a Rouse mode
-# we'll let the user of this function worry about the value of k, though
-def get_poly_eigen_1d(sim):
-  return torch.exp(-sim.delta_t/sim.drag[0]).item()
 
 
+# NOTES ON HOW TO COMPUTE THE THEORETICAL TIME CONSTANT FOR AN OU-TYPE PROCESS:
+# v' = -k*x - drag*v + noise
+# if we average out the noise, and set v' = 0, we get: v = -k*x/drag
+# x' = v = -k*x/drag
+# thus, the time constant is proportional to drag/k
+# (note that k is normalize by particle mass, so its units are [L/TTL]=[/TT])
+# interestingly, time constant doesn't depend on temperature!
+
+def get_poly_tc(sim, mode_k):
+  """ get the relaxation time constant for a particular mode, with mode spring constant mode_k [/TT].
+      WARNING: ASSUMES that the drag is identical for all coordinates! """
+  drag = sim.drag[0].item() # assume that the drag for all atoms is identical!
+  return drag / mode_k
 
 
 

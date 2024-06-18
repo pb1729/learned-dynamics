@@ -212,6 +212,7 @@ class WGAN3D:
     assert config.sim.space_dim == 3
     assert config.cond_type == Condition.COORDS
     assert config.subtract_mean == 0
+    assert config.x_only
     self.n_nodes = config.sim.poly_len
     self.init_optim()
   def init_optim(self):

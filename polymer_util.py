@@ -1,19 +1,20 @@
 import numpy as np
 
-from sims import get_poly_eigen_1d
+from sims import get_poly_tc
 
 
 def rouse(n, length):
   """ get nth Rouse mode for polymer of a given length """
   return np.cos(n*np.pi*(0.5 + np.arange(length))/length) - 0.5*(n == 0)
 
-def rouse_k(n, length):
-  """ get spring constant for nth Rouse mode for polymer of given length """
-  return 4*(np.sin(0.5*np.pi*n/length))**2
+def rouse_k(n, k, length):
+  """ get the mode spring constant [/TT] for nth Rouse mode for polymer of given length
+      and bond spring constant k [/TT]. """
+  return 4*k*(np.sin(0.5*np.pi*n/length))**2
 
 def tica_theory(sim):
   n = np.arange(1, sim.poly_len)
-  return np.exp(np.log(get_poly_eigen_1d(sim))*rouse_k(n, sim.poly_len))
+  return np.exp(-sim.delta_t/get_poly_tc(sim, rouse_k(n, sim.k, sim.poly_len)))
 
 def rouse_block(length):
   """ get the entire block of rouse mode coefficients for a given polymer length

@@ -30,9 +30,13 @@ def get_continuation_dataset(batch, contins, config, iterations=1):
   x = x.reshape(batch*contins, -1)
   v = v.reshape(batch*contins, -1)
   print("created. calculating continuations from initial states...")
-  x_fin = get_dataset(config, [x, v], iterations)
+  xv_fin = get_dataset(config, [x, v], iterations)[:, -1]
+  if config.x_only:
+    xv_init = x_init
+  else:
+    xv_init = torch.cat([x_init, v_init], dim=1)
   print("done.")
-  return x_init, x_fin.reshape(batch, contins, iterations, config.sim.dim)
+  return xv_init, xv_fin.reshape(batch, contins, config.state_dim)
 
 
 def get_sample_step(model):
@@ -64,7 +68,7 @@ def compare_predictions_x(x_init, x_predicted, x_actual, sim, basis, show_histog
 def eval_sample_step(sample_step, init_statess, fin_statess, config, basis):
   """ given a method that continues evolution for one more step,
       plot various graphs to evaluate it for accuracy
-      sample_step:  (batch, state_dim) -> (batch, state_dim)
+      sample_step:  (contins, state_dim) -> (contins, state_dim)
       init_statess: (batch, state_dim)
       fin_statess:  (batch, contins, state_dim) """
   batch, *_ = fin_statess.shape
@@ -72,6 +76,11 @@ def eval_sample_step(sample_step, init_statess, fin_statess, config, basis):
     init_states = init_statess[i]
     fin_states = fin_statess[i]
     pred_fin_states = sample_step(init_states)
+    # just plot the x part:
+    if not config.x_only:
+      init_states = init_states[:, :config.sim.dim]
+      fin_states = fin_states[:, :config.sim.dim]
+      pred_fin_states = pred_fin_states[:, :config.sim.dim]
     compare_predictions_x(init_states[0], pred_fin_states, fin_states, config.sim, basis)
 
 
@@ -91,7 +100,6 @@ def main(fpath, basis="rouse", iterations=1, contins=10000):
   # get comparison data
   init_states, fin_states = get_continuation_dataset(10, contins, model.config, iterations=iterations)
   init_states, fin_states = init_states.to(torch.float32), fin_states.to(torch.float32)
-  print(fin_states.shape, init_states.shape)
   # compare!
   init_states = init_states[:, None]
   if is_gan(model):
