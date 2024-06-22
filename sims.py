@@ -139,7 +139,7 @@ sims = {
 
 
 for l in [2, 5, 12, 24, 36, 48]:
-  for t in [3, 10, 30, 100]:
+  for t in [3, 10, 30, 100, 300]:
     sims["ou_poly_l%d_t%d" % (l, t)] = TrajectorySim(
         get_polymer_a(1.0, l, dim=1),
         torch.tensor([10.]*l, dtype=torch.float64), 1.0,

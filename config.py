@@ -34,7 +34,10 @@ class Config:
     self.t_eql = t_eql
     self.nsteps = nsteps
     self.save_every = save_every
-    assert nsteps % save_every == 0
+    if isinstance(nsteps, list):
+      assert all(map(lambda ns: ns % save_every == 0, nsteps))
+    else:
+      assert nsteps % save_every == 0
     if self.x_only:
       self.state_dim = self.sim.dim
     else:

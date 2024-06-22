@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
+from utils import must_be
 from config import load
 from sims import equilibrium_sample, get_dataset
 from plotting_common import Plotter, basis_transform_coords, basis_transform_rouse, basis_transform_neighbours
@@ -65,6 +66,26 @@ def compare_predictions_x(x_init, x_predicted, x_actual, sim, basis, show_histog
     plotter.show()
 
 
+def gaussian_kl_div(x_actual, x_predicted):
+  """ approximate given distributions as Gaussians with the same mean and standard deviation.
+      returns the KL divergence between the distributions, the expectation being taken over x_actual.
+      https://ra1ndeer.github.io/posts/kl_divergence_gaussians.html
+      x_actual:    (samples, dim)
+      x_predicted: (samples, dim) """
+  samples,          dim          = x_actual.shape
+  must_be[samples], must_be[dim] = x_predicted.shape
+  mu_actl = x_actual.mean(0)
+  mu_pred = x_predicted.mean(0)
+  cov_actl = torch.cov(x_actual.T)
+  cov_pred = torch.cov(x_predicted.T)
+  d_mu = mu_pred - mu_actl
+  inv_cov_pred = torch.linalg.inv(cov_pred)
+  kl_means = 0.5*(d_mu*(inv_cov_pred @ d_mu)).sum()
+  kl_covar = 0.5*torch.trace(inv_cov_pred @ cov_actl)
+  kl_lgdet = 0.5*(torch.log(torch.det(cov_pred)/torch.det(cov_actl)) - dim)
+  return (kl_means + kl_covar + kl_lgdet).item()
+
+
 def eval_sample_step(sample_step, init_statess, fin_statess, config, basis):
   """ given a method that continues evolution for one more step,
       plot various graphs to evaluate it for accuracy
@@ -81,6 +102,7 @@ def eval_sample_step(sample_step, init_statess, fin_statess, config, basis):
       init_states = init_states[:, :config.sim.dim]
       fin_states = fin_states[:, :config.sim.dim]
       pred_fin_states = pred_fin_states[:, :config.sim.dim]
+    print("Gaussian approximation KL divergence for this instance:", gaussian_kl_div(fin_states, pred_fin_states))
     compare_predictions_x(init_states[0], pred_fin_states, fin_states, config.sim, basis)
 
 

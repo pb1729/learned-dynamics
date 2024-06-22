@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from itertools import chain
 
 from config import Condition
 from utils import must_be
@@ -204,8 +205,9 @@ class Generator(nn.Module):
 
 class WGAN3D:
   is_gan = True
-  def __init__(self, disc, gen, config):
-    self.disc = disc
+  def __init__(self, crow, taxi, gen, config):
+    self.crow = crow # discriminator
+    self.taxi = taxi # discriminator
     self.gen  = gen
     self.config = config
     assert config.sim.space_dim == 3
@@ -216,23 +218,28 @@ class WGAN3D:
     self.init_optim()
   def init_optim(self):
     betas = (self.config["beta_1"], self.config["beta_2"])
-    self.optim_d = torch.optim.AdamW(self.disc.parameters(), self.config["lr_d"], betas, weight_decay=self.config["weight_decay"])
-    self.optim_g = torch.optim.AdamW(self.gen.parameters(),  self.config["lr_g"], betas, weight_decay=self.config["weight_decay"])
+    self.optim_d = torch.optim.AdamW(chain(self.crow.parameters(), self.taxi.parameters()),
+      self.config["lr_d"], betas, weight_decay=self.config["weight_decay"])
+    self.optim_g = torch.optim.AdamW(self.gen.parameters(), 
+      self.config["lr_g"], betas, weight_decay=self.config["weight_decay"])
   @staticmethod
   def load_from_dict(states, config):
-    disc, gen = Discriminator(config).to(config.device), Generator(config).to(config.device)
-    disc.load_state_dict(states["disc"])
+    crow, taxi, gen = Discriminator(config).to(config.device), Discriminator(config).to(config.device), Generator(config).to(config.device)
+    crow.load_state_dict(states["crow"])
+    taxi.load_state_dict(states["taxi"])
     gen.load_state_dict(states["gen"])
-    return WGAN3D(disc, gen, config)
+    return WGAN3D(crow, taxi, gen, config)
   @staticmethod
   def makenew(config):
-    disc, gen = Discriminator(config).to(config.device), Generator(config).to(config.device)
-    disc.apply(weights_init)
+    crow, taxi, gen = Discriminator(config).to(config.device), Discriminator(config).to(config.device), Generator(config).to(config.device)
+    crow.apply(weights_init)
+    taxi.apply(weights_init)
     gen.apply(weights_init)
-    return WGAN3D(disc, gen, config)
+    return WGAN3D(crow, taxi, gen, config)
   def save_to_dict(self):
     return {
-        "disc": self.disc.state_dict(),
+        "crow": self.crow.state_dict(),
+        "taxi": self.taxi.state_dict(),
         "gen": self.gen.state_dict(),
       }
   def train_step(self, data, cond):
@@ -240,46 +247,46 @@ class WGAN3D:
     loss_d = self.disc_step(data, cond)
     loss_g = self.gen_step(cond)
     return loss_d, loss_g
-  def disc_step(self, data, cond):
+  def disc_step(self, r_data, cond):
     self.optim_d.zero_grad()
-    # train on real data (with instance noise)
-    instance_noise_r = self.config["inst_noise_str_r"]*torch.randn_like(data)
-    r_data = data + instance_noise_r # instance noise
-    y_r = self.disc(cond, r_data)
-    # train on generated data (with instance noise)
+    # train on real data
+    y_r_crow, y_r_taxi = self.y_disc(cond, r_data)
+    # train on generated data
     g_data = self.generate(cond)
-    instance_noise_g = self.config["inst_noise_str_g"]*torch.randn_like(g_data)
-    g_data = g_data + instance_noise_g # instance noise
-    y_g = self.disc(cond, g_data)
-    # endpoint penalty on interpolated data
-    mix_factors1 = torch.rand(cond.shape[0], 1, 1, device=self.config.device)
-    mixed_data1 = mix_factors1*g_data + (1 - mix_factors1)*r_data
-    y_mixed1 = self.disc(cond, mixed_data1)
-    mix_factors2 = torch.rand(cond.shape[0], 1, 1, device=self.config.device)
-    mixed_data2 = mix_factors2*g_data + (1 - mix_factors2)*r_data
-    y_mixed2 = self.disc(cond, mixed_data2)
-    ep_penalty = (self.endpoint_penalty(r_data, g_data, y_r, y_g)
-                + self.endpoint_penalty(mixed_data1, r_data, y_mixed1, y_r)
-                + self.endpoint_penalty(g_data, mixed_data1, y_g, y_mixed1)
-                + self.endpoint_penalty(mixed_data2, r_data, y_mixed2, y_r)
-                + self.endpoint_penalty(g_data, mixed_data2, y_g, y_mixed2)
-                + self.endpoint_penalty(mixed_data1, mixed_data2, y_mixed1, y_mixed2))
+    y_g_crow, y_g_taxi = self.y_disc(cond, g_data)
+    # endpoint penalty on interpolated data, each discriminator gets its own penalty
+    mix_factors = torch.rand(cond.shape[0], 1, 1, device=self.config.device)
+    m_data = mix_factors*g_data + (1 - mix_factors)*r_data
+    y_m_crow, y_m_taxi = self.y_disc(cond, m_data)
+    penalty_crow = (self.endpoint_penalty_crow(r_data, g_data, y_r_crow, y_g_crow)
+                  + self.endpoint_penalty_crow(r_data, m_data, y_r_crow, y_m_crow)
+                  + self.endpoint_penalty_crow(m_data, g_data, y_m_crow, y_g_crow))
+    penalty_taxi = (self.endpoint_penalty_taxi(r_data, g_data, y_r_taxi, y_g_taxi)
+                  + self.endpoint_penalty_taxi(r_data, m_data, y_r_taxi, y_m_taxi)
+                  + self.endpoint_penalty_taxi(m_data, g_data, y_m_taxi, y_g_taxi))
     # loss, backprop, update
-    loss = self.config["lpen_wt"]*ep_penalty.mean() + y_r.mean() - y_g.mean()
+    loss = (y_r_crow.mean() + y_r_taxi.mean()) - (y_g_crow.mean() + y_g_taxi.mean())
+    loss = loss + self.config["lpen_wt"]*(penalty_crow.mean() + penalty_taxi.mean())
     loss.backward()
     self.optim_d.step()
     return loss.item()
   def gen_step(self, cond):
     self.optim_g.zero_grad()
     g_data = self.generate(cond)
-    instance_noise_g = self.config["inst_noise_str_g"]*torch.randn_like(g_data)
-    g_data = g_data + instance_noise_g # instance noise
-    y_g = self.disc(cond, g_data)
+    y_g_crow, y_g_taxi = self.y_disc(cond, g_data)
+    y_g = y_g_crow + y_g_taxi
     loss = y_g.mean()
     loss.backward()
     self.optim_g.step()
     return loss.item()
-  def endpoint_penalty(self, x1, x2, y1, y2):
+  def endpoint_penalty_crow(self, x1, x2, y1, y2):
+    # use the euclidean metric (take RMS distance)
+    dist = torch.sqrt(((x1 - x2)**2).sum(2).mean(1))
+    # one-sided L1 penalty:
+    penalty = F.relu(torch.abs(y1 - y2)/(dist*k_L + 1e-6) - 1.)
+    # weight by square root of separation
+    return torch.sqrt(dist)*penalty
+  def endpoint_penalty_taxi(self, x1, x2, y1, y2):
     # use the taxicab metric (take average distance that node moved rather than RMS distance)
     dist = torch.sqrt(((x1 - x2)**2).sum(2)).mean(1)
     # one-sided L1 penalty:
@@ -290,6 +297,10 @@ class WGAN3D:
     batch, must_be[self.n_nodes], must_be[3] = cond.shape
     pos_noise, z_a, z_v = self.get_latents(batch)
     return self.gen(cond, pos_noise, z_a, z_v)
+  def y_disc(self, x0, x1):
+    y_crow = self.crow(x0, x1)
+    y_taxi = self.taxi(x0, x1)
+    return y_crow, y_taxi
   def get_latents(self, batchsz):
     """ sample latent space for generator """
     pos_noise = self.config["z_scale"]*torch.randn(batchsz, self.n_nodes, 3, device=self.config.device)
@@ -298,10 +309,12 @@ class WGAN3D:
     return pos_noise, z_a, z_v
   def set_eval(self, bool_eval):
     if bool_eval:
-      self.disc.eval()
+      self.crow.eval()
+      self.taxi.eval()
       self.gen.eval()
     else:
-      self.disc.train()
+      self.crow.train()
+      self.taxi.train()
       self.gen.train()
   def predict(self, cond):
     batch, must_be[3*self.n_nodes] = cond.shape

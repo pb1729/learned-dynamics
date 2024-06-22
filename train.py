@@ -45,13 +45,22 @@ def train(model, save_path):
   config = model.config # configuration for this run...
   data_generator = dataset_gen(config)
   trainer = config.trainerclass(model, board)
+  if isinstance(config.nsteps, list):
+    nsteps = max(config.nsteps)
+    checkpoints = [ns for ns in config.nsteps if ns < nsteps]
+  else:
+    nsteps = config.nsteps
+    checkpoints = []
   for i in itertools.count():
-    trajs = data_generator.send(None if i < config.nsteps else True)
+    trajs = data_generator.send(None if i < nsteps else True)
     if trajs is None: break
     trainer.step(i, trajs) # main training step
     if (i + 1) % config.save_every == 0:
       print("\nsaving...")
       save(model, save_path)
+      if i + 1 in checkpoints:
+        save(model, save_path[:-3] + ".chkp_" + str(i + 1) + ".pt")
+      # checkpoint
       print("saved.\n")
 
 
