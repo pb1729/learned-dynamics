@@ -14,8 +14,7 @@ BASES = {
   "neighbours": basis_transform_neighbours,
 }
 SHOW_REALSPACE_SAMPLES = 10
-# override number of steps we're looking at
-ITERATIONS = 1
+
 
 def is_gan(model):
   return hasattr(model, "is_gan") and model.is_gan
@@ -102,13 +101,15 @@ def eval_sample_step(sample_step, init_statess, fin_statess, config, basis):
       init_states = init_states[:, :config.sim.dim]
       fin_states = fin_states[:, :config.sim.dim]
       pred_fin_states = pred_fin_states[:, :config.sim.dim]
-    print("Gaussian approximation KL divergence for this instance:", gaussian_kl_div(fin_states, pred_fin_states))
+    print(gaussian_kl_div(fin_states, pred_fin_states), end="\t")
     compare_predictions_x(init_states[0], pred_fin_states, fin_states, config.sim, basis)
 
 
 def main(fpath, basis="rouse", iterations=1, contins=10000):
   assert fpath is not None
   assert basis in BASES
+  if isinstance(iterations, str): iterations = int(iterations)
+  print("basis = %s    iterations = %d" % (basis, iterations))
   # load the model
   model = load(fpath)
   model.set_eval(True)
@@ -133,7 +134,7 @@ def main(fpath, basis="rouse", iterations=1, contins=10000):
 
 if __name__ == "__main__":
   from sys import argv
-  main(*argv[1:], iterations=ITERATIONS)
+  main(*argv[1:])
 
 
 
