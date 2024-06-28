@@ -386,7 +386,73 @@ class VecGroupNorm(nn.Module):
 
 
 
+class ScalConv1d(nn.Module):
+  def __init__(self, chan, kernsz, edges_to_nodes=False):
+    super().__init__()
+    if edges_to_nodes:
+      assert kernsz % 2 == 0
+      self.conv = nn.Conv1d(chan, chan, kernsz, padding=(kernsz//2))
+    else:
+      assert kernsz % 2 == 1
+      self.conv = nn.Conv1d(chan, chan, kernsz, padding="same")
+  def forward(self, x):
+    """ x: (batch, length, chan) """
+    x = x.permute(0, 2, 1) # (batch, chan, length)
+    y = self.conv(x)
+    y = y.permute(0, 2, 1) # (batch, newlength, chan)
+    return y
 
+class VecConv1d(nn.Module):
+  def __init__(self, chan, kernsz, edges_to_nodes=False):
+    super().__init__()
+    if edges_to_nodes:
+      assert kernsz % 2 == 0
+      self.conv = nn.Conv1d(chan, chan, kernsz, padding=(kernsz//2), bias=False)
+    else:
+      assert kernsz % 2 == 1
+      self.conv = nn.Conv1d(chan, chan, kernsz, padding="same", bias=False)
+  def forward(self, x):
+    """ x: (batch, length, chan, 3) """
+    batch, length, chan, must_be[3] = x.shape
+    x = x.permute(0, 3, 2, 1).reshape(3*batch, chan, length) # (batch*3, chan, length)
+    y = self.conv(x)
+    must_be[batch*3], must_be[chan], newlength = y.shape # length might have changed!
+    y = y.reshape(batch, 3, chan, newlength).permute(0, 3, 2, 1) # (batch, newlength, chan, 3)
+    return y
+
+
+class EdgeRelativeEmbedMLPPath(nn.Module):
+  """ input embedding for edges, where 2 positions are passed as input.
+      assumes graph structure is path """
+  def __init__(self, adim, vdim):
+    super().__init__()
+    self.lin_v = VecLinear(4, vdim)
+    self.scalar_layers = nn.Sequential(
+      nn.Linear(4, adim),
+      nn.LeakyReLU(0.2, inplace=True),
+      nn.Linear(adim, adim))
+    self.conv_v = VecConv1d(vdim, 4, True)
+    self.conv_a = ScalConv1d(adim, 4, True)
+  def forward(self, pos_0, pos_1):
+    """ pos0: (batch, nodes, 3)
+        pos1: (batch, nodes, 3)
+        return: tuple(a_out, v_out)
+        a_out: (batch, nodes, adim)
+        v_out: (batch, nodes, vdim, 3) """
+    batch,          nodes,          must_be[3] = pos_0.shape
+    must_be[batch], must_be[nodes], must_be[3] = pos_1.shape
+    vecs = torch.stack([ # 4 relative vectors
+        pos_0[:,  1:] - pos_0[:, :-1],
+        pos_1[:,  1:] - pos_1[:, :-1],
+        pos_1[:, :-1] - pos_0[:,  1:],
+        pos_1[:,  1:] - pos_0[:, :-1],
+      ], dim=2) # (batch, nodes - 1, 4, 3)
+    norms = torch.linalg.vector_norm(vecs, dim=-1) # (batch, nodes - 1, 4)
+    y_a = self.scalar_layers(norms)
+    y_v = self.lin_v(vecs)
+    a_out = self.conv_a(y_a)
+    v_out = self.conv_v(y_v)
+    return a_out, v_out
 
 
 
