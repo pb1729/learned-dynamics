@@ -123,6 +123,24 @@ def get_polymer_a_quart(k, n, dim=3):
         return ans.reshape(-1, n*dim)
     return a
 
+def get_polymer_a_steric(k, n, dim=3):
+    """ Get an acceleration function defining a polymer syste, with n atoms and
+        a (1/r)**12 repulsive force between all pairs of atoms. """
+    def bond_force(delta_x):
+      return k*delta_x
+    def repel_force(delta_x):
+      return -delta_x/((delta_x**2).sum(-1, keepdim=True) + 0.2)**6
+    def a(x):
+      x = x.reshape(-1, n, dim)
+      ans = torch.zeros_like(x)
+      F_bond = bond_force(x[:, :-1] - x[:, 1:])
+      ans[:, 1:]  += F_bond
+      ans[:, :-1] -= F_bond
+      ans += repel_force(x[:, :, None] - x[:, None, :]).sum(1)
+      return ans.reshape(-1, n*dim)
+    return a
+
+
 
 sims = {
     "SHO, Langevin": TrajectorySim(
@@ -174,6 +192,12 @@ for l in [2, 5, 12, 24, 36, 48]:
         get_polymer_a(1.0, l, dim=3),
         torch.tensor([0.]*l*3, dtype=torch.float64), 1.0,
         float(t), 16*t,
+        metadata={"poly_len": l, "space_dim": 3}
+      )
+    sims["3d_repel_ou_poly_l%d_t%d" % (l, t)] = TrajectorySim(
+      get_polymer_a_steric(1.0, l, dim=3),
+      torch.tensor([10.]*l*3, dtype=torch.float64), 1.0,
+        float(t), 32*t,
         metadata={"poly_len": l, "space_dim": 3}
       )
 

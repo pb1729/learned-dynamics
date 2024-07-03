@@ -7,11 +7,11 @@ from config import Config, Condition
 from train import training_run
 
 
-SIMTYPE = "3d_ou_poly"
-ARCH = "wgan_3d_taxicab"
-RUN_ID = "M0"
+SIMTYPE = "3d_repel_ou_poly"
+ARCH = "wgan_3d_proxattn"
+RUN_ID = "M2"
 
-L_LIST = [2, 5, 12, 24, 36, 48]
+L_LIST = [24]#[2, 5, 12, 24, 36, 48]
 T_LIST = [3, 10, 30, 100, 300]
 NSTEPS_LIST = [1024, 2048, 4096, 8192, 16384, 32768, 65536]
 
@@ -25,6 +25,9 @@ if "gan" in ARCH:
     "z_scale": 18., "inst_noise_str_r": 0., "inst_noise_str_g": 0.,
     "adim": 64, "vdim": 32, "agroups": 8, "vgroups": 4,
     "rank": 24,
+    # proxattn stuff:
+    "r0_list": [2., 3., 4., 6., 8., 12., 16., 24.],
+    "kq_dim": (8, 8),
   }
   for l in L_LIST:
     for t in T_LIST:

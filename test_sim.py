@@ -37,16 +37,36 @@ def eval_sample_step(init_states, fin_statess, sim, basis):
     compare_predictions_x(init_state, fin_states, sim, basis)
 
 
-def main(sim_nm, basis="rouse"):
+def atoms_display(config):
+  from atoms_display import launch_atom_display
+  import time
+  from sims import equilibrium_sample
+  assert config.sim.space_dim == 3
+  def clean_for_display(x):
+    return x.cpu().numpy()
+  x, v = equilibrium_sample(config, 1)
+  display = launch_atom_display(5*np.ones(config.sim.poly_len, dtype=int),
+    clean_for_display(x.reshape(config.sim.poly_len, config.sim.space_dim)))
+  while True:
+    x_traj, v_traj = config.sim.generate_trajectory(x, v, 256)
+    x, v = x_traj[:, -1], v_traj[:, -1]
+    x_snapshots = x_traj.reshape(1, 256, config.sim.poly_len, config.sim.space_dim)
+    for i in range(256):
+      time.sleep(0.1)
+      display.update_pos(clean_for_display(x_snapshots[0, i]))
+    
+      
+def main(sim_nm, basis="rouse", do_atoms_display=None):
   assert basis in BASES
   # get comparison data
   test_config = Config(sim_nm, "none", x_only=True, t_eql=4)
-  init_states, fin_states = get_continuation_dataset(10, 10000, test_config)
+  if do_atoms_display is not None:
+    atoms_display(test_config)
+  init_states, fin_states = get_continuation_dataset(10, 1000, test_config)
   init_states, fin_states = init_states.to(torch.float32), fin_states.to(torch.float32)
   print(fin_states.shape, init_states.shape)
   # compare!
   eval_sample_step(init_states, fin_states, test_config.sim, basis)
-
 
 if __name__ == "__main__":
   from sys import argv
