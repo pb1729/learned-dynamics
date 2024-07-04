@@ -3,7 +3,7 @@
 #   --- Utilization: ---
 #
 # tensorboard --logdir=runs
-# ssh -NfL 6006:localhost:6006 phillip@yourmachine.example.com
+# ssh -NfL 6006:localhost:6006 username@yourmachine.example.com
 # firefox http://localhost:6006
 
 from torch.utils.tensorboard import SummaryWriter
