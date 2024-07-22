@@ -142,22 +142,15 @@ def get_polymer_a_steric(k, n, dim=3):
 
 
 
-sims = {
-    "SHO, Langevin": TrajectorySim(
-        (lambda x: -x),
-        torch.tensor([1.0], dtype=torch.float64), 1.0,
-        1.0, 60
-    ),
-    "SHO, Ornstein Uhlenbeck": TrajectorySim(
-        (lambda x: -x),
-        torch.tensor([10.], dtype=torch.float64), 1.0,
-        3.0, 60
-    ),
-}
+sims = {}
 
-
-for l in [2, 5, 12, 24, 36, 48]:
-  for t in [3, 10, 30, 100, 300]:
+for t in [3, 10, 30, 100, 300]:
+  sims["ou_sho_t%d" % t] = TrajectorySim(
+      (lambda x: -x),
+      torch.tensor([10.], dtype=torch.float64), 1.0,
+      float(t), 32*t,
+    )
+  for l in [2, 5, 12, 24, 36, 48]:
     sims["ou_poly_l%d_t%d" % (l, t)] = TrajectorySim(
         get_polymer_a(1.0, l, dim=1),
         torch.tensor([10.]*l, dtype=torch.float64), 1.0,

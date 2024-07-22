@@ -50,9 +50,15 @@ def get_sample_step(model):
 
 
 def compare_predictions_x(x_init, x_predicted, x_actual, sim, basis, show_histogram=True):
-  x_init = x_init.cpu().numpy().reshape(-1, sim.poly_len, sim.space_dim)
-  x_predicted = x_predicted.cpu().numpy().reshape(-1, sim.poly_len, sim.space_dim)
-  x_actual = x_actual.cpu().numpy().reshape(-1, sim.poly_len, sim.space_dim)
+  if hasattr(sim, "poly_len") and hasattr(sim, "space_dim"):
+    poly_len = sim.poly_len
+    space_dim = sim.space_dim
+  else: # just pretend each dim is a 1d atom
+    poly_len = sim.dim
+    space_dim = 1
+  x_init = x_init.cpu().numpy().reshape(-1, poly_len, space_dim)
+  x_predicted = x_predicted.cpu().numpy().reshape(-1, poly_len, space_dim)
+  x_actual = x_actual.cpu().numpy().reshape(-1, poly_len, space_dim)
   plotter = Plotter(BASES[basis], samples_subset_size=SHOW_REALSPACE_SAMPLES, title=("basis type = " + basis))
   plotter.plot_samples(x_actual)
   plotter.plot_samples(x_predicted)
@@ -75,8 +81,8 @@ def gaussian_kl_div(x_actual, x_predicted):
   must_be[samples], must_be[dim] = x_predicted.shape
   mu_actl = x_actual.mean(0)
   mu_pred = x_predicted.mean(0)
-  cov_actl = torch.cov(x_actual.T)
-  cov_pred = torch.cov(x_predicted.T)
+  cov_actl = torch.cov(x_actual.T).reshape(dim, dim) # we're forced to reshape because the behaviour of cov is inconsistent for vectors of dimension 1
+  cov_pred = torch.cov(x_predicted.T).reshape(dim, dim)
   d_mu = mu_pred - mu_actl
   inv_cov_pred = torch.linalg.inv(cov_pred)
   kl_means = 0.5*(d_mu*(inv_cov_pred @ d_mu)).sum()
