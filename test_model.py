@@ -108,6 +108,7 @@ def eval_sample_step(sample_step, init_statess, fin_statess, config, basis):
       fin_states = fin_states[:, :config.sim.dim]
       pred_fin_states = pred_fin_states[:, :config.sim.dim]
     print(gaussian_kl_div(fin_states, pred_fin_states), end="\t")
+    print(gaussian_kl_div(fin_states[0::2], fin_states[1::2]))
     compare_predictions_x(init_states[0], pred_fin_states, fin_states, config.sim, basis)
 
 

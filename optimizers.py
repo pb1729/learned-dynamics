@@ -32,7 +32,7 @@ class FriendlyAverage34(Optimizer):
       for param in group["params"]:
         state = self._get_state(param, weight_decay)
         state["step"] += 1
-        grad = param.grad
+        grad = param.grad if param.grad is not None else torch.tensor(0., device=param.device)
         # estimate second moment:
         state["v"].mul_(beta)
         state["v"].addcmul_(grad, grad, value=(1. - beta))

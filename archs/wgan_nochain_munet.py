@@ -145,11 +145,9 @@ class GAN:
       }
   def train_step(self, data, cond):
     # training steps
-    if self.step_count % 3 == 0:
-      loss_g = self.gen_step(data, cond)
-    else:
-      loss_g = 0
-    loss_d = self.disc_step(data, cond)
+    for _ in range(3): # do a full FA34 cycle for the discriminator on the same data
+      loss_d = self.disc_step(data, cond)
+    loss_g = self.gen_step(data, cond)
     # save parameters and other data, maybe record a frame
     if self.step_count % 3 == 0:
       self.record_frame(self.step_count//3)

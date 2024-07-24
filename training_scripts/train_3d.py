@@ -7,21 +7,21 @@ from config import Config, Condition
 from train import training_run
 
 
-SIMTYPE = "3d_repel_ou_poly"
-ARCH = "wgan_3d_proxattn"
-RUN_ID = "M2"
+SIMTYPE = "3d_ou_poly"
+ARCH = "wgan_3d_l2pen"
+RUN_ID = "N1"
 
-L_LIST = [24]#[2, 5, 12, 24, 36, 48]
-T_LIST = [3, 10, 30, 100, 300]
+L_LIST = [12]#[2, 5, 12, 24, 36, 48]
+T_LIST = [10]#[3, 10, 30, 100, 300]
 NSTEPS_LIST = [1024, 2048, 4096, 8192, 16384, 32768, 65536]
 
 
 if "gan" in ARCH:
   arch_specific = {
-    "lr_d": 0.0008,
-    "lr_g": 0.00005,
+    "lr_d": 0.001,
+    "lr_g": 0.0001,
     "lpen_wt": 1.0,
-    "beta_1": 0.5, "beta_2": 0.99, "weight_decay": 0.01,
+    "beta_1": 0., "beta_2": 0.99, "weight_decay": 0.001,
     "z_scale": 18., "inst_noise_str_r": 0., "inst_noise_str_g": 0.,
     "adim": 64, "vdim": 32, "agroups": 8, "vgroups": 4,
     "rank": 24,
