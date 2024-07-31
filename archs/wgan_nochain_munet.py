@@ -149,7 +149,7 @@ class GAN:
       loss_d = self.disc_step(data, cond)
     loss_g = self.gen_step(data, cond)
     # save parameters and other data, maybe record a frame
-    if self.step_count % 3 == 0:
+    if False and self.step_count % 3 == 0: # TODO: put to true if you want to record frames...
       self.record_frame(self.step_count//3)
     for j, param in enumerate(self.disc.parameters()):
       self.weight_histories_d[self.step_count, j] = param.reshape(-1)[0].detach().item()

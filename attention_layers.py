@@ -22,7 +22,7 @@ class ProbePoints(nn.Module):
     """ ax: (batch, nodes, adim)
         vx: (batch, nodes, vdim, 3)
         positions: list of (batch, nodes, 3)
-        ans: (batch, nodes, probe_pts, 3) """
+        ans: (n_probe_pts, batch, nodes, 3) """
     batch,          nodes,          adim = ax.shape
     must_be[batch], must_be[nodes], vdim, must_be[3] = vx.shape
     positions = torch.stack(positions, dim=2)

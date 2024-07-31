@@ -123,13 +123,13 @@ def get_polymer_a_quart(k, n, dim=3):
         return ans.reshape(-1, n*dim)
     return a
 
-def get_polymer_a_steric(k, n, dim=3):
+def get_polymer_a_steric(k, n, dim=3, repel_scale=1.0):
     """ Get an acceleration function defining a polymer syste, with n atoms and
         a (1/r)**12 repulsive force between all pairs of atoms. """
     def bond_force(delta_x):
       return k*delta_x
     def repel_force(delta_x):
-      return -delta_x/((delta_x**2).sum(-1, keepdim=True) + 0.2)**6
+      return -repel_scale*delta_x/((delta_x**2).sum(-1, keepdim=True) + 0.2)**6
     def a(x):
       x = x.reshape(-1, n, dim)
       ans = torch.zeros_like(x)
@@ -140,6 +140,21 @@ def get_polymer_a_steric(k, n, dim=3):
       return ans.reshape(-1, n*dim)
     return a
 
+def get_polymer_a_poten(k, n, dim=3):
+    """ Get an acceleration function defining a polymer system with n atoms and spring constant k
+    The polymer is in a potential (x**4 + y**4 + z**4)/24
+    Shapes:
+    k: ()             [/TT]
+    x: (batch, n*dim) [L]
+    a: (batch, n*dim) [L/TT] """
+    def a(x):
+        x = x.reshape(-1, n, dim)
+        ans = torch.zeros_like(x)
+        ans[:, 1:] += k*(x[:, :-1] - x[:, 1:])
+        ans[:, :-1] += k*(x[:, 1:] - x[:, :-1])
+        ans -= (1/6)*x**3
+        return ans.reshape(-1, n*dim)
+    return a
 
 
 sims = {}
@@ -188,8 +203,26 @@ for t in [3, 10, 30, 100, 300]:
         metadata={"poly_len": l, "space_dim": 3}
       )
     sims["3d_repel_ou_poly_l%d_t%d" % (l, t)] = TrajectorySim(
-      get_polymer_a_steric(1.0, l, dim=3),
-      torch.tensor([10.]*l*3, dtype=torch.float64), 1.0,
+        get_polymer_a_steric(1.0, l, dim=3),
+        torch.tensor([10.]*l*3, dtype=torch.float64), 1.0,
+        float(t), 32*t,
+        metadata={"poly_len": l, "space_dim": 3}
+      )
+    sims["3d_repel2_ou_poly_l%d_t%d" % (l, t)] = TrajectorySim(
+        get_polymer_a_steric(1.0, l, dim=3, repel_scale=3.),
+        torch.tensor([10.]*l*3, dtype=torch.float64), 1.0,
+        float(t), 32*t,
+        metadata={"poly_len": l, "space_dim": 3}
+      )
+    sims["3d_repel3_ou_poly_l%d_t%d" % (l, t)] = TrajectorySim(
+        get_polymer_a_steric(1.0, l, dim=3, repel_scale=10.),
+        torch.tensor([10.]*l*3, dtype=torch.float64), 1.0,
+        float(t), 64*t,
+        metadata={"poly_len": l, "space_dim": 3}
+      )
+    sims["3d_poten_ou_poly_l%d_t%d" % (l, t)] = TrajectorySim(
+        get_polymer_a_poten(1.0, l, dim=3),
+        torch.tensor([10.]*l*3, dtype=torch.float64), 1.0,
         float(t), 32*t,
         metadata={"poly_len": l, "space_dim": 3}
       )

@@ -10,9 +10,9 @@ from train import training_run
 
 SIMTYPE = "ou_sho"
 ARCH = "wgan_nochain_munet"
-RUN_ID = "B45"
+RUN_ID = "B46"
 
-T_LIST = [10]#[3, 10, 30, 100]
+T_LIST = [3, 10, 30]#[3, 10, 30, 100]
 
 
 for t in T_LIST:

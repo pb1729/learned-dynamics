@@ -23,6 +23,17 @@ def basis_transform_neighbours(x):
   n = np.arange(poly_len)
   return x[:, n] - x[:, (n+1)%poly_len]
 
+def basis_transform_neighbours2(x):
+  """ x: (batch, poly_len, space_dim) """
+  _, poly_len, _ = x.shape
+  n = np.arange(poly_len)
+  return x[:, n] - x[:, (n+2)%poly_len]
+  
+def basis_transform_neighbours4(x):
+  """ x: (batch, poly_len, space_dim) """
+  _, poly_len, _ = x.shape
+  n = np.arange(poly_len)
+  return x[:, n] - x[:, (n+4)%poly_len]
 
 
 
@@ -52,13 +63,23 @@ class Plotter:
     plt_w, plt_h = squarish_factorize(poly_len*space_dim)
     self.axes = [self.fig.add_subplot(plt_h, plt_w, n + 1) for n in range(poly_len*space_dim)]
     self.hist_ranges = []
+  def plot_hist_radial(self, samples):
+    batch, poly_len, space_dim = samples.shape
+    if self.fig is None: self._init_hist(poly_len, 1)
+    samples = self.hist_transform(samples)
+    sample_sqmags = (samples**2).sum(2)
+    for i in range(poly_len):
+      if len(self.hist_ranges) <= i: # hist ranges will be filled in once, by the first call to this function
+        self.hist_ranges.append((0, np.max(sample_sqmags[:, i])))
+      ax = self.axes[i]
+      ax.hist(sample_sqmags[:, i], range=self.hist_ranges[i], bins=100, color=self._get_color(), alpha=0.7)
+    self.col_idx += 1
   def plot_hist(self, samples):
     """ samples: (batch, poly_len, space_dim) """
     batch, poly_len, space_dim = samples.shape
     if self.fig is None: self._init_hist(poly_len, space_dim)
     samples = self.hist_transform(samples)
     for i in range(poly_len):
-      hist_range = (np.min(samples[:, i]), np.max(samples[:, i]))
       if len(self.hist_ranges) <= i: # hist ranges will be filled in once, by the first call to this function
         self.hist_ranges.append((np.min(samples[:, i]), np.max(samples[:, i])))
       for j in range(space_dim):

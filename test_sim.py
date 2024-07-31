@@ -13,6 +13,7 @@ BASES = {
   "neighbours": basis_transform_neighbours,
 }
 SHOW_REALSPACE_SAMPLES = 10
+RADIAL = True
 
 
 def compare_predictions_x(x_init, x_actual, sim, basis, show_histogram=True):
@@ -23,8 +24,11 @@ def compare_predictions_x(x_init, x_actual, sim, basis, show_histogram=True):
   plotter.plot_samples_ic(x_init)
   plotter.show()
   if show_histogram:
-    plotter.plot_hist(x_actual)
-    plotter.plot_hist_ic(x_init)
+    if RADIAL:
+      plotter.plot_hist_radial(x_actual)
+    else:
+      plotter.plot_hist(x_actual)
+      plotter.plot_hist_ic(x_init)
     plotter.show()
 
 
@@ -37,7 +41,7 @@ def eval_sample_step(init_states, fin_statess, sim, basis):
     compare_predictions_x(init_state, fin_states, sim, basis)
 
 
-def atoms_display(config):
+def atoms_display(config, iters=256):
   from atoms_display import launch_atom_display
   import time
   from sims import equilibrium_sample
@@ -48,10 +52,10 @@ def atoms_display(config):
   display = launch_atom_display(5*np.ones(config.sim.poly_len, dtype=int),
     clean_for_display(x.reshape(config.sim.poly_len, config.sim.space_dim)))
   while True:
-    x_traj, v_traj = config.sim.generate_trajectory(x, v, 256)
+    x_traj, v_traj = config.sim.generate_trajectory(x, v, iters)
     x, v = x_traj[:, -1], v_traj[:, -1]
-    x_snapshots = x_traj.reshape(1, 256, config.sim.poly_len, config.sim.space_dim)
-    for i in range(256):
+    x_snapshots = x_traj.reshape(1, iters, config.sim.poly_len, config.sim.space_dim)
+    for i in range(iters):
       time.sleep(0.1)
       display.update_pos(clean_for_display(x_snapshots[0, i]))
     
@@ -62,7 +66,7 @@ def main(sim_nm, basis="rouse", do_atoms_display=None):
   test_config = Config(sim_nm, "none", x_only=True, t_eql=4)
   if do_atoms_display is not None:
     atoms_display(test_config)
-  init_states, fin_states = get_continuation_dataset(10, 1000, test_config)
+  init_states, fin_states = get_continuation_dataset(10, 10000, test_config)
   init_states, fin_states = init_states.to(torch.float32), fin_states.to(torch.float32)
   print(fin_states.shape, init_states.shape)
   # compare!

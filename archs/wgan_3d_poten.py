@@ -9,6 +9,11 @@ from layers_common import *
 from attention_layers import *
 
 
+#
+# This is a version of WGAN-3D to handle a polymer that lives in a potential...
+# Basically, we need to tell it the value and derivative of the potential at various probe points
+#
+
 
 class LocalResidual(nn.Module):
   """ Residual layer that just does local processing on individual nodes. """
@@ -39,6 +44,37 @@ class LocalResidual(nn.Module):
     return (x_a + z_a), (x_v + z_v)
 
 
+class GetPotentialData(nn.Module):
+  """ nn layer that gets data about the value of the potential at a a set of probe points
+      for this case, the potential is (x**4 + y**4 + z**4)/24 """
+  def __init__(self, adim, vdim, npts):
+    super().__init__()
+    self.probes = ProbePoints(2, npts, adim, vdim)
+    self.W_a = nn.Parameter(torch.empty(adim, npts))
+    self.W_v = nn.Parameter(torch.empty(vdim, npts))
+  def self_init(self):
+    _, npts,         = self.W_a.shape
+    _, must_be[npts] = self.W_v.shape
+    stddev = npts**(-0.5)
+    nn.init.normal_(self.W_a, std=stddev)
+    nn.init.normal_(self.W_v, std=stddev)
+  def forward(self, tup):
+    """ shapes:
+    pos_0, pos_1: (batch, nodes, 3)
+    x_a: (batch, nodes, adim)
+    x_v: (batch, nodes, vdim, 3)
+    ans: tuple(y_a, y_v)
+    y_a: (batch, nodes, adim)
+    y_v: (batch, nodes, vdim, 3) """
+    pos_0, pos_1, x_a, x_v = tup
+    probe_pts = self.probes(x_a, x_v, [pos_0, pos_1]) # (npts, batch, nodes, 3)
+    U = (probe_pts**4).sum(-1)/24 # (npts, batch, nodes)
+    dU = (probe_pts**3)/6 # (npts, batch, nodes, 3)
+    y_a = torch.einsum("pbn, jp -> bnj", U, self.W_a)
+    y_v = torch.einsum("pbnv, jp -> bnjv", dU, self.W_v)
+    return y_a, y_v
+
+
 class Block(nn.Module):
   def __init__(self, config):
     super().__init__()
@@ -46,6 +82,7 @@ class Block(nn.Module):
     agroups, vgroups = config["agroups"], config["vgroups"]
     self.edge_embed = EdgeRelativeEmbedMLPPath(adim, vdim)
     self.node_embed = NodeRelativeEmbedMLP(adim, vdim)
+    self.poten_embed = GetPotentialData(adim, vdim, 8)
     self.conv_0_a = ScalConv1d(adim, 7)
     self.conv_0_v = VecConv1d(vdim, 7)
     self.local_res = LocalResidual(config)
@@ -62,8 +99,9 @@ class Block(nn.Module):
   def forward(self, tup):
     pos_0, pos_1, x_a, x_v = tup
     emb_a, emb_v = self.get_embedding(pos_0, pos_1)
-    y_a = self.conv_0_a(x_a) + emb_a
-    y_v = self.conv_0_v(x_v) + emb_v
+    emb_poten_a, emb_poten_v = self.poten_embed(tup)
+    y_a = self.conv_0_a(x_a) + emb_a + emb_poten_a
+    y_v = self.conv_0_v(x_v) + emb_v + emb_poten_v
     y_a, y_v = self.local_res(y_a, y_v)
     probes = self.probe_pts(y_a, y_v, [pos_0, pos_1])
     probes_k, probes_q = probes[0], probes[1]
@@ -139,6 +177,7 @@ class WGAN3D:
     assert config.cond_type == Condition.COORDS
     assert config.subtract_mean == 0
     assert config.x_only
+    assert "poten" in config.sim_name
     self.n_nodes = config.sim.poly_len
     self.init_optim()
   def init_optim(self):
@@ -172,16 +211,10 @@ class WGAN3D:
       self.lr_schedule_update()
     return loss_d, loss_g
   def lr_schedule_update(self):
-    try:
-      lr_d_fac = self.config["lr_d_fac"]
-      lr_g_fac = self.config["lr_g_fac"]
-    except IndexError:
-      lr_d_fac = 0.99
-      lr_g_fac = 0.95
     for group in self.optim_g.param_groups: # learning rate schedule
-      group["lr"] *= lr_g_fac
+      group["lr"] *= 0.95
     for group in self.optim_d.param_groups: # learning rate schedule
-      group["lr"] *= lr_d_fac
+      group["lr"] *= 0.99
   def disc_step(self, data, cond):
     self.optim_d.zero_grad()
     # train on real data (with instance noise)

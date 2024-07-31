@@ -5,13 +5,15 @@ import matplotlib.pyplot as plt
 from utils import must_be
 from config import load
 from sims import equilibrium_sample, get_dataset
-from plotting_common import Plotter, basis_transform_coords, basis_transform_rouse, basis_transform_neighbours
+from plotting_common import Plotter, basis_transform_coords, basis_transform_rouse, basis_transform_neighbours, basis_transform_neighbours2, basis_transform_neighbours4
 
 
 BASES = {
   "coords": basis_transform_coords,
   "rouse": basis_transform_rouse,
   "neighbours": basis_transform_neighbours,
+  "neighbours2": basis_transform_neighbours2,
+  "neighbours4": basis_transform_neighbours4,
 }
 SHOW_REALSPACE_SAMPLES = 10
 
@@ -20,13 +22,14 @@ def is_gan(model):
   return hasattr(model, "is_gan") and model.is_gan
 
 
-def get_continuation_dataset(batch, contins, config, iterations=1):
-  """ get a dataset of many possible continued trajectories from each of N initial states """
-  print("creating initial states...")
-  x_init, v_init = equilibrium_sample(config, batch)
+def continuation(x_init, v_init, contins, config, iterations=1):
   # expand along another dim to enumerate continuations
-  x = x_init[:, None].expand(batch, contins, config.sim.dim).clone() # will be written to, so clone
-  v = v_init[:, None].expand(batch, contins, config.sim.dim).clone() # will be written to, so clone
+  batch,          must_be[config.sim.dim] = x_init.shape
+  must_be[batch], must_be[config.sim.dim] = v_init.shape
+  x_init = x_init[:, None].expand(batch, contins, config.sim.dim)
+  v_init = v_init[:, None].expand(batch, contins, config.sim.dim)
+  x = x_init.clone() # will be written to, so clone
+  v = v_init.clone() # will be written to, so clone
   x = x.reshape(batch*contins, -1)
   v = v.reshape(batch*contins, -1)
   print("created. calculating continuations from initial states...")
@@ -39,6 +42,13 @@ def get_continuation_dataset(batch, contins, config, iterations=1):
   return xv_init, xv_fin.reshape(batch, contins, config.state_dim)
 
 
+def get_continuation_dataset(batch, contins, config, iterations=1):
+  """ get a dataset of many possible continued trajectories from each of N initial states """
+  print("creating initial states...")
+  x_init, v_init = equilibrium_sample(config, batch)
+  return continuation(x_init, v_init, contins, config, iterations)
+
+
 def get_sample_step(model):
   """ given a model and current state, predict the next state """
   model.set_eval(True)
@@ -49,7 +59,7 @@ def get_sample_step(model):
   return sample_step
 
 
-def compare_predictions_x(x_init, x_predicted, x_actual, sim, basis, show_histogram=True):
+def compare_predictions_x(x_init, x_predicted, x_actual, sim, basis, show_histogram=True, radial=False):
   if hasattr(sim, "poly_len") and hasattr(sim, "space_dim"):
     poly_len = sim.poly_len
     space_dim = sim.space_dim
@@ -65,9 +75,13 @@ def compare_predictions_x(x_init, x_predicted, x_actual, sim, basis, show_histog
   plotter.plot_samples_ic(x_init)
   plotter.show()
   if show_histogram:
-    plotter.plot_hist(x_actual)
-    plotter.plot_hist(x_predicted)
-    plotter.plot_hist_ic(x_init)
+    if radial:
+      plotter.plot_hist_radial(x_actual)
+      plotter.plot_hist_radial(x_predicted)
+    else:
+      plotter.plot_hist(x_actual)
+      plotter.plot_hist(x_predicted)
+      plotter.plot_hist_ic(x_init)
     plotter.show()
 
 
@@ -91,7 +105,7 @@ def gaussian_kl_div(x_actual, x_predicted):
   return (kl_means + kl_covar + kl_lgdet).item()
 
 
-def eval_sample_step(sample_step, init_statess, fin_statess, config, basis):
+def eval_sample_step(sample_step, init_statess, fin_statess, config, basis, radial=False):
   """ given a method that continues evolution for one more step,
       plot various graphs to evaluate it for accuracy
       sample_step:  (contins, state_dim) -> (contins, state_dim)
@@ -109,39 +123,43 @@ def eval_sample_step(sample_step, init_statess, fin_statess, config, basis):
       pred_fin_states = pred_fin_states[:, :config.sim.dim]
     print(gaussian_kl_div(fin_states, pred_fin_states), end="\t")
     print(gaussian_kl_div(fin_states[0::2], fin_states[1::2]))
-    compare_predictions_x(init_states[0], pred_fin_states, fin_states, config.sim, basis)
+    compare_predictions_x(init_states[0], pred_fin_states, fin_states, config.sim, basis, radial=radial)
 
 
-def main(fpath, basis="rouse", iterations=1, contins=10000):
-  assert fpath is not None
-  assert basis in BASES
-  if isinstance(iterations, str): iterations = int(iterations)
-  print("basis = %s    iterations = %d" % (basis, iterations))
+def main(args):
+  print(args)
+  print("basis = %s    iterations = %d" % (args.basis, args.iter))
   # load the model
-  model = load(fpath)
+  model = load(args.fpath)
   model.set_eval(True)
   # define sampling function
   sample_step = get_sample_step(model)
   def sample_steps(state):
     ans = state
-    for i in range(iterations):
+    for i in range(args.iter):
       ans = sample_step(ans)
     return ans
   # get comparison data
-  init_states, fin_states = get_continuation_dataset(10, contins, model.config, iterations=iterations)
+  init_states, fin_states = get_continuation_dataset(args.samples, args.contins, model.config, iterations=args.iter)
   init_states, fin_states = init_states.to(torch.float32), fin_states.to(torch.float32)
   # compare!
-  init_states = init_states[:, None]
-  if is_gan(model):
-    init_states = init_states.expand(-1, contins, -1)
-  eval_sample_step(sample_steps, init_states, fin_states, model.config, basis)
+  if not is_gan(model): # don't do so many samples if we're not distribution matching
+    init_states = init_states[:, 0:1]
+  eval_sample_step(sample_steps, init_states, fin_states, model.config, args.basis, radial=args.radial)
 
 
 
 
 if __name__ == "__main__":
-  from sys import argv
-  main(*argv[1:])
+  from argparse import ArgumentParser
+  parser = ArgumentParser(prog="test_model")
+  parser.add_argument("fpath")
+  parser.add_argument("--basis", dest="basis", choices=[key for key in BASES], default="rouse")
+  parser.add_argument("--radial", dest="radial", action="store_true")
+  parser.add_argument("--iter", dest="iter", type=int, default=1)
+  parser.add_argument("--contins", dest="contins", type=int, default=10000)
+  parser.add_argument("--samples", dest="samples", type=int, default=4)
+  main(parser.parse_args())
 
 
 
