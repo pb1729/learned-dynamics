@@ -8,11 +8,11 @@ from train import training_run
 
 
 SIMTYPE = "3d_repel3_ou_poly"
-ARCH = "wgan_3d_l2pen"
-RUN_ID = "N6"
+ARCH = "wgan_3d_rouse_noise"
+RUN_ID = "N8"
 
 L_LIST = [12]#[2, 5, 12, 24, 36, 48]
-T_LIST = [30]#[3, 10, 30, 100, 300]
+T_LIST = [3, 10, 30, 100, 300]
 NSTEPS_LIST = [1024, 2048, 4096, 8192, 16384, 32768, 65536]
 
 

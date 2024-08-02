@@ -87,7 +87,7 @@ if __name__ == "__main__":
   from argparse import ArgumentParser
   parser = ArgumentParser(prog="full_model_test_1d")
   parser.add_argument("fpath")
-  parser.add_argument("--iter", dest="iter", type=int, action="append")
+  parser.add_argument("--iter", dest="iter", type=int, action="append", default=[1])
   parser.add_argument("--contins", dest="contins", type=int, default=10000)
   parser.add_argument("--samples", dest="samples", type=int, default=24)
   parser.add_argument("--plot", dest="plot", action="store_true") # plot previously recorded datas

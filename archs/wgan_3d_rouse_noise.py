@@ -7,6 +7,7 @@ from utils import must_be
 from gan_common import GANTrainer
 from layers_common import *
 from attention_layers import *
+from polymer_util import RouseEvolver
 
 
 
@@ -98,6 +99,7 @@ class Generator(nn.Module):
   def __init__(self, config):
     super().__init__()
     adim, vdim = config["adim"], config["vdim"]
+    self.rouse_noiser = RouseEvolver(config)
     self.node_enc = NodeRelativeEmbedMLP(adim, vdim)
     self.blocks = nn.Sequential(
       Block(config),
@@ -122,7 +124,8 @@ class Generator(nn.Module):
     *_, y_v = self.blocks_tune((pos0, noised, x_a, x_v))
     return self.lin_v_node_tune(y_v)[:, :, 0]*self.out_norm_coeff
   def forward(self, pos0, noise, ε_a, ε_v):
-    noised = pos0 + noise
+    noised = self.rouse_noiser.predict(pos0, noise)
+    return noised # TODO
     pred_noise = self._predict(pos0, noised)
     noised = noised - pred_noise
     return noised + self._finetune(pos0, noised, ε_a, ε_v)
@@ -182,16 +185,11 @@ class WGAN3D:
       group["lr"] *= lr_g_fac
     for group in self.optim_d.param_groups: # learning rate schedule
       group["lr"] *= lr_d_fac
-  def disc_step(self, data, cond):
+  def disc_step(self, r_data, cond):
     self.optim_d.zero_grad()
-    # train on real data (with instance noise)
-    instance_noise_r = self.config["inst_noise_str_r"]*torch.randn_like(data)
-    r_data = data + instance_noise_r # instance noise
     y_r = self.disc(cond, r_data)
-    # train on generated data (with instance noise)
+    # train on generated data
     g_data = self.generate(cond)
-    instance_noise_g = self.config["inst_noise_str_g"]*torch.randn_like(g_data)
-    g_data = g_data + instance_noise_g # instance noise
     y_g = self.disc(cond, g_data)
     # endpoint penalty on interpolated data
     mix_factors1 = torch.rand(cond.shape[0], 1, 1, device=self.config.device)
@@ -214,8 +212,6 @@ class WGAN3D:
   def gen_step(self, cond):
     self.optim_g.zero_grad()
     g_data = self.generate(cond)
-    instance_noise_g = self.config["inst_noise_str_g"]*torch.randn_like(g_data)
-    g_data = g_data + instance_noise_g # instance noise
     y_g = self.disc(cond, g_data)
     loss = y_g.mean()
     loss.backward()
@@ -236,7 +232,8 @@ class WGAN3D:
     return self.gen(cond, pos_noise, z_a, z_v)
   def get_latents(self, batchsz):
     """ sample latent space for generator """
-    pos_noise = self.config["z_scale"]*torch.randn(batchsz, self.n_nodes, 3, device=self.config.device)
+    self.n_nodes
+    pos_noise = torch.randn(batchsz, self.n_nodes, 3, device=self.config.device)
     z_a = torch.randn(batchsz, self.n_nodes, self.config["adim"], device=self.config.device)
     z_v = torch.randn(batchsz, self.n_nodes, self.config["vdim"], 3, device=self.config.device)
     return pos_noise, z_a, z_v

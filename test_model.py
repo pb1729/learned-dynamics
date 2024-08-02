@@ -105,7 +105,7 @@ def gaussian_kl_div(x_actual, x_predicted):
   return (kl_means + kl_covar + kl_lgdet).item()
 
 
-def eval_sample_step(sample_step, init_statess, fin_statess, config, basis, radial=False):
+def eval_sample_step(sample_step, init_statess, fin_statess, config, basis, radial=False, showkl=False):
   """ given a method that continues evolution for one more step,
       plot various graphs to evaluate it for accuracy
       sample_step:  (contins, state_dim) -> (contins, state_dim)
@@ -121,8 +121,9 @@ def eval_sample_step(sample_step, init_statess, fin_statess, config, basis, radi
       init_states = init_states[:, :config.sim.dim]
       fin_states = fin_states[:, :config.sim.dim]
       pred_fin_states = pred_fin_states[:, :config.sim.dim]
-    print(gaussian_kl_div(fin_states, pred_fin_states), end="\t")
-    print(gaussian_kl_div(fin_states[0::2], fin_states[1::2]))
+    if showkl:
+      print(gaussian_kl_div(fin_states, pred_fin_states), end="\t")
+      print(gaussian_kl_div(fin_states[0::2], fin_states[1::2]))
     compare_predictions_x(init_states[0], pred_fin_states, fin_states, config.sim, basis, radial=radial)
 
 
@@ -145,7 +146,7 @@ def main(args):
   # compare!
   if not is_gan(model): # don't do so many samples if we're not distribution matching
     init_states = init_states[:, 0:1]
-  eval_sample_step(sample_steps, init_states, fin_states, model.config, args.basis, radial=args.radial)
+  eval_sample_step(sample_steps, init_states, fin_states, model.config, args.basis, radial=args.radial, showkl=args.showkl)
 
 
 
@@ -159,6 +160,7 @@ if __name__ == "__main__":
   parser.add_argument("--iter", dest="iter", type=int, default=1)
   parser.add_argument("--contins", dest="contins", type=int, default=10000)
   parser.add_argument("--samples", dest="samples", type=int, default=4)
+  parser.add_argument("--showkl", dest="showkl", action="store_true")
   main(parser.parse_args())
 
 

@@ -1,7 +1,20 @@
 import numpy as np
+import torch
 
 from sims import get_poly_tc
+from utils import must_be
 
+
+def sinhc(x):
+  """ sinhc(x) = sinh(x)/x
+      hyperbolic analog of the sinc function, though without scaling by π.
+      product approximation used here is a truncation of (1080) in Jolley's Summation of Series """
+  ans = 1.
+  z = x.copy()
+  for _ in range(5):
+    z *= 0.5
+    ans *= np.cosh(z)
+  return ans
 
 def rouse(n, length):
   """ get nth Rouse mode for polymer of a given length """
@@ -24,6 +37,36 @@ def rouse_block(length):
     for n in range(length)
   ], axis=-1)
 
+def rouse_block_unitary(length):
+  """ get the entire block of rouse mode coefficients, normalized to give a unitary matrix
+      ans: (length, length) --> ans[i_atom, n_mode] """
+  n = np.arange(0, length)[:, None]
+  m = np.arange(0, length)[None, :]
+  return np.cos(m*np.pi*(0.5 + n)/length)*np.sqrt((2. - (m == 0))/length)
+
+class RouseEvolver:
+  def __init__(self, config, device="cuda"):
+    sim = config.sim
+    length = sim.poly_len
+    drag = get_poly_tc(sim, 1.)
+    mode_k = rouse_k(np.arange(0, length), sim.k, length)
+    quickness = sim.delta_t/drag
+    self.sigmas = np.sqrt(np.exp(-quickness*mode_k)*2*quickness*sinhc(quickness*mode_k))
+    self.decays = np.exp(-quickness*mode_k)
+    self.rouse_block = rouse_block_unitary(length)
+    # now move everything to a torch tensor on the device
+    self.sigmas = torch.tensor(self.sigmas, device=device, dtype=torch.float32)
+    self.decays = torch.tensor(self.decays, device=device, dtype=torch.float32)
+    self.rouse_block = torch.tensor(self.rouse_block, device=device, dtype=torch.float32)
+  def predict(self, x0, noise):
+    """ sample x1 given x0 for a Rouse chain with the same parameters as this sim
+        noise is expected to be randn() with same shape as x0 """
+    batch, length, space_dim = x0.shape
+    must_be[batch], must_be[length], must_be[space_dim] = noise.shape
+    modes = torch.einsum("bnv, nm -> bmv", x0, self.rouse_block)
+    modes *= self.decays[..., None]
+    modes += self.sigmas[..., None]*noise
+    return torch.einsum("bmv, nm -> bnv", modes, self.rouse_block)
 
 
 # ARBITRARY QUANTA THEORY (THE IDEALISTIC THEORY)

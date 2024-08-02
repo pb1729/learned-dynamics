@@ -218,13 +218,13 @@ for t in [3, 10, 30, 100, 300]:
         get_polymer_a_steric(1.0, l, dim=3, repel_scale=10.),
         torch.tensor([10.]*l*3, dtype=torch.float64), 1.0,
         float(t), 64*t,
-        metadata={"poly_len": l, "space_dim": 3}
+        metadata={"poly_len": l, "space_dim": 3, "k": 1.0}
       )
     sims["3d_poten_ou_poly_l%d_t%d" % (l, t)] = TrajectorySim(
         get_polymer_a_poten(1.0, l, dim=3),
         torch.tensor([10.]*l*3, dtype=torch.float64), 1.0,
         float(t), 32*t,
-        metadata={"poly_len": l, "space_dim": 3}
+        metadata={"poly_len": l, "space_dim": 3, "k": 1.0}
       )
 
 
