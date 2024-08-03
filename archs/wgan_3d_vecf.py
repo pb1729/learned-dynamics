@@ -87,13 +87,12 @@ class Discriminator(nn.Module):
       Block(config),
       Block(config),
       Block(config))
-    self.lin_a = nn.Linear(adim, 1, bias=False)
-    self.lin_v = nn.Linear(vdim, 1, bias=False)
+    self.lin_v = VecLinear(vdim, 1)
   def forward(self, pos_0, pos_1):
     x_a, x_v = self.node_enc(pos_0, pos_1)
     *_, y_a, y_v = self.blocks((pos_0, pos_1, x_a, x_v))
-    v_norms = torch.linalg.vector_norm(y_v, dim=-1)
-    return (self.lin_a(y_a) + self.lin_v(v_norms)).sum(2).mean(1)
+    # y_a not used, very sad! TODO?
+    return self.lin_v(y_v)[:, :, 0]
 
 
 class Generator(nn.Module):
@@ -185,47 +184,32 @@ class WGAN3D:
       group["lr"] *= lr_g_fac
     for group in self.optim_d.param_groups: # learning rate schedule
       group["lr"] *= lr_d_fac
+  def sample_flow(self, x, x_rg):
+    """ sample flow vector field function
+        x, x_rg: (batch, nodes, 3) """
+    Δx = x - x_rg
+    #sq_dist = (torch.sqrt((Δx**2).sum(2, keepdim=True)).mean(1, keepdim=True))**2
+    sq_dist = (Δx**2).sum(2, keepdim=True).mean(1, keepdim=True)
+    return Δx/torch.sqrt(sq_dist + 1)
+    #return Δx/(sq_dist**3 + 1.)
   def disc_step(self, r_data, cond):
     self.optim_d.zero_grad()
-    y_r = self.disc(cond, r_data)
-    # train on generated data
     g_data = self.generate(cond)
-    y_g = self.disc(cond, g_data)
-    # endpoint penalty on interpolated data
-    mix_factors1 = torch.rand(cond.shape[0], 1, 1, device=self.config.device)
-    mixed_data1 = mix_factors1*g_data + (1 - mix_factors1)*r_data
-    y_mixed1 = self.disc(cond, mixed_data1)
-    mix_factors2 = torch.rand(cond.shape[0], 1, 1, device=self.config.device)
-    mixed_data2 = mix_factors2*g_data + (1 - mix_factors2)*r_data
-    y_mixed2 = self.disc(cond, mixed_data2)
-    ep_penalty = (self.endpoint_penalty(r_data, g_data, y_r, y_g)
-                + self.endpoint_penalty(mixed_data1, r_data, y_mixed1, y_r)
-                + self.endpoint_penalty(g_data, mixed_data1, y_g, y_mixed1)
-                + self.endpoint_penalty(mixed_data2, r_data, y_mixed2, y_r)
-                + self.endpoint_penalty(g_data, mixed_data2, y_g, y_mixed2)
-                + self.endpoint_penalty(mixed_data1, mixed_data2, y_mixed1, y_mixed2))
-    # loss, backprop, update
-    loss = self.config["lpen_wt"]*ep_penalty.mean() + y_r.mean() - y_g.mean()
+    x_data = self.generate(cond) + self.config["z_scale"]*torch.randn_like(g_data) # we'd like the discriminator flow field to be accurate on the space of generated data
+    flow_frg = self.sample_flow(x_data, r_data) - self.sample_flow(x_data, g_data) # get a fragment of the actual flow
+    flow_hat = self.disc(cond, x_data) # get predicted flow
+    loss = ((flow_hat - flow_frg)**2).sum(2).mean() # average over batch and nodes
     loss.backward()
     self.optim_d.step()
     return loss.item()
   def gen_step(self, cond):
     self.optim_g.zero_grad()
     g_data = self.generate(cond)
-    y_g = self.disc(cond, g_data)
-    loss = y_g.mean()
-    loss.backward()
+    with torch.no_grad():
+      flow = self.disc(cond, g_data)
+    g_data.backward(gradient=flow) # ooh, not using a scalar loss function, spooky
     self.optim_g.step()
-    return loss.item()
-  def endpoint_penalty(self, x1, x2, y1, y2):
-    epsilon = 0.01 # this will be put into distance, since we'll be dividing by it
-    # use the taxicab metric (take average distance that nodes moved rather than RMS distance)
-    dist = torch.sqrt(((x1 - x2)**2).sum(2) + epsilon).mean(1)
-    # one-sided L1 penalty:
-    penalty_l1 = F.relu(torch.abs(y1 - y2)/dist - 1.)
-    # zero-centered L2 penalty:
-    penalty_l2 = 0.2*((y1 - y2)/dist)**2
-    return penalty_l1 + penalty_l2
+    return (flow**2).mean().item()
   def generate(self, cond):
     batch, must_be[self.n_nodes], must_be[3] = cond.shape
     pos_noise, z_a, z_v = self.get_latents(batch)

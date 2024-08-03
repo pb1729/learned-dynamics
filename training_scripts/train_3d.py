@@ -7,12 +7,12 @@ from config import Config, Condition
 from train import training_run
 
 
-SIMTYPE = "3d_repel3_ou_poly"
-ARCH = "wgan_3d_rouse_noise"
-RUN_ID = "N8"
+SIMTYPE = "3d_ou_poly"
+ARCH = "wgan_3d_vecf"
+RUN_ID = "O0"
 
 L_LIST = [12]#[2, 5, 12, 24, 36, 48]
-T_LIST = [3, 10, 30, 100, 300]
+T_LIST = [30]#[3, 10, 30, 100, 300]
 NSTEPS_LIST = [1024, 2048, 4096, 8192, 16384, 32768, 65536]
 
 
@@ -22,7 +22,7 @@ if "gan" in ARCH:
     "lr_g": 0.0001, "lr_g_fac": 0.99,
     "lpen_wt": 1.0,
     "beta_1": 0., "beta_2": 0.99, "weight_decay": 0.001,
-    "z_scale": 18.,
+    "z_scale": 4.,
     "inst_noise_str_r": 0., "inst_noise_str_g": 0., # TODO: probably get rid of these at some point (need to make another arch for it...)
     "adim": 64, "vdim": 32, "agroups": 8, "vgroups": 4,
     "rank": 24,
