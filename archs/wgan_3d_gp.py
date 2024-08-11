@@ -10,6 +10,14 @@ from attention_layers import *
 from polymer_util import RouseEvolver
 
 
+#
+# This model uses a proper gradient penalty (zero-centered L2) and hinge loss
+# these suggestions are from the diffusion distillation paper, 2311.17042 (https://arxiv.org)
+#
+# TODO: do hinge loss? (if choose not to, delete from above comment)
+#
+
+
 class LocalResidual(nn.Module):
   """ Residual layer that just does local processing on individual nodes. """
   def __init__(self, config):
@@ -190,21 +198,9 @@ class WGAN3D:
     # train on generated data
     g_data = self.generate(cond)
     y_g = self.disc(cond, g_data)
-    # endpoint penalty on interpolated data
-    mix_factors1 = torch.rand(cond.shape[0], 1, 1, device=self.config.device)
-    mixed_data1 = mix_factors1*g_data + (1 - mix_factors1)*r_data
-    y_mixed1 = self.disc(cond, mixed_data1)
-    mix_factors2 = torch.rand(cond.shape[0], 1, 1, device=self.config.device)
-    mixed_data2 = mix_factors2*g_data + (1 - mix_factors2)*r_data
-    y_mixed2 = self.disc(cond, mixed_data2)
-    ep_penalty = (self.endpoint_penalty(r_data, g_data, y_r, y_g)
-                + self.endpoint_penalty(mixed_data1, r_data, y_mixed1, y_r)
-                + self.endpoint_penalty(g_data, mixed_data1, y_g, y_mixed1)
-                + self.endpoint_penalty(mixed_data2, r_data, y_mixed2, y_r)
-                + self.endpoint_penalty(g_data, mixed_data2, y_g, y_mixed2)
-                + self.endpoint_penalty(mixed_data1, mixed_data2, y_mixed1, y_mixed2))
-    # loss, backprop, update
-    loss = self.config["lpen_wt"]*ep_penalty.mean() + y_r.mean() - y_g.mean()
+    # gradient penalty on real data
+    gp = self.gradient_penalty(cond, r_data)
+    loss = self.config["gp_coeff"]*gp + y_r.mean() - y_g.mean()
     loss.backward()
     self.optim_d.step()
     return loss.item()
@@ -216,15 +212,14 @@ class WGAN3D:
     loss.backward()
     self.optim_g.step()
     return loss.item()
-  def endpoint_penalty(self, x1, x2, y1, y2):
-    epsilon = 0.01 # this will be put into distance, since we'll be dividing by it
-    # use the taxicab metric (take average distance that nodes moved rather than RMS distance)
-    dist = torch.sqrt(((x1 - x2)**2).sum(2) + epsilon).mean(1)
-    # one-sided L1 penalty:
-    penalty_l1 = F.relu(torch.abs(y1 - y2)/dist - 1.)
-    # zero-centered L2 penalty:
-    penalty_l2 = 0.2*((y1 - y2)/dist)**2
-    return penalty_l1 + penalty_l2
+  def gradient_penalty(self, x0, x1):
+    x1 = x1.clone().detach().requires_grad_(True)
+    y = self.disc(x0, x1)
+    outputs = y.mean()
+    gradients, = torch.autograd.grad(outputs=[outputs], inputs=[x1],
+      grad_outputs=[torch.ones_like(outputs)],
+      create_graph=True, retain_graph=True)
+    return 0.5*(gradients**2).sum((1,2)).mean(0)
   def generate(self, cond):
     batch, must_be[self.n_nodes], must_be[3] = cond.shape
     pos_noise, z_a, z_v = self.get_latents(batch)
