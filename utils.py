@@ -18,26 +18,32 @@ must_be = _MustBe()
 
 # batched evaluation:
 
-def batched_2_moment(x, batch=64000):
-  """ compute expected (outer product) square of tensor in batches
-      x: (instances, dim)
-      ans: (dim, dim) """
-  instances, _ = x.shape
-  ans = 0.
-  for i in range(0, instances, batch):
-    ans += torch.einsum("ix, iy -> xy", x[i:i+batch], x[i:i+batch])
-  return ans/(instances - 1)
-
 def batched_xy_moment(x, y, batch=64000):
   """ compute product moment of two tensors in batches
       x: (instances, dim1)
       y: (instances, dim2)
       ans: (dim1, dim2)"""
-  instances, _ = x.shape
-  assert y.shape[0] == instances
+  instances,          _ = x.shape
+  must_be[instances], _ = y.shape
   ans = 0.
   for i in range(0, instances, batch):
     ans += torch.einsum("ix, iy -> xy", x[i:i+batch], y[i:i+batch])
+  return ans/(instances - 1)
+
+def batched_xy_moment_dot_3d(x, y, l=1, batch=64000):
+  """ compute expected (outer product) square of tensor in batches
+      tensor should contain irreps for the given choice of l
+      takes dot product of the irreps in the tensor
+      l: int -- characterizes which irrep we're dealing with
+      x: (instances, dim1, 2l+1)
+      y: (instances, dim2, 2l+1)
+      ans: (dim1, dim2) """
+  repdim = 2*l + 1
+  instances,          _, must_be[repdim] = x.shape
+  must_be[instances], _, must_be[repdim] = y.shape
+  ans = 0.
+  for i in range(0, instances, batch):
+    ans += torch.einsum("ixv, iyv -> xy", x[i:i+batch], y[i:i+batch])
   return ans/(instances - 1)
 
 

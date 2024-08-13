@@ -9,7 +9,7 @@ from train import training_run
 
 SIMTYPE = "3d_ou_poly"
 ARCH = "wgan_3d_gp_classic"
-RUN_ID = "O3"
+RUN_ID = "TODO"
 
 L_LIST = [12]#[2, 5, 12, 24, 36, 48]
 T_LIST = [3]#[3, 10, 30, 100, 300]
