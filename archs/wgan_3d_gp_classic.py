@@ -13,8 +13,6 @@ from attention_layers import *
 # This model uses a proper gradient penalty (zero-centered L2) and hinge loss
 # these suggestions are from the diffusion distillation paper, 2311.17042 (https://arxiv.org)
 #
-# TODO: do hinge loss? (if choose not to, delete from above comment)
-#
 
 
 class LocalResidual(nn.Module):
@@ -198,7 +196,12 @@ class WGAN3D:
     y_g = self.disc(cond, g_data)
     # gradient penalty on real data
     gp = self.gradient_penalty(cond, r_data)
-    loss = self.config["gp_coeff"]*gp + y_r.mean() - y_g.mean()
+    # overall loss
+    if self.config["hinge"]:
+      loss = torch.relu(1. + y_r).mean() + torch.relu(1. - y_g).mean()
+    else:
+      loss = y_r.mean() - y_g.mean()
+    loss = loss + self.config["gp_coeff"]*gp
     loss.backward()
     self.optim_d.step()
     return loss.item()
