@@ -1,6 +1,13 @@
 import torch
 
 
+def prod(dims):
+  ans = 1
+  for dim in dims:
+    ans *= dim
+  return ans
+
+
 def compare_tensors(t1, t2):
   def largest_elem(t):
     return abs(t).max().item()

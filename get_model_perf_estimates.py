@@ -6,31 +6,57 @@ from test_model import get_sample_step, get_continuation_dataset, gaussian_kl_di
 from config import load
 
 
+def get_avg_kl(n_iter, model, args):
+  # define sampling function
+  sample_step = get_sample_step(model)
+  def sample_steps(state):
+    ans = state.to(torch.float32)
+    for i in range(n_iter):
+      ans = sample_step(ans)
+    return ans.to(torch.float64)
+  x0, x1 = get_continuation_dataset(args.samples, args.contins, model.config, iterations=n_iter)
+  x1_hat = sample_steps(x0.reshape(-1, model.config.sim.dim)).reshape(-1, args.contins, model.config.sim.dim)
+  divs = []
+  for i in range(args.samples):
+    divs.append(gaussian_kl_div(x1[i], x1_hat[i]))
+  divs = np.array(divs)
+  div_μ  = divs.mean()
+  div_uμ = divs.std()/(args.samples**0.5) # uncertainty in the mean
+  return div_μ, div_uμ
+
+
+def compute_by_iter(args, model):
+  ans = []
+  for n_iter in args.iter:
+    div_μ, div_uμ = get_avg_kl(n_iter, model, args)
+    Δt = n_iter*model.config.sim.delta_t
+    print("%d, %f, %f, %f" % (n_iter, Δt, div_μ, div_uμ))
+    ans.append((Δt, div_μ, div_uμ))
+  return ans
+
+def compute_by_trainsteps(args, model):
+  assert len(args.iter) == 1, "can't compute by nsteps and iter list simultaneously"
+  assert type(model.config.nsteps) == list
+  ans = []
+  for nsteps in model.config.nsteps[:-1]:
+    checkpoint_path = args.fpath.replace(".pt", ".chkp_%d.pt" % nsteps)
+    model_chkp = load(checkpoint_path)
+    div_μ, div_uμ = get_avg_kl(1, model_chkp, args)
+    print("%d, %f, %f" % (nsteps, div_μ, div_uμ))
+    ans.append((nsteps, div_μ, div_uμ))
+  div_μ, div_uμ = get_avg_kl(1, model, args)
+  print("%d, %f, %f" % (model.config.nsteps[-1], div_μ, div_uμ))
+  ans.append((model.config.nsteps[-1], div_μ, div_uμ))
+  return ans
+
 def main_compute(args):
   # load the model
   model = load(args.fpath)
   model.set_eval(True)
-  config = model.config
-  # define sampling function
-  sample_step = get_sample_step(model)
-  ans = []
-  for n_iter in args.iter:
-    def sample_steps(state):
-      ans = state.to(torch.float32)
-      for i in range(n_iter):
-        ans = sample_step(ans)
-      return ans.to(torch.float64)
-    x0, x1 = get_continuation_dataset(args.samples, args.contins, model.config, iterations=n_iter)
-    x1_hat = sample_steps(x0.reshape(-1, config.sim.dim)).reshape(-1, args.contins, config.sim.dim)
-    divs = []
-    for i in range(args.samples):
-      divs.append(gaussian_kl_div(x1[i], x1_hat[i]))
-    divs = np.array(divs)
-    div_μ  = divs.mean()
-    div_uμ = divs.std()/(args.samples**0.5) # uncertainty in the mean
-    Δt = n_iter*model.config.sim.delta_t
-    print("%d, %f, %f, %f" % (n_iter, Δt, div_μ, div_uμ))
-    ans.append((Δt, div_μ, div_uμ))
+  if args.trainsteps:
+    ans = compute_by_trainsteps(args, model)
+  else:
+    ans = compute_by_iter(args, model)
   print("--- Results: ---")
   for tup in ans:
     print("%f, %f, %f" % tup)
@@ -68,9 +94,13 @@ def main_plot(args):
     traces_y.append(np.array(trace_y))
     traces_u.append(np.array(trace_u))
   for x, y, u in zip(traces_x, traces_y, traces_u):
-    plt.errorbar(x, y, yerr=u, marker="o", label="Δt = %f" % x[0]) # TODO: assumption! is x[0] really for 1 iteration?
+    if args.trainsteps:
+      label = None
+    else:
+      label = "Δt = %f" % x[0] # TODO: assumption! is x[0] really for 1 iteration?
+    plt.errorbar(x, y, yerr=u, marker="o", label=label)
   plt.xscale("log")
-  plt.xlabel("Δt * #steps")
+  plt.xlabel("# training steps" if args.trainsteps else "Δt * #iterations")
   plt.ylabel("fake KL div.")
   plt.legend()
   plt.show()
@@ -91,6 +121,7 @@ if __name__ == "__main__":
   parser.add_argument("--contins", dest="contins", type=int, default=10000)
   parser.add_argument("--samples", dest="samples", type=int, default=24)
   parser.add_argument("--plot", dest="plot", action="store_true") # plot previously recorded datas
+  parser.add_argument("--trainsteps", dest="trainsteps", action="store_true") # get or data for training steps elapsed rather than # iterations
   main(parser.parse_args())
 
 
