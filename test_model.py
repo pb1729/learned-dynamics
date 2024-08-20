@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-from utils import must_be
+from utils import must_be, batched_model_eval
 from config import load
 from sims import equilibrium_sample, get_dataset
 from plotting_common import Plotter, basis_transform_coords, basis_transform_rouse, basis_transform_neighbours, basis_transform_neighbours2, basis_transform_neighbours4
@@ -16,6 +16,7 @@ BASES = {
   "neighbours4": basis_transform_neighbours4,
 }
 SHOW_REALSPACE_SAMPLES = 10
+EVAL_BATCHSZ = 1024
 
 
 def is_gan(model):
@@ -54,8 +55,10 @@ def get_sample_step(model):
   model.set_eval(True)
   def sample_step(state):
     with torch.no_grad():
-      state_fin = model.predict(model.config.cond(state))
-    return state_fin
+      ans = batched_model_eval(
+        (lambda x: model.predict(model.config.cond(x))),
+        state, model.config.state_dim, batch=EVAL_BATCHSZ)
+    return ans
   return sample_step
 
 

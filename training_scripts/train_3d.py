@@ -7,9 +7,9 @@ from config import Config, Condition
 from train import training_run
 
 
-SIMTYPE = "3d_ou_poly"
+SIMTYPE = "3d_repel3_ou_poly"
 ARCH = "wgan_3d_interval"
-RUN_ID = "P4"
+RUN_ID = "P5"
 
 L_LIST = [24]#[2, 5, 12, 24, 36, 48]
 T_LIST = [3, 30, 300]#[3, 10, 30, 100, 300]
@@ -29,8 +29,8 @@ if "gan" in ARCH:
     "gp_coeff": 1.,
     "hinge": True,
     # multihead stuff
-    "covar_pen": True,
-    "heads": 8,
+    "covar_pen": False,
+    "heads": 1,
     # interval stuff
     "ndiscs": 4,
     # proxattn stuff:
