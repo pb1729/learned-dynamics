@@ -6,7 +6,7 @@ from test_model import get_sample_step, get_continuation_dataset, gaussian_kl_di
 from config import load
 
 
-def get_avg_kl(n_iter, model, args):
+def get_avg_kl(n_iter, model, args, x0, x1):
   # define sampling function
   sample_step = get_sample_step(model)
   def sample_steps(state):
@@ -14,7 +14,6 @@ def get_avg_kl(n_iter, model, args):
     for i in range(n_iter):
       ans = sample_step(ans)
     return ans.to(torch.float64)
-  x0, x1 = get_continuation_dataset(args.samples, args.contins, model.config, iterations=n_iter)
   x1_hat = sample_steps(x0.reshape(-1, model.config.sim.dim)).reshape(-1, args.contins, model.config.sim.dim)
   divs = []
   for i in range(args.samples):
@@ -28,7 +27,8 @@ def get_avg_kl(n_iter, model, args):
 def compute_by_iter(args, model):
   ans = []
   for n_iter in args.iter:
-    div_μ, div_uμ = get_avg_kl(n_iter, model, args)
+    x0, x1 = get_continuation_dataset(args.samples, args.contins, model.config, iterations=n_iter)
+    div_μ, div_uμ = get_avg_kl(n_iter, model, args, x0, x1)
     Δt = n_iter*model.config.sim.delta_t
     print("%d, %f, %f, %f" % (n_iter, Δt, div_μ, div_uμ))
     ans.append((Δt, div_μ, div_uμ))
@@ -38,13 +38,15 @@ def compute_by_trainsteps(args, model):
   assert len(args.iter) == 1, "can't compute by nsteps and iter list simultaneously"
   assert type(model.config.nsteps) == list
   ans = []
+  x0, x1 = get_continuation_dataset(args.samples, args.contins, model.config, iterations=1)
   for nsteps in model.config.nsteps[:-1]:
+    if nsteps == 0: continue # some models have 0 as first checkpoint, but this does not get saved
     checkpoint_path = args.fpath.replace(".pt", ".chkp_%d.pt" % nsteps)
     model_chkp = load(checkpoint_path)
-    div_μ, div_uμ = get_avg_kl(1, model_chkp, args)
+    div_μ, div_uμ = get_avg_kl(1, model_chkp, args, x0, x1)
     print("%d, %f, %f" % (nsteps, div_μ, div_uμ))
     ans.append((nsteps, div_μ, div_uμ))
-  div_μ, div_uμ = get_avg_kl(1, model, args)
+  div_μ, div_uμ = get_avg_kl(1, model, args, x0, x1)
   print("%d, %f, %f" % (model.config.nsteps[-1], div_μ, div_uμ))
   ans.append((model.config.nsteps[-1], div_μ, div_uμ))
   return ans
