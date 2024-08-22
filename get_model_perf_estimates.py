@@ -115,7 +115,7 @@ def main(args):
 
 if __name__ == "__main__":
   from argparse import ArgumentParser
-  parser = ArgumentParser(prog="full_model_test_1d")
+  parser = ArgumentParser(prog="model_perf_estimates")
   parser.add_argument("fpath")
   parser.add_argument("--iter", dest="iter", type=int, action="append", default=[1])
   parser.add_argument("--contins", dest="contins", type=int, default=10000)

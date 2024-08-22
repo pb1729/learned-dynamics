@@ -8,12 +8,12 @@ from train import training_run
 
 
 SIMTYPE = "3d_repel3_ou_poly"
-ARCH = "wgan_3d_interval"
-RUN_ID = "P5"
+ARCH = "wgan_3d_interval_cheap"
+RUN_ID = "P6"
 
 L_LIST = [24]#[2, 5, 12, 24, 36, 48]
-T_LIST = [3, 30, 300]#[3, 10, 30, 100, 300]
-NSTEPS_LIST = [1024, 2048, 3072, 4096, 5120, 6144, 7168, 8192, 9216, 10240, 11264, 12288, 13312, 14336, 15360, 16384]#[1024, 2048, 4096, 8192, 16384, 32768, 65536]
+T_LIST = [3, 30]#[3, 10, 30, 100, 300]
+NSTEPS_LIST = [0, 1024, 2048, 3072, 4096, 5120, 6144, 7168, 8192, 9216, 10240, 11264, 12288, 13312, 14336, 15360, 16384, 17408, 18432, 19456, 20480, 21504, 22528, 23552, 24576, 25600, 26624, 27648, 28672, 29696, 30720, 31744]#[1024, 2048, 4096, 8192, 16384, 32768, 65536]
 
 
 if "gan" in ARCH:
@@ -29,8 +29,8 @@ if "gan" in ARCH:
     "gp_coeff": 1.,
     "hinge": True,
     # multihead stuff
-    "covar_pen": False,
-    "heads": 1,
+    "covar_pen": True,
+    "heads": 8,
     # interval stuff
     "ndiscs": 4,
     # proxattn stuff:
