@@ -4,14 +4,9 @@ import matplotlib.pyplot as plt
 
 from config import Config
 from plotting_common import Plotter, basis_transform_coords, basis_transform_rouse, basis_transform_neighbours
-from test_model import get_continuation_dataset
+from test_model import get_continuation_dataset, BASES
 
 
-BASES = {
-  "coords": basis_transform_coords,
-  "rouse": basis_transform_rouse,
-  "neighbours": basis_transform_neighbours,
-}
 SHOW_REALSPACE_SAMPLES = 10
 RADIAL = True
 
@@ -60,21 +55,24 @@ def atoms_display(config, iters=256):
       display.update_pos(clean_for_display(x_snapshots[0, i]))
     
       
-def main(sim_nm, basis="rouse", do_atoms_display=None):
-  assert basis in BASES
+def main(args):
   # get comparison data
-  test_config = Config(sim_nm, "none", x_only=True, t_eql=4)
-  if do_atoms_display is not None:
+  test_config = Config(args.sim_nm, "none", x_only=True, t_eql=4)
+  if args.anim:
     atoms_display(test_config)
   init_states, fin_states = get_continuation_dataset(10, 10000, test_config)
   init_states, fin_states = init_states.to(torch.float32), fin_states.to(torch.float32)
   print(fin_states.shape, init_states.shape)
   # compare!
-  eval_sample_step(init_states, fin_states, test_config.sim, basis)
+  eval_sample_step(init_states, fin_states, test_config.sim, args.basis)
 
 if __name__ == "__main__":
-  from sys import argv
-  main(*argv[1:])
+  from argparse import ArgumentParser
+  parser = ArgumentParser(prog="diffusion_plot")
+  parser.add_argument("sim_nm")
+  parser.add_argument("--basis", dest="basis", choices=[key for key in BASES], default="rouse")
+  parser.add_argument("--anim", dest="anim", action="store_true")
+  main(parser.parse_args())
 
 
 

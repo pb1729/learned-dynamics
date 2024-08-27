@@ -1,3 +1,4 @@
+import time
 import torch
 
 
@@ -22,6 +23,20 @@ class _MustBe:
   def __setitem__(self, key, value):
     assert key == value, "must_be[%d] does not match dimension %d" % (key, value)
 must_be = _MustBe()
+
+
+class PrintTiming:
+  def __init__(self, start_message):
+    self.start_message = start_message
+  def __enter__(self):
+    print(self.start_message)
+    self.start_time = time.time()
+    return self
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    end_time = time.time()
+    elapsed_time = end_time - self.start_time
+    print(f"done after {elapsed_time:.4f} s")
+
 
 # batched evaluation:
 
