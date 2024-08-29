@@ -15,7 +15,7 @@
                     cudaGetErrorString(error)); \
             exit(EXIT_FAILURE); \
         } \
-    } while(0)
+    } while(0);
 
 
 __global__ void init_curand_states(curandState* states, unsigned long seed)
@@ -76,7 +76,7 @@ __device__ float3 repel_force(float3 delta_x) {
     return factor*delta_x;
 }
 
-__device__ float3 repel5_ff(int i, float3* x, int n) {
+__device__ float3 repel5_ff(int i, const float3* x, int n) {
     float3 delta_x;
     float3 force = make_float3(0.0, 0.0, 0.0);
 
@@ -101,8 +101,8 @@ __device__ float3 repel5_ff(int i, float3* x, int n) {
 }
 
 __global__ void repel5_sim_kern(
-    float3* x, float3* v, float3* a,
-    float* drag, float T, float dt,
+    float3* __restrict__ x, float3* __restrict__ v, float3* __restrict__ a,
+    const float* drag, float T, float dt,
     int nsteps, int batch_size, int n,
     curandState* states)
 {

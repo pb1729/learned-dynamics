@@ -12,8 +12,8 @@ x = torch.randn(batch, n_particles, 3, device='cuda')
 v = torch.zeros(batch, n_particles, 3, device='cuda')
 drag = torch.ones(n_particles, device='cuda') * 1.
 T = 1.0
-dt = 0.001
-nsteps = 64
+dt = 0.01
+nsteps = 100
 
 def clean_for_display(x):
     """ Return first element of batch as a np array on cpu. """
