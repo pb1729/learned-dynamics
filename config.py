@@ -29,7 +29,6 @@ class Config:
   def __init__(self, pred_spec, arch_name,
                device="cuda", batch=16, simlen=16, nsteps=65536, save_every=512,
                arch_specific=None, **kwargs_rest):
-    print("extra kwargs: ", ", ".join(key for key in kwargs_rest))
     self.pred_spec = pred_spec
     self.arch_name = arch_name
     self.predictor = get_predictor(pred_spec)

@@ -3,28 +3,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from test_model import model_list_to_predictor_list
-from sims import equilibrium_sample, get_dataset
 from config import load, Config
 from utils import PrintTiming
 
-# TODO: this file is not up to date with the Predictor/State refactor.
-# update it if you want to use it...
 
-
-def get_sim_x(args, config):
-  x_init, v_init = equilibrium_sample(config, args.batch)
-  x = get_dataset(config, [x_init, v_init], args.tmax)
-  return x.to(torch.float32).reshape(args.batch, args.tmax, config.sim.poly_len, 3)
-
-def get_model_x(args, model):
-  sample_step = get_sample_step(model)
-  ans = torch.zeros(args.batch, args.tmax, model.config.state_dim, device=model.config.device)
-  x, _ = equilibrium_sample(model.config, args.batch)
-  x = x.to(torch.float32).to(model.config.device)
-  for i in range(args.tmax):
-    ans[:, i] = model.predict(x)
-    x = ans[:, i]
-  return ans.reshape(args.batch, args.tmax, model.config.sim.poly_len, 3)
+def get_x(args, predictor):
+  state = predictor.sample_q(args.batch)
+  return predictor.predict(args.tmax, state)
 
 def structure_factor(q, x):
   """ structure factor S(q)
@@ -43,26 +28,12 @@ def structure_factor(q, x):
 
 
 def main(args):
+  predictors = model_list_to_predictor_list(args.models)
   x_list = []
   labels = []
-  for model_path in args.usemodel:
-    model_nm = model_path.split("/")[-1]
-    model = load(model_path)
-    model.set_eval(True)
-    with PrintTiming("computing model data for %s" % model_nm):
-      x_g = get_model_x(args, model)
-      x_list.append(x_g)
-      labels.append("model %s" % model_nm)
-    with PrintTiming("computing simulation data for %s" % model_nm):
-      x_r = get_sim_x(args, model.config)
-      x_list.append(x_r)
-      labels.append("sim %s" % model.config.sim_name)
-  for sim_nm in args.usesim:
-    config = Config(sim_nm, "none", x_only=True, t_eql=4)
-    with PrintTiming("computing simulation data for %s" % sim_nm):
-      x_r = get_sim_x(args, config)
-      x_list.append(x_r)
-      labels.append("sim %s" % sim_nm)
+  for predictor in predictors:
+    x_list.append(get_x(args, predictor))
+    labels.append(predictor.name)
   q = np.exp(np.linspace(np.log(0.15915494309189535/max([x.shape[2] for x in x_list])) - 2.3, np.log(6.283185307179586) + 2.3))
   for x, label in zip(x_list, labels):
     S = structure_factor(q, x).cpu().numpy()
@@ -78,8 +49,7 @@ def main(args):
 if __name__ == "__main__":
   from argparse import ArgumentParser
   parser = ArgumentParser(prog="structure_factor_plot")
-  parser.add_argument("--usesim", dest="usesim", action="append", default=[])
-  parser.add_argument("--usemodel", dest="usemodel", action="append", default=[])
+  parser.add_argument("-M", dest="models", action="extend", nargs="+", type=str)
   parser.add_argument("--tmax", dest="tmax", type=int, default=8)
   parser.add_argument("--batch", dest="batch", type=int, default=256)
   main(parser.parse_args())

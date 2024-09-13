@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 from predictor import ModelPredictor
 from utils import must_be
-from config import load, get_predictor
+from config import get_predictor
 from plotting_common import Plotter, basis_transform_coords, basis_transform_rouse, basis_transform_neighbours, basis_transform_neighbours2, basis_transform_neighbours4
 
 
