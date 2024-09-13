@@ -5,7 +5,6 @@ from queue import Queue
 import torch
 
 from run_visualization import TensorBoard
-from sims import equilibrium_sample, get_dataset
 from config import Config, load, save, makenew
 
 
@@ -17,8 +16,8 @@ def dataset_gen(config):
   control_queue = Queue()
   def thread_main():
     while True: # queue maxsize stops us from going crazy here
-      xv_init = equilibrium_sample(config, 128*config.batch)
-      next_dataset = get_dataset(config, xv_init, config.simlen).to(torch.float32)
+      state = config.predictor.sample_q(128*config.batch)
+      next_dataset = config.predictor.predict(config.simlen, state)
       for i in range(0, 128*config.batch, config.batch):
         if not control_queue.empty():
           command = control_queue.get_nowait()

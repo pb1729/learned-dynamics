@@ -21,7 +21,10 @@ class _MustBe:
       "must_be" in order to use the functionality. example code:
       `batch, chan, mustbe[32], mustbe[32] = image.shape` """
   def __setitem__(self, key, value):
-    assert key == value, "must_be[%d] does not match dimension %d" % (key, value)
+    if isinstance(key, tuple):
+      assert key == tuple(value), "must_be[%s] does not match dimension %s" % (str(key), str(value))
+    else:
+      assert key == value, "must_be[%d] does not match dimension %d" % (key, value)
 must_be = _MustBe()
 
 
@@ -69,17 +72,16 @@ def batched_xy_moment_dot_3d(x, y, l=1, batch=64000):
   return ans/(instances - 1)
 
 
-def batched_model_eval(model, input, outdim, batch=16384):
+def batched_model_eval(model, x, batch=16384):
   """ to avoid running out of memory, evaluate the model on a large tensor in batches
       Should only be called within torch.no_grad() context!
-      model  - the pytorch model to evaluate
-      input  - the input we are feeding to the model. shape: (N, channels)
-      outdim - integer, the size of the model's output
-      returns: the result of evaulating the model. shape: (N, out_chan) """
-  N, channels = input.shape
-  ans = torch.zeros(N, outdim, device=input.device)
+      model - the pytorch model to evaluate
+      x     - the input we are feeding to the model. shape: (N, *shape)
+      returns: the result of evaulating the model on x. shape: (N, *shape) """
+  N = x.shape[0]
+  ans = torch.zeros_like(x)
   for i in range(0, N, batch):
-    ans[i:i+batch] = model(input[i:i+batch])
+    ans[i:i+batch] = model(x[i:i+batch])
   return ans
 
 

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from config import Condition
+from polymer_util import poly_len, space_dim
 from utils import must_be, prod
 from layers_common import *
 from attention_layers import *
@@ -112,8 +112,8 @@ class DiscHeads(nn.Module):
     self.res3 = FlatResidual(config)
     self.lin_a = nn.Linear(adim, heads, bias=False)
     self.lin_v = nn.Linear(vdim, heads, bias=False)
-    self.norm_a = 1/config.sim.poly_len
-    self.norm_v = 0.02/config.sim.poly_len # much fudge factor... probably a TODO here
+    self.norm_a = 1/poly_len(config)
+    self.norm_v = 0.02/poly_len(config) # much fudge factor... probably a TODO here
   def forward(self, x_a, x_v):
     x_a, x_v = self.res1(x_a*self.norm_a, x_v*self.norm_v)
     x_a, x_v = self.res2(x_a, x_v)
@@ -132,8 +132,8 @@ class Discriminator(nn.Module):
       Block(config),
       Block(config),
       Block(config))
-    self.lin_a = nn.Linear(config.sim.poly_len*adim, adim, bias=False)
-    self.lin_v = VecLinear(config.sim.poly_len*vdim, vdim)
+    self.lin_a = nn.Linear(poly_len(config)*adim, adim, bias=False)
+    self.lin_v = VecLinear(poly_len(config)*vdim, vdim)
     self.heads = DiscHeads(config)
   def forward(self, pos_0, pos_1):
     x_a, x_v = self.node_enc(pos_0, pos_1)
@@ -186,11 +186,8 @@ class WGAN3D:
     self.discs = discs
     self.gen  = gen
     self.config = config
-    assert config.sim.space_dim == 3
-    assert config.cond_type == Condition.COORDS
-    assert config.subtract_mean == 0
-    assert config.x_only
-    self.n_nodes = config.sim.poly_len
+    assert space_dim(config) == 3
+    self.n_nodes = poly_len(config)
     self.init_optim()
   def init_optim(self):
     betas = (self.config["beta_1"], self.config["beta_2"])
@@ -221,9 +218,8 @@ class WGAN3D:
         "gen": self.gen.state_dict(),
       }
   def train_step(self, x):
-    """ x: (batch, L, poly_len*3) """
-    batch, L, must_be[self.n_nodes*3] = x.shape
-    x = x.reshape(batch, L, self.n_nodes, 3)
+    """ x: (batch, L, poly_len, 3) """
+    batch, L, must_be[self.n_nodes], must_be[3] = x.shape
     loss_d = self.discs_step(x)
     loss_g = self.gen_step(x)
     self.step_count += 1
@@ -349,9 +345,8 @@ class WGAN3D:
         disc.train()
       self.gen.train()
   def predict(self, cond):
-    batch, must_be[3*self.n_nodes] = cond.shape
     with torch.no_grad():
-      return self.generate(cond.reshape(batch, self.n_nodes, 3)).reshape(batch, 3*self.n_nodes)
+      return self.generate(cond)
 
 
 class GANTrainer:

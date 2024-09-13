@@ -455,5 +455,40 @@ class EdgeRelativeEmbedMLPPath(nn.Module):
     return a_out, v_out
 
 
+class IndexedLinear(nn.Module): # TODO: test it out, and add bias
+  """ Linear layer with many weight matrices. Which weight matrix is used is indexed by an int tensor. """
+  def __init__(self, ch_in, ch_out, n):
+    super().__init__()
+    self.n = n
+    self.W = nn.Parameter(torch.empty(n, ch_out, ch_in))
+  def self_init(self):
+    must_be[self.n], fan_in, fan_out = self.W.shape
+    nn.init.normal_(self.W, std=fan_in**-0.5)
+  def forward(self, x, sel):
+    """ apply indexed linear to x, with weight matrices selected by sel
+        x: (batch, nodes, ch_in)
+        sel: (nodes) -- type is int. we use the same selection across the batch
+        ans: (batch nodes, ch_out) """
+    return torch.einsum("bnj, nij -> bni", x, self.W[sel])
+
+
+def periodic_rel(pos_0, pos_1, L): # TODO: test it out
+  """ get translation-invariant periodicity-respecting relative position vector
+      pos_0: (..., 3)
+      pos_1: (..., 3)
+      L: (3) -- box periodicity
+      ans: (..., 3) """
+  d_pos = pos_1 - pos_0
+  return (L*0.15915494309189535)*torch.sin(d_pos*6.283185307179586/L)
+
+def periodic_sqrel(pos_0, pos_1, L): # TODO: test it out
+  """ get translation-invariant periodicity-respecting squared relative position vector
+      pos_0: (..., 3)
+      pos_1: (..., 3)
+      L: (3) -- box periodicity
+      ans: (...) """
+  d_pos = pos_1 - pos_0
+  return (((L*0.3183098861837907)*torch.sin(d_pos*3.141592653589793/L))**2).sum(-1)
+
 
 

@@ -10,26 +10,23 @@ from utils import must_be
 def vvel_lng_batch(x, v, a, drag, T, dt, nsteps, device="cuda"):
     """ Langevin dynamics with Velocity-Verlet.
     Batched version: compute multiple trajectories in parallel
-    This function mutates the position (x) and velocity(v) arrays.
+    This function MUTATES the position (x) and velocity(v) arrays.
     Compute nsteps updates of the system: We're passed x(t=0) and v(t=0) and
     return x(dt*nsteps), v(dt*nsteps). Leapfrog updates are used for the intermediate steps.
     a(x) is the acceleration as a function of the position.
     drag[] is a vector of drag coefficients to be applied to the system.
     T is the temperature in units of energy.
-    dt is the timestep size.
+    dt is the timestep size. nsteps should be >= 1.
     Shapes:
-    x: (batch, coorddim)                  [L]
-    v: (batch, coorddim)                  [L/T]
-    drag: (coorddim,)                     [/T]
-    a: (-1, coorddim) -> (-1, coorddim)   [L/TT]
-    return = x:(batch, coorddim), v:(batch, coorddim)"""
-    assert nsteps >= 1
-    assert x.shape == v.shape and drag.shape == x.shape[1:]
-    assert x.dtype == torch.float64 and v.dtype == torch.float64
+    x: (batch, *shape)                    [L]
+    v: (batch, *shape)                    [L/T]
+    drag: (*shape)                        [/T]
+    a: (-1, *shape) -> (-1, *shape)       [L/TT]
+    return = x:(batch, *shape), v:(batch, *shape) """
     sqrt_hlf = 0.5**0.5
     noise_coeffs = torch.sqrt(2*drag*T*dt) # noise coefficients for a dt timestep
     def randn():
-        return torch.randn(*x.shape, device=device, dtype=torch.float64)
+        return torch.randn_like(x)
     v += 0.5*(dt*(a(x) - drag*v) + sqrt_hlf*noise_coeffs*randn())
     for i in range(nsteps - 1):
         x += dt*v
@@ -54,29 +51,25 @@ class TrajectorySim:
         self.delta_t = delta_t
         self.t_res = t_res
         self.dt = delta_t/t_res
-        self.dim = drag.flatten().shape[0]
+        self.shape = drag.shape
         if metadata is not None:
           for key in metadata:
             setattr(self, key, metadata[key])
     def generate_trajectory(self, x, v, time, ret=True):
         """ generate trajectory from initial conditions x, v
-            WARNING: initial condition tensors *will* be overwritten
-            x: (batch, self.dim)
-            v: (batch, self.dim)
-            x_traj: (batch, time, self.dim)
-            v_traj: (batch, time, self.dim) """
-        batch,          must_be[self.dim] = x.shape
-        must_be[batch], must_be[self.dim] = v.shape
+            WARNING: initial condition tensors x,v *will* be overwritten
+            x: (batch, *self.shape)
+            v: (batch, *self.shape)
+            ans: (batch, time, *self.shape) """
+        batch,          *must_be[self.shape] = x.shape
+        must_be[batch], *must_be[self.shape] = v.shape
         if ret:
-            x_traj = torch.zeros((batch, time, self.dim), device="cuda", dtype=torch.float64)
-            v_traj = torch.zeros((batch, time, self.dim), device="cuda", dtype=torch.float64)
+            ans = torch.zeros((batch, time, *self.shape), device="cuda", dtype=x.dtype)
         for i in range(time):
             vvel_lng_batch(x, v, self.acc_fn, self.drag, self.T, self.dt, self.t_res)
-            if ret:
-                x_traj[:, i] = x
-                v_traj[:, i] = v
+            if ret: ans[:, i] = x
         if ret:
-            return x_traj, v_traj
+            return ans
     def sample_equilibrium(self, batch, iterations, t_noise=None, t_ballistic=None,
             drag_const=20.): # TODO: come up with a better way to pick the drag constant?
         """ Do our best to sample from the equilibrium distribution by alternately setting drag to be high/zero. """
@@ -87,8 +80,8 @@ class TrajectorySim:
         high_drag = torch.zeros_like(self.drag) + drag_const
         zero_drag = torch.zeros_like(self.drag)
         # start from 0:
-        x = torch.zeros((batch,) + self.drag.shape, dtype=torch.float64, device="cuda")
-        v = torch.zeros((batch,) + self.drag.shape, dtype=torch.float64, device="cuda")
+        x = torch.zeros((batch,) + self.shape, dtype=self.drag.dtype, device="cuda")
+        v = torch.zeros((batch,) + self.shape, dtype=self.drag.dtype, device="cuda")
         # do several iterations:
         for i in range(iterations):
             vvel_lng_batch(x, v, self.acc_fn, high_drag, self.T, self.dt, int(t_noise/self.dt))
@@ -107,13 +100,11 @@ class CUDASim:
     self.delta_t = delta_t
     self.t_res = t_res
     self.dt = delta_t/t_res
-    self.dim = l*3
+    self.shape = (l, 3)
     if metadata is not None:
       for key in metadata:
         setattr(self, key, metadata[key])
   def _integrate(self, x, v, drag, T, steps):
-    x = x.view(-1, self.l, 3) # use .view because it's important that memory is shared so that
-    v = v.view(-1, self.l, 3) # mutating x or v will still mutate the original args
     polymer_sim(self.sim_id, x, v, drag, T, self.dt, steps)
   def generate_trajectory(self, x, v, time, ret=True):
     """ generate trajectory from initial conditions x, v
@@ -121,20 +112,16 @@ class CUDASim:
         we construct and return the trajectory if ret is True.
         x: (batch, self.dim)
         v: (batch, self.dim)
-        x_traj: (batch, time, self.dim)
-        v_traj: (batch, time, self.dim) """
-    batch,          must_be[self.dim] = x.shape
-    must_be[batch], must_be[self.dim] = v.shape
+        ans: (batch, time, self.dim) """
+    batch,          must_be[self.l], must_be[3] = x.shape
+    must_be[batch], must_be[self.l], must_be[3] = v.shape
     if ret:
-      x_traj = torch.zeros((batch, time, self.dim), device="cuda")
-      v_traj = torch.zeros((batch, time, self.dim), device="cuda")
+      ans = torch.zeros((batch, time, *self.shape), device="cuda")
     for i in range(time):
       self._integrate(x, v, self.drag, self.T, self.t_res)
-      if ret:
-        x_traj[:, i] = x
-        v_traj[:, i] = v
+      if ret: ans[:, i] = x
     if ret:
-      return x_traj, v_traj
+      return ans
   def sample_equilibrium(self, batch, iterations, t_noise=None, t_ballistic=None,
             drag_const=20.): # TODO: come up with a better way to pick the drag constant?
     """ Do our best to sample from the equilibrium distribution by alternately setting drag to be high/zero. """
@@ -145,8 +132,8 @@ class CUDASim:
     high_drag = self.drag + drag_const
     zero_drag = torch.zeros_like(self.drag)
     # start from 0:
-    x = torch.randn(batch, self.l*3, device="cuda") # spread out the particles initially for numerical stability
-    v = torch.zeros(batch, self.l*3, device="cuda")
+    x = torch.randn(batch, *self.shape, device="cuda") # spread out the particles initially for numerical stability
+    v = torch.zeros(batch, *self.shape, device="cuda")
     # do several iterations:
     for i in range(iterations):
       self._integrate(x, v, high_drag, self.T, int(t_noise/self.dt))
@@ -160,31 +147,29 @@ def get_polymer_a(k, n, dim=3):
     """ Get an acceleration function defining a polymer system with n atoms and spring constant k
     Shapes:
     k: ()             [/TT]
-    x: (batch, n*dim) [L]
-    a: (batch, n*dim) [L/TT] """
+    x: (batch, n, dim) [L]
+    a: (batch, n, dim) [L/TT] """
     def a(x):
-        x = x.reshape(-1, n, dim)
         ans = torch.zeros_like(x)
         ans[:, 1:] += k*(x[:, :-1] - x[:, 1:])
         ans[:, :-1] += k*(x[:, 1:] - x[:, :-1])
-        return ans.reshape(-1, n*dim)
+        return ans
     return a
 
 def get_polymer_a_quart(k, n, dim=3):
     """ Get an acceleration function defining a polymer system with n atoms and a quartic bond potential
         the potential is given by the quartic (k/8)(x**2 - 1)**2
     Shapes:
-    x: (batch, n*dim) [L]
-    a: (batch, n*dim) [L/TT] """
+    x: (batch, n, dim) [L]
+    a: (batch, n, dim) [L/TT] """
     def bond_force(delta_x):
       return 0.5*k*((delta_x**2).sum(2, keepdim=True) - 1)*delta_x
     def a(x):
-        x = x.reshape(-1, n, dim)
         ans = torch.zeros_like(x)
         F = bond_force(x[:, :-1] - x[:, 1:])
         ans[:, 1:]  += F
         ans[:, :-1] -= F
-        return ans.reshape(-1, n*dim)
+        return ans
     return a
 
 def get_polymer_a_steric(k, n, dim=3, repel_scale=1.0):
@@ -195,13 +180,12 @@ def get_polymer_a_steric(k, n, dim=3, repel_scale=1.0):
     def repel_force(delta_x):
       return -repel_scale*delta_x/((delta_x**2).sum(-1, keepdim=True) + 0.2)**6
     def a(x):
-      x = x.reshape(-1, n, dim)
       ans = torch.zeros_like(x)
       F_bond = bond_force(x[:, :-1] - x[:, 1:])
       ans[:, 1:]  += F_bond
       ans[:, :-1] -= F_bond
       ans += repel_force(x[:, :, None] - x[:, None, :]).sum(1)
-      return ans.reshape(-1, n*dim)
+      return ans
     return a
 
 def get_polymer_a_poten(k, n, dim=3):
@@ -209,15 +193,14 @@ def get_polymer_a_poten(k, n, dim=3):
     The polymer is in a potential (x**4 + y**4 + z**4)/24
     Shapes:
     k: ()             [/TT]
-    x: (batch, n*dim) [L]
-    a: (batch, n*dim) [L/TT] """
+    x: (batch, n, dim) [L]
+    a: (batch, n, dim) [L/TT] """
     def a(x):
-        x = x.reshape(-1, n, dim)
         ans = torch.zeros_like(x)
         ans[:, 1:] += k*(x[:, :-1] - x[:, 1:])
         ans[:, :-1] += k*(x[:, 1:] - x[:, :-1])
         ans -= (1/6)*x**3
-        return ans.reshape(-1, n*dim)
+        return ans
     return a
 
 
@@ -251,72 +234,72 @@ class SimsDict:
 sims = SimsDict(
   ("ou_sho_t%d", lambda t: TrajectorySim(
     (lambda x: -x),
-    torch.tensor([10.], dtype=torch.float64), 1.0,
+    torch.tensor([10.], dtype=torch.float32), 1.0,
     float(t), 32*t,
   )),
   ("ou_poly_l%d_t%d", lambda l, t: TrajectorySim(
     get_polymer_a(1.0, l, dim=1),
-    torch.tensor([10.]*l, dtype=torch.float64), 1.0,
+    10. + torch.zeros(l, 3), 1.0,
     float(t), 16*t,
     metadata={"poly_len": l, "space_dim": 1, "k": 1.0}
   )),
   ("quart_ou_poly_l%d_t%d", lambda l, t: TrajectorySim(
     get_polymer_a_quart(4.0, l, dim=1),
-    torch.tensor([10.]*l, dtype=torch.float64), 1.0,
+    10. + torch.zeros(l, 1), 1.0,
     float(t), 32*t,
     metadata={"poly_len": l, "space_dim": 1}
   )),
   ("2d_ou_poly_l%d_t%d", lambda l, t: TrajectorySim(
     get_polymer_a(1.0, l, dim=2),
-    torch.tensor([10.]*l*2, dtype=torch.float64), 1.0,
+    10. + torch.zeros(l, 2), 1.0,
     float(t), 16*t,
     metadata={"poly_len": l, "space_dim": 2}
   )),
   ("3d_ou_poly_l%d_t%d", lambda l, t: TrajectorySim(
     get_polymer_a(1.0, l, dim=3),
-    torch.tensor([10.]*l*3, dtype=torch.float64), 1.0,
+    10. + torch.zeros(l, 3), 1.0,
     float(t), 16*t,
     metadata={"poly_len": l, "space_dim": 3, "k": 1.0}
   )),
   ("3d_quart_ou_poly_l%d_t%d", lambda l, t: TrajectorySim(
     get_polymer_a_quart(4.0, l, dim=3),
-    torch.tensor([10.]*l*3, dtype=torch.float64), 1.0,
+    10. + torch.zeros(l, 3), 1.0,
     float(t), 32*t,
     metadata={"poly_len": l, "space_dim": 3}
   )),
   ("3d_ballistic_poly_l%d_t%d", lambda l, t: TrajectorySim(
     get_polymer_a(1.0, l, dim=3),
-    torch.tensor([0.]*l*3, dtype=torch.float64), 1.0,
+    torch.zeros(l, 3), 1.0,
     float(t), 16*t,
     metadata={"poly_len": l, "space_dim": 3}
   )),
   ("3d_repel_ou_poly_l%d_t%d", lambda l, t: TrajectorySim(
     get_polymer_a_steric(1.0, l, dim=3),
-    torch.tensor([10.]*l*3, dtype=torch.float64), 1.0,
+    10. + torch.zeros(l, 3), 1.0,
     float(t), 32*t,
     metadata={"poly_len": l, "space_dim": 3}
   )),
   ("3d_repel2_ou_poly_l%d_t%d", lambda l, t: TrajectorySim(
     get_polymer_a_steric(1.0, l, dim=3, repel_scale=3.),
-    torch.tensor([10.]*l*3, dtype=torch.float64), 1.0,
+    10. + torch.zeros(l, 3), 1.0,
     float(t), 32*t,
     metadata={"poly_len": l, "space_dim": 3}
   )),
   ("3d_repel3_ou_poly_l%d_t%d", lambda l, t: TrajectorySim(
     get_polymer_a_steric(1.0, l, dim=3, repel_scale=10.),
-    torch.tensor([10.]*l*3, dtype=torch.float64), 1.0,
+    10. + torch.zeros(l, 3), 1.0,
     float(t), 64*t,
     metadata={"poly_len": l, "space_dim": 3, "k": 1.0}
   )),
   ("3d_repel4_ou_poly_l%d_t%d", lambda l, t: TrajectorySim(
     get_polymer_a_steric(4.0, l, dim=3, repel_scale=10.),
-    torch.tensor([10.]*l*3, dtype=torch.float64), 1.0,
+    10. + torch.zeros(l, 3), 1.0,
     float(t), 64*t,
     metadata={"poly_len": l, "space_dim": 3, "k": 4.0}
   )),
   ("3d_poten_ou_poly_l%d_t%d", lambda l, t: TrajectorySim(
     get_polymer_a_poten(1.0, l, dim=3),
-    torch.tensor([10.]*l*3, dtype=torch.float64), 1.0,
+    10. + torch.zeros(l, 3), 1.0,
     float(t), 32*t,
     metadata={"poly_len": l, "space_dim": 3, "k": 1.0}
   )),

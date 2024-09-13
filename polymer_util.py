@@ -1,9 +1,22 @@
 import numpy as np
 import torch
 
+from config import Config
 from sims import get_poly_tc
 from utils import must_be
 
+
+def poly_len(obj):
+  if isinstance(obj, Config):
+    obj = obj.predictor
+  ans, _ = obj.shape # obj is the predictor
+  return ans
+
+def space_dim(obj):
+  if isinstance(obj, Config):
+    obj = obj.predictor
+  _, ans = obj.shape # obj is the predictor
+  return ans
 
 def sinhc(x):
   """ sinhc(x) = sinh(x)/x

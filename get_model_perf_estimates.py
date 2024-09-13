@@ -2,63 +2,89 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-from test_model import get_sample_step, get_continuation_dataset, gaussian_kl_div
+from test_model import model_list_to_predictor_list, get_contin_states
 from config import load
+from utils import must_be, prod
 
 
-def get_avg_kl(n_iter, model, args, x0, x1):
-  # define sampling function
-  sample_step = get_sample_step(model)
-  def sample_steps(state):
-    ans = state.to(torch.float32)
-    for i in range(n_iter):
-      ans = sample_step(ans)
-    return ans.to(torch.float64)
-  x1_hat = sample_steps(x0.reshape(-1, model.config.sim.dim)).reshape(-1, args.contins, model.config.sim.dim)
+def gaussian_kl_div(x_actual, x_predicted):
+  """ approximate given distributions as Gaussians with the same mean and standard deviation.
+      returns the KL divergence between the distributions, the expectation being taken over x_actual.
+      https://ra1ndeer.github.io/posts/kl_divergence_gaussians.html
+      x_actual:    (samples, dim)
+      x_predicted: (samples, dim) """
+  samples,          *rest           = x_actual.shape
+  must_be[samples], *must_be[rest]  = x_predicted.shape
+  dim = prod(rest)
+  x_actual = x_actual.reshape(samples, dim)
+  x_predicted = x_predicted.reshape(samples, dim)
+  with torch.no_grad():
+    mu_actl = x_actual.mean(0)
+    mu_pred = x_predicted.mean(0)
+    d_mu = mu_pred - mu_actl
+    # do SVD's because it is more numerically stable than covariances
+    _, S_actl, Vh_actl = torch.linalg.svd(x_actual, full_matrices=False)
+    _, S_pred, Vh_pred = torch.linalg.svd(x_predicted, full_matrices=False)
+    S_pred_inv = torch.diag(samples/(S_pred**2))
+    S_actl = torch.diag((S_actl**2)/samples) # square and normalize to get covariance
+    S_pred = torch.diag((S_pred**2)/samples) # square and normalize to get covariance
+    # compute covariance terms:
+    kl_means = 0.5*(d_mu*(Vh_pred.T @ S_pred_inv @ Vh_pred @ d_mu)).sum()
+    kl_covar = 0.5*torch.trace(Vh_pred.T @ S_pred_inv @ Vh_pred @ Vh_actl.T @ S_actl @ Vh_actl)
+    kl_lgdet = 0.5*(torch.log(torch.diag(S_pred)).sum() - torch.log(torch.diag(S_actl)).sum())
+    return (kl_means + kl_covar + kl_lgdet - 0.5*dim).item()
+
+
+def get_avg_kl(args, predictors):
+  # we expect exactly 2 predictors in the list
+  state = predictors[0].sample_q(args.samples)
+  state_contins = get_contin_states(state, args, predictors)
   divs = []
   for i in range(args.samples):
-    divs.append(gaussian_kl_div(x1[i], x1_hat[i]))
+    divs.append(gaussian_kl_div(state_contins[0].x[i::args.samples], state_contins[1].x[i::args.samples]))
+  print(divs)
   divs = np.array(divs)
   div_μ  = divs.mean()
   div_uμ = divs.std()/(args.samples**0.5) # uncertainty in the mean
   return div_μ, div_uμ
 
 
-def compute_by_iter(args, model):
+def compute_by_iter(args, predictors):
   ans = []
   for n_iter in args.iter:
-    x0, x1 = get_continuation_dataset(args.samples, args.contins, model.config, iterations=n_iter)
-    div_μ, div_uμ = get_avg_kl(n_iter, model, args, x0, x1)
-    Δt = n_iter*model.config.sim.delta_t
+    args.iter = n_iter
+    div_μ, div_uμ = get_avg_kl(args, predictors)
+    Δt = n_iter*predictors[0].sim.delta_t # predictors[0] should be a SimPredictor
     print("%d, %f, %f, %f" % (n_iter, Δt, div_μ, div_uμ))
     ans.append((Δt, div_μ, div_uμ))
   return ans
 
-def compute_by_trainsteps(args, model):
+def compute_by_trainsteps(args, predictors):
   assert len(args.iter) == 1, "can't compute by nsteps and iter list simultaneously"
-  assert type(model.config.nsteps) == list
+  args.iter = args.iter[0] # single value
+  config = predictors[1].model.config # predictors[1] should be a ModelPredictor
+  assert type(config.nsteps) == list
   ans = []
-  x0, x1 = get_continuation_dataset(args.samples, args.contins, model.config, iterations=1)
-  for nsteps in model.config.nsteps[:-1]:
+  for nsteps in config.nsteps[:-1]:
     if nsteps == 0: continue # some models have 0 as first checkpoint, but this does not get saved
     checkpoint_path = args.fpath.replace(".pt", ".chkp_%d.pt" % nsteps)
-    model_chkp = load(checkpoint_path)
-    div_μ, div_uμ = get_avg_kl(1, model_chkp, args, x0, x1)
+    chkp_predictors = model_list_to_predictor_list(["model:"+checkpoint_path])
+    div_μ, div_uμ = get_avg_kl(args, chkp_predictors)
     print("%d, %f, %f" % (nsteps, div_μ, div_uμ))
     ans.append((nsteps, div_μ, div_uμ))
-  div_μ, div_uμ = get_avg_kl(1, model, args, x0, x1)
-  print("%d, %f, %f" % (model.config.nsteps[-1], div_μ, div_uμ))
-  ans.append((model.config.nsteps[-1], div_μ, div_uμ))
+  div_μ, div_uμ = get_avg_kl(args, predictors)
+  print("%d, %f, %f" % (config.nsteps[-1], div_μ, div_uμ))
+  print()
+  ans.append((config.nsteps[-1], div_μ, div_uμ))
   return ans
 
 def main_compute(args):
   # load the model
-  model = load(args.fpath)
-  model.set_eval(True)
+  predictors = model_list_to_predictor_list(["model:"+args.fpath])
   if args.trainsteps:
-    ans = compute_by_trainsteps(args, model)
+    ans = compute_by_trainsteps(args, predictors)
   else:
-    ans = compute_by_iter(args, model)
+    ans = compute_by_iter(args, predictors)
   print("--- Results: ---")
   for tup in ans:
     print("%f, %f, %f" % tup)

@@ -2,11 +2,13 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-
-from test_model import get_sample_step
+from test_model import model_list_to_predictor_list
 from sims import equilibrium_sample, get_dataset
 from config import load, Config
 from utils import PrintTiming
+
+# TODO: this file is not up to date with the Predictor/State refactor.
+# update it if you want to use it...
 
 
 def get_sim_x(args, config):
