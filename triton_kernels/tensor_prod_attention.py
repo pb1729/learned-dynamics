@@ -49,14 +49,14 @@ def _fwd_kernel(
     v_ptrs = V + z*stride_z + ax_n[:, None]*stride_n + ax_d[None, :] # does not account for start_n
     # initialize accumulator and q block
     acc = tl.zeros([BLOCK_N, BLOCK_D], tl.float32)
-    q = tl.load(q_ptrs) # (BLOCK_N, BLOCK_D)
+    q = tl.load(q_ptrs, mask=(idx_m[:, None] < N)) # (BLOCK_N, BLOCK_D)
     # main accumulation loop
     for start_n in tl.range(0, N, BLOCK_N):
         start_n = tl.multiple_of(start_n, BLOCK_N)
-        k = tl.load(k_ptrs + start_n*stride_n) # (BLOCK_N, BLOCK_D)
+        k = tl.load(k_ptrs + start_n*stride_n, mask=(start_n + ax_n[:, None] < N)) # (BLOCK_N, BLOCK_D)
         qk = tl.dot(q, tl.trans(k)) # (BLOCK_N, BLOCK_N)
         qk = tl.where(start_n + ax_n[None, :] < N, qk, 0.) # remove the out-of-range guys
-        v = tl.load(v_ptrs + start_n*stride_n) # (BLOCK_N, BLOCK_D)
+        v = tl.load(v_ptrs + start_n*stride_n, mask=(start_n + ax_n[:, None] < N)) # (BLOCK_N, BLOCK_D)
         acc += tl.dot(qk, v)
     out_ptrs = Out + z*stride_z + idx_m[:, None]*stride_n + ax_d[None, :]
     tl.store(out_ptrs, acc, mask=(idx_m[:, None] < N))
@@ -84,23 +84,23 @@ def _bwd_kernel_kv(
     v_ptrs = V + z*stride_z + idx_n[:, None]*stride_n + ax_d[None, :]
     dout_ptrs = dOut + z*stride_z + ax_m[:, None]*stride_n + ax_d[None, :] # does not account for start_m
     # load k, v which are fixed by grid location
-    k = tl.load(k_ptrs) # (BLOCK_N, BLOCK_D)
-    v = tl.load(v_ptrs) # (BLOCK_N, BLOCK_D)
+    k = tl.load(k_ptrs, mask=(idx_n[:, None] < N)) # (BLOCK_N, BLOCK_D)
+    v = tl.load(v_ptrs, mask=(idx_n[:, None] < N)) # (BLOCK_N, BLOCK_D)
     # main accumulation loop for dv and dk
     dv = tl.zeros([BLOCK_N, BLOCK_D], dtype=tl.float32)
     dk = tl.zeros([BLOCK_N, BLOCK_D], dtype=tl.float32)
     for start_m in tl.range(0, N, BLOCK_N):
         start_m = tl.multiple_of(start_m, BLOCK_N)
         # compute dv
-        q = tl.load(q_ptrs + start_m*stride_n) # (BLOCK_N, BLOCK_D)
-        dout = tl.load(dout_ptrs + start_m*stride_n) # (BLOCK_N, BLOCK_D)
+        q = tl.load(q_ptrs + start_m*stride_n, mask=(start_m + ax_m[:, None] < N)) # (BLOCK_N, BLOCK_D)
+        dout = tl.load(dout_ptrs + start_m*stride_n, mask=(start_m + ax_m[:, None] < N)) # (BLOCK_N, BLOCK_D)
         kq = tl.dot(k, tl.trans(q)) # (BLOCK_N, BLOCK_N) n,m
         kq = tl.where(start_m + ax_m[None, :] < N, kq, 0.) # remove the out-of-range guys
         dv += tl.dot(kq, dout)
         tl.debug_barrier() # must put a debug barrier and reload since triton compiler is weird
         # compute dk
-        q = tl.load(q_ptrs + start_m*stride_n) # (BLOCK_N, BLOCK_D)
-        dout = tl.load(dout_ptrs + start_m*stride_n) # (BLOCK_N, BLOCK_D)
+        q = tl.load(q_ptrs + start_m*stride_n, mask=(start_m + ax_m[:, None] < N)) # (BLOCK_N, BLOCK_D)
+        dout = tl.load(dout_ptrs + start_m*stride_n, mask=(start_m + ax_m[:, None] < N)) # (BLOCK_N, BLOCK_D)
         v_dout = tl.dot(v, tl.trans(dout)) # (BLOCK_N, BLOCK_N) n,m
         v_dout = tl.where(start_m + ax_m[None, :] < N, v_dout, 0.)
         dk += tl.dot(v_dout, q)
@@ -134,13 +134,13 @@ def _bwd_kernel_q(
     dout_ptrs = dOut + z*stride_z + idx_m[:, None]*stride_n + ax_d[None, :]
     # accumulator for grad q
     dq = tl.zeros([BLOCK_N, BLOCK_D], dtype=tl.float32)
-    q = tl.load(q_ptrs) # (BLOCK_N, BLOCK_D)
-    dout = tl.load(dout_ptrs) # (BLOCK_N, BLOCK_D)
+    q = tl.load(q_ptrs, mask=(idx_m[:, None] < N)) # (BLOCK_N, BLOCK_D)
+    dout = tl.load(dout_ptrs, mask=(idx_m[:, None] < N)) # (BLOCK_N, BLOCK_D)
     # main accumulation loop
     for start_n in tl.range(0, N, BLOCK_N):
         start_n = tl.multiple_of(start_n, BLOCK_N)
-        k = tl.load(k_ptrs + start_n*stride_n) # (BLOCK_N, BLOCK_D)
-        v = tl.load(v_ptrs + start_n*stride_n) # (BLOCK_N, BLOCK_D)
+        k = tl.load(k_ptrs + start_n*stride_n, mask=(start_n + ax_n[:, None] < N)) # (BLOCK_N, BLOCK_D)
+        v = tl.load(v_ptrs + start_n*stride_n, mask=(start_n + ax_n[:, None] < N)) # (BLOCK_N, BLOCK_D)
         v_dout = tl.dot(dout, tl.trans(v))
         v_dout = tl.where(start_n + ax_n[None, :] < N, v_dout, 0.) # remove the out-of-range guys
         dq += tl.dot(v_dout, k)
