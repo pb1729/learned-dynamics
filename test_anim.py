@@ -54,6 +54,8 @@ def main(args):
     if args.slideshow:
       input("...")
     display.update_pos(clean_for_display(state.x))
+    if args.center:
+      display.center_pos()
     if args.framedelay > 0:
       time.sleep(args.framedelay)
 
@@ -64,6 +66,7 @@ if __name__ == "__main__":
   parser.add_argument("predictor_spec")
   parser.add_argument("--slideshow", dest="slideshow", action="store_true")
   parser.add_argument("--framedelay", dest="framedelay", type=float, default=0.001) # default is small, but long enough so the display can update
+  parser.add_argument("--center", dest="center", action="store_true")
   main(parser.parse_args())
 
 
