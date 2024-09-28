@@ -1,18 +1,19 @@
 import torch
 from torch.profiler import profile, record_function, ProfilerActivity
 
-from config import load
+from config import get_predictor
 from sims import equilibrium_sample, get_dataset
 from utils import prod
 
 
 def main(args):
   # load model
-  model = load(args.fpath)
-  config = model.config
-  model.set_eval(False) # we'll be testing a train step
+  predictor = get_predictor(args.fpath)
+  # setup to make sure we're profiling a full training step
+  model = predictor.model
+  model.set_eval(False)
   # get input
-  inp = torch.randn(args.batch, args.length, config.state_dim, device=config.device)
+  inp = torch.randn(args.batch, args.length, *predictor.shape, device=model.config.device)
   for i in range(args.burnin):
     print("burn-in %d" % i)
     model.train_step(inp)
