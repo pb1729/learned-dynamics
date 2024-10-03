@@ -21,10 +21,9 @@ def comparison_plot(x_list, shape, args):
   for i, x in enumerate(x_list):
     batch, tmax, must_be[poly_len], must_be[space_dim] = x.shape
     y = BASES[args.basis](x.cpu().numpy().reshape(batch*tmax, poly_len, space_dim)).reshape(batch, tmax, poly_len, space_dim)
-    y_avg = y.mean(0)
-    abs_y_avg = np.sqrt((y_avg**2).sum(-1)) # get magnitude of averaged vector
+    corr = (y*y[:, 0, None]).sum(-1).mean(0)
     for j in range(poly_len):
-      axes[j].plot(abs_y_avg[:, j])
+      axes[j].plot(corr[:, j])
   for j in range(poly_len):
     _, top = axes[j].get_ylim()
     axes[j].set_ylim(bottom=0., top=1.2*top)
@@ -35,9 +34,9 @@ def get_x_list(state, args, predictors):
   states = []
   for predictor in predictors:
     if isinstance(predictor, ModelPredictor):
-      states.append(state.expand(args.contins).to_model_predictor_state())
+      states.append(state.expand(1).to_model_predictor_state()) # expand just there to clone the state
     else:
-      states.append(state.expand(args.contins))
+      states.append(state.expand(1)) # expand just there to clone the state
   ans = []
   for state, predictor in zip(states, predictors):
     x = torch.zeros(args.contins, 1 + args.tmax, *predictor.shape)
@@ -50,7 +49,7 @@ def get_x_list(state, args, predictors):
 def eval_predictors(args, predictors):
   """ compare a predictor to its base predictor """
   shape = predictors[0].shape
-  state = predictors[0].sample_q(1) # get our initial condition from the first predictor in the list
+  state = predictors[0].sample_q(args.contins)
   # evaluate the base predictor and model predictor dynamics
   x_list = get_x_list(state, args, predictors)
   comparison_plot(x_list, shape, args)
