@@ -1,6 +1,9 @@
 import torch
+import numpy as np
+from typing_extensions import Self
 
 from utils import batched_model_eval
+from hoomd_sims import HoomdSim
 
 
 EVAL_BATCHSZ = 1024
@@ -18,27 +21,24 @@ class Predictor:
     """ Base State class. This one pretty much does nothing, but its subclasses do stuff.
         State can have multiplicity, and the amount of multiplicity is defined by the batch property. """
     @property
-    def batch(self):
+    def batch(self) -> int:
       assert False, "this class not concretely implemented!"
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> Self:
       assert False, "this class not concretely implemented!"
-    def expand(self, key):
+    def expand(self, n) -> Self:
       assert False, "this class not concretely implemented!"
   @property
-  def shape(self):
+  def shape(self) -> tuple:
     assert False, "this class not concretely implemented!"
-  def sample_q(self, batch):
+  def sample_q(self, batch) -> State:
     """ Some predictors may provide a way to sample States from some distribution q. (not necessarily
         the equilibrium distribution.) If so, you can sample a State of size batch by calling this function. """
     assert False, "q sampling not implemented for this class"
-  def predict(self, L, state, ret=True):
+  def predict(self, L, state, ret=True) -> torch.Tensor | None:
     """ predict L steps based on initial state.
         MUTATES state
         ret: return the trajectory? """
     assert False, "this class not concretely implemented!"
-  @staticmethod
-  def from_sim(sim_nm):
-    return SimPredictor(sim_nm)
 
 
 class SimPredictor(Predictor):
@@ -65,6 +65,7 @@ class SimPredictor(Predictor):
   def shape(self):
     return self.sim.shape
   def predict(self, L, state, ret=True):
+    """ MUTATES state """
     return self.sim.generate_trajectory(state.x, state.v, L, ret=ret)
   def sample_q(self, batch):
     x, v = self.sim.sample_equilibrium(batch, self.t_eql)
@@ -92,6 +93,7 @@ class ModelPredictor(Predictor):
   def shape(self):
     return self.model.config.predictor.shape
   def predict(self, L, state, ret=True):
+    """ MUTATES state """
     if ret:
       trajectory = torch.zeros((state.batch, L, *self.shape) ,
         dtype=state.x.dtype, device=state.x.device)
@@ -110,4 +112,36 @@ class ModelPredictor(Predictor):
     return self.model.config.predictor
 
 
-
+class HoomdPredictor(Predictor):
+  class State(Predictor.State):
+    def __init__(self, simulations):
+      self.simulations = simulations
+    @property
+    def x(self) -> torch.Tensor:
+      def sim2pos(simulation):
+        snapshot = simulation.state.get_snapshot()
+        return snapshot.particles.position + np.array(snapshot.configuration.box[:3])*snapshot.particles.image
+      ans = [sim2pos(sim) for sim in self.simulations]
+      return torch.tensor(ans)
+    @property
+    def batch(self):
+      return len(self.simulations)
+    def __getitem__(self, key) -> Self:
+      return HoomdPredictor.State(self.simulations[key])
+    def to_model_predictor_state(self):
+      return ModelPredictor.State(self.x)
+  def __init__(self, hoomd_sim:HoomdSim):
+    self.hoomd_sim = hoomd_sim
+  @property
+  def shape(self):
+    return (self.hoomd_sim.n_particles, 3)
+  def sample_q(self, batch) -> State:
+    return HoomdPredictor.State([self.hoomd_sim.sample_q() for _ in range(batch)])
+  def predict(self, L, state, ret=True):
+    """ MUTATES state """
+    assert ret == False # TODO: implement this as seen above
+    for i in range(L):
+      for sim in state.simulations:
+        self.hoomd_sim.step(sim)
+  def box(self):
+    return np.array(self.hoomd_sim.box)

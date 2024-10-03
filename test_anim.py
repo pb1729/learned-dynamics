@@ -45,6 +45,9 @@ def main(args):
   predictor = get_predictor(args.predictor_spec)
   assert space_dim(predictor) == 3
   def clean_for_display(x):
+    if args.wrap:
+      box = predictor.box()
+      x = (x - 0.5*box) % box + 0.5*box
     return x[0].cpu().numpy()
   state = predictor.sample_q(1)
   display = launch_atom_display(5*np.ones(poly_len(predictor), dtype=int),
@@ -67,11 +70,5 @@ if __name__ == "__main__":
   parser.add_argument("--slideshow", dest="slideshow", action="store_true")
   parser.add_argument("--framedelay", dest="framedelay", type=float, default=0.001) # default is small, but long enough so the display can update
   parser.add_argument("--center", dest="center", action="store_true")
+  parser.add_argument("--wrap", dest="wrap", action="store_true")
   main(parser.parse_args())
-
-
-
-
-
-
-

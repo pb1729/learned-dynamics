@@ -2,7 +2,8 @@ import torch
 import importlib
 
 from sims import sims
-from predictor import ModelPredictor, SimPredictor
+from hoomd_sims import hoomd_sims
+from predictor import ModelPredictor, SimPredictor, HoomdPredictor
 
 
 ARCH_PREFIX = "archs."
@@ -17,6 +18,8 @@ def get_predictor(predictor_spec):
     pred_type, rest = "sim", predictor_spec
   if "sim" == pred_type:
     ans = SimPredictor(sims[rest])
+  elif "hoomd" == pred_type:
+    ans = HoomdPredictor(hoomd_sims[rest])
   elif "model" == pred_type: # treat "rest" as a path
     ans = ModelPredictor(load(rest))
   else: assert False, "unknown predictor type"
@@ -76,7 +79,7 @@ class Config:
     return self.arch_specific[key]
   def __setitem__(self, key, value):
     self.arch_specific[key] = value
-    
+
 
 
 
@@ -87,11 +90,11 @@ class Config:
 # * @staticmethod .makenew()        creates a new instance of the model
 
 def load_config(path):
-  data = torch.load(path)
+  data = torch.load(path, weights_only=False)
   return Config(*data["args"], **data["kwargs"])
 
 def load(path):
-  data = torch.load(path)
+  data = torch.load(path, weights_only=False)
   config = Config(*data["args"], **data["kwargs"])
   return config.modelclass.load_from_dict(data["states"], config)
 
@@ -106,7 +109,3 @@ def save(model, path):
 
 def makenew(config):
   return config.modelclass.makenew(config)
-
-
-
-
