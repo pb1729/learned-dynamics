@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from torch_scatter import scatter
 
 from utils import must_be
 
@@ -82,7 +81,10 @@ class FromAtomCoords(nn.Module):
 class VecLinear(nn.Module):
   def __init__(self, dim_in, dim_out):
     super().__init__()
-    self.W = nn.Parameter(torch.randn(dim_out, dim_in))
+    self.W = nn.Parameter(torch.empty(dim_out, dim_in))
+  def self_init(self):
+    _, fan_in = self.W.shape
+    nn.init.normal_(self.W, std=fan_in**-0.5)
   def forward(self, v):
     return torch.einsum("oi, ...ik -> ...ok", self.W, v)
 
@@ -107,103 +109,6 @@ class VecResidual(nn.Module):
   def forward(self, x):
     return x + self.layers(x)
 
-
-class Graph:
-  def __init__(self, src, dst, n_nodes):
-    device = src.device
-    edges, = src.shape
-    self.src = src
-    self.dst = dst
-    self.n_nodes = n_nodes
-    self.deg = scatter(torch.ones(edges, device=device), src, dim=0, dim_size=n_nodes)
-    self.norm_coeff = (1. + self.deg)**(-0.5)
-
-
-class VecNodesConv(nn.Module):
-  """ Pass linearly transformed messages along the edges of the graph. """
-  def __init__(self, dim_in, dim_out):
-    super().__init__()
-    # layers:
-    self.linear_node = VecLinear(dim_in, dim_out)
-    self.linear_edge = VecLinear(dim_in, dim_out)
-  def forward(self, x, graph):
-    """ x: (batch, nodes, dim_in, 3)
-        return: (batch, nodes, dim_out, 3) """
-    y_node = self.linear_node(x)
-    y_edge = self.linear_edge(x) # compute transformed values before doing graph convolution
-    y_edge = scatter(y_edge[:, graph.src], graph.dst, dim=1, dim_size=graph.n_nodes) # pass information along edges
-    ans = y_node + graph.norm_coeff[:, None, None]*y_edge
-    return ans*INV_SQRT_2
-
-class VecEdgesRead(nn.Module):
-  """ edges read from nodes """
-  def __init__(self, dim_in, dim_out):
-    super().__init__()
-    # layers:
-    self.linear_src = VecLinear(dim_in, dim_out)
-    self.linear_dst = VecLinear(dim_in, dim_out)
-  def forward(self, x, graph):
-    """ x: (batch, nodes, dim_in, 3)
-        return: (batch, edges, dim_out, 3) """
-    ans = (self.linear_src(x[:, graph.src]) + self.linear_dst(x[:, graph.dst]))
-    return ans*INV_SQRT_2
-
-class VecEdgesWrite(nn.Module):
-  """ edges write to nodes """
-  def __init__(self, dim_in, dim_out):
-    super().__init__()
-    # layers:
-    self.linear_src = VecLinear(dim_in, dim_out)
-    self.linear_dst = VecLinear(dim_in, dim_out)
-  def forward(self, x, graph):
-    """ x: (batch, edges, dim_in, 3)
-        return: (batch, nodes, dim_out, 3) """
-    ans = (scatter(self.linear_src(x), graph.src, dim=1, dim_size=graph.n_nodes)
-         + scatter(self.linear_dst(x), graph.dst, dim=1, dim_size=graph.n_nodes))
-    return ans*INV_SQRT_2*graph.norm_coeff[:, None, None]
-
-class ScalNodesConv(nn.Module):
-  """ Pass linearly transformed messages along the edges of the graph. """
-  def __init__(self, dim_in, dim_out, bias=False):
-    super().__init__()
-    # layers:
-    self.linear_node = nn.Linear(dim_in, dim_out, bias=bias)
-    self.linear_edge = nn.Linear(dim_in, dim_out, bias=bias)
-  def forward(self, x, graph):
-    """ x: (batch, nodes, dim_in)
-        return: (batch, nodes, dim_out) """
-    y_node = self.linear_node(x)
-    y_edge = self.linear_edge(x) # compute transformed values before doing graph convolution
-    y_edge = scatter(y_edge[:, graph.src], graph.dst, dim=1, dim_size=graph.n_nodes) # pass information along edges
-    ans = y_node + graph.norm_coeff[:, None]*y_edge
-    return ans*INV_SQRT_2
-
-class ScalEdgesRead(nn.Module):
-  """ edges read from nodes """
-  def __init__(self, dim_in, dim_out, bias=False):
-    super().__init__()
-    # layers:
-    self.linear_src = nn.Linear(dim_in, dim_out, bias=bias)
-    self.linear_dst = nn.Linear(dim_in, dim_out, bias=bias)
-  def forward(self, x, graph):
-    """ x: (batch, nodes, dim_in)
-        return: (batch, edges, dim_out) """
-    ans = (self.linear_src(x[:, graph.src]) + self.linear_dst(x[:, graph.dst]))
-    return ans*INV_SQRT_2
-
-class ScalEdgesWrite(nn.Module):
-  """ edges write to nodes """
-  def __init__(self, dim_in, dim_out, bias=False):
-    super().__init__()
-    # layers:
-    self.linear_src = nn.Linear(dim_in, dim_out, bias=bias)
-    self.linear_dst = nn.Linear(dim_in, dim_out, bias=bias)
-  def forward(self, x, graph):
-    """ x: (batch, edges, dim_in)
-        return: (batch, nodes, dim_out) """
-    ans = (scatter(self.linear_src(x), graph.src, dim=1, dim_size=graph.n_nodes)
-         + scatter(self.linear_dst(x), graph.dst, dim=1, dim_size=graph.n_nodes))
-    return ans*INV_SQRT_2*graph.norm_coeff[:, None]
 
 class ScalVecProducts(nn.Module):
   """ computes dot, cross, and scalar products, respects SO3 symmetry
@@ -387,14 +292,15 @@ class VecGroupNorm(nn.Module):
 
 
 class ScalConv1d(nn.Module):
-  def __init__(self, chan, kernsz, edges_to_nodes=False):
+  def __init__(self, chan, kernsz, edges_to_nodes=False, dilation=1):
     super().__init__()
     if edges_to_nodes:
       assert kernsz % 2 == 0
-      self.conv = nn.Conv1d(chan, chan, kernsz, padding=(kernsz//2))
+      assert dilation == 1
+      self.conv = nn.Conv1d(chan, chan, kernsz, dilation=dilation, padding=(kernsz//2))
     else:
       assert kernsz % 2 == 1
-      self.conv = nn.Conv1d(chan, chan, kernsz, padding="same")
+      self.conv = nn.Conv1d(chan, chan, kernsz, dilation=dilation, padding="same")
   def forward(self, x):
     """ x: (batch, length, chan) """
     x = x.permute(0, 2, 1) # (batch, chan, length)
@@ -403,14 +309,15 @@ class ScalConv1d(nn.Module):
     return y
 
 class VecConv1d(nn.Module):
-  def __init__(self, chan, kernsz, edges_to_nodes=False):
+  def __init__(self, chan, kernsz, edges_to_nodes=False, dilation=1):
     super().__init__()
     if edges_to_nodes:
       assert kernsz % 2 == 0
-      self.conv = nn.Conv1d(chan, chan, kernsz, padding=(kernsz//2), bias=False)
+      assert dilation == 1
+      self.conv = nn.Conv1d(chan, chan, kernsz, dilation=dilation, padding=(kernsz//2), bias=False)
     else:
       assert kernsz % 2 == 1
-      self.conv = nn.Conv1d(chan, chan, kernsz, padding="same", bias=False)
+      self.conv = nn.Conv1d(chan, chan, kernsz, dilation=dilation, padding="same", bias=False)
   def forward(self, x):
     """ x: (batch, length, chan, 3) """
     batch, length, chan, must_be[3] = x.shape
@@ -489,6 +396,3 @@ def periodic_sqrel(pos_0, pos_1, L): # TODO: test it out
       ans: (...) """
   d_pos = pos_1 - pos_0
   return (((L*0.3183098861837907)*torch.sin(d_pos*3.141592653589793/L))**2).sum(-1)
-
-
-

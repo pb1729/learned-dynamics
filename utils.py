@@ -42,6 +42,17 @@ class PrintTiming:
     print(f"done after {elapsed_time:.4f} s")
 
 
+class _GradPrint(torch.autograd.Function):
+  @staticmethod
+  def forward(ctx, x):
+    return x
+  @staticmethod
+  def backward(ctx, grad_out):
+    print(grad_out)
+    return grad_out
+grad_print = _GradPrint.apply
+
+
 # batched evaluation:
 
 def batched_xy_moment(x, y, batch=64000):

@@ -71,6 +71,25 @@ class ProbePoints2(nn.Module):
     return probe_pts
 
 
+class ProbePoints3(nn.Module):
+  """ Even simpler probe points layer! """
+  def __init__(self, heads, vdim):
+    super().__init__()
+    self.H = heads
+    self.W_vec = nn.Parameter(torch.empty(heads, vdim))
+  def self_init(self):
+    must_be[self.H], vdim = self.W_vec.shape
+    nn.init.normal_(self.W_vec, std=(vdim**(-0.5)))
+  def forward(self, vx, pos):
+    """ vx: (batch, nodes, vdim, 3)
+        pos: (batch, nodes, 3)
+        ans: (batch, heads, nodes, 3) """
+    batch, nodes, vdim, must_be[3] = vx.shape
+    must_be[batch], must_be[nodes], must_be[3] = pos.shape
+    delta_v = torch.einsum("hj, bnjv -> bhnv", self.W_vec, vx) # (batch, heads, nodes, 3)
+    return pos[:, None] + delta_v
+
+
 class ProximityAttention(nn.Module):
   """ A multiheaded attention module. The layer can be configured with the following parameters:
       r0_list: (H)        --> a python list of characteristic radii for each attention head
@@ -164,7 +183,7 @@ class ProximityAttentionV2(nn.Module):
       kq_prescale: ()     --> k*q dot products are multiplied by this to make them smaller
       Attention is based both on vector dot products, and also on spatial proximity.
       This implementation does not allow masking.
-      
+
       This is version 2, with radial separation encodings added onto the attention operation. """
   def __init__(self, r0_list, kq_dim, chan, kq_prescale=0.01, kq_scale=0.1):
     super().__init__()
@@ -316,7 +335,7 @@ class ProximityFlashAttention(nn.Module):
     ay = torch.einsum("hji, bhni -> bnj", self.W_ao, ay.reshape(batch, self.H, nodes, self.chan))
     vy = torch.einsum("hji, bhniv -> bnjv", self.W_vo, vy.reshape(batch, self.H, nodes, self.chan, 3))
     return ay, vy
-    
+
 
 
 
@@ -351,7 +370,3 @@ if __name__ == "__main__":
   aans_prime, vans_prime = m((ax, vx), pos_kq_prime[0], pos_kq_prime[1])
   print((aans**2).mean(), (vans**2).mean())
   print(((aans - aans_prime)**2).max(), ((vans - vans_prime)**2).sum(-1).max())
-
-
-
-
