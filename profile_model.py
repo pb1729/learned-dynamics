@@ -2,13 +2,11 @@ import torch
 from torch.profiler import profile, record_function, ProfilerActivity
 
 from config import get_predictor
-from sims import equilibrium_sample, get_dataset
-from utils import prod
 
 
 def main(args):
   # load model
-  predictor = get_predictor(args.fpath)
+  predictor = get_predictor("model:" + args.fpath)
   # setup to make sure we're profiling a full training step
   model = predictor.model
   model.set_eval(False)
@@ -37,6 +35,3 @@ if __name__ == "__main__":
   parser.add_argument("--burnin", dest="burnin", type=int, default=5)
   parser.add_argument("--saveto", dest="saveto", type=str, default="/tmp/chrome_trace.json")
   main(parser.parse_args())
-
-
-
