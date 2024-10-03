@@ -1,6 +1,7 @@
 import itertools
 from threading import Thread
 from queue import Queue
+import os
 
 import torch
 
@@ -37,6 +38,8 @@ def dataset_gen(config):
 
 def train(model, save_path):
   assert save_path.split(".")[-1] == "pt", "expected pytorch .pt file suffix"
+  if os.path.isfile(save_path):
+    input(f"File {save_path} already exists. Press ENTER to continue training anyway. Press CTL-C to exit.")
   run_name = ".".join(save_path.split("/")[-1].split(".")[:-1])
   print(run_name)
   print(model.config)
@@ -71,6 +74,3 @@ def training_run(save_path, src):
   else:
     raise TypeError("incorrect source for training run!")
   train(model, save_path)
-
-
-
