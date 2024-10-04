@@ -47,7 +47,7 @@ def main(args):
   def clean_for_display(x):
     if args.wrap:
       box = predictor.box()
-      x = (x - 0.5*box) % box + 0.5*box
+      x = (x + 0.5*box) % box - 0.5*box
     return x[0].cpu().numpy()
   state = predictor.sample_q(1)
   display = launch_atom_display(5*np.ones(poly_len(predictor), dtype=int),

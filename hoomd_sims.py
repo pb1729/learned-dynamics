@@ -20,9 +20,20 @@ class HoomdSim:
     self.nsteps = nsteps
   def _settle_simulation(self, simulation:hoomd.Simulation):
     old_dt = simulation.operations.integrator.dt
-    simulation.operations.integrator.dt = old_dt / 20
-    simulation.run(1024)
-    simulation.operations.integrator.dt = old_dt / 20
+    simulation.operations.integrator.dt = old_dt / 20 # smaller time step improves success odds
+    while True: # could need several retries before the sim settles
+      try:
+        simulation.run(1024)
+      except RuntimeError as e:
+        box = np.array(self.box)
+        snapshot = simulation.state.get_snapshot()
+        snapshot.particles.position[:] = (snapshot.particles.position + 0.5*box) % box - 0.5*box
+        simulation.state.set_snapshot(snapshot)
+        simulation.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=self.kT)
+        continue
+      else:
+        break
+    simulation.operations.integrator.dt = old_dt
     simulation.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=self.kT)
   def sample_q(self):
     frame = self.sample_frame(self.n_particles, self.box)
