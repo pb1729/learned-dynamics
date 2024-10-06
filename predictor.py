@@ -39,6 +39,8 @@ class Predictor:
         MUTATES state
         ret: return the trajectory? """
     assert False, "this class not concretely implemented!"
+  def get_box(self) -> torch.Tensor|None:
+    return None
 
 
 class SimPredictor(Predictor):
@@ -108,8 +110,10 @@ class ModelPredictor(Predictor):
       return trajectory
   def sample_q(self, batch):
     return self.get_base_predictor().sample_q(batch).to_model_predictor_state()
-  def get_base_predictor(self):
+  def get_base_predictor(self) -> Predictor:
     return self.model.config.predictor
+  def get_box(self):
+    return self.get_base_predictor().get_box()
 
 
 class HoomdPredictor(Predictor):
@@ -122,7 +126,7 @@ class HoomdPredictor(Predictor):
         snapshot = simulation.state.get_snapshot()
         return snapshot.particles.position + np.array(snapshot.configuration.box[:3])*snapshot.particles.image
       ans = [sim2pos(sim) for sim in self.simulations]
-      return torch.tensor(ans)
+      return torch.tensor(ans, dtype=torch.float32, device="cuda")
     @property
     def batch(self):
       return len(self.simulations)
@@ -139,9 +143,14 @@ class HoomdPredictor(Predictor):
     return HoomdPredictor.State([self.hoomd_sim.sample_q() for _ in range(batch)])
   def predict(self, L, state, ret=True):
     """ MUTATES state """
-    assert ret == False # TODO: implement this as seen above
+    if ret:
+      trajectory = torch.zeros((state.batch, L, *self.shape) ,
+        dtype=torch.float32, device="cuda")
     for i in range(L):
       for sim in state.simulations:
         self.hoomd_sim.step(sim)
-  def box(self):
-    return np.array(self.hoomd_sim.box)
+      if ret: trajectory[:, i] = state.x
+    if ret:
+      return trajectory
+  def get_box(self):
+    return torch.tensor(self.hoomd_sim.box, dtype=torch.float32, device="cuda")

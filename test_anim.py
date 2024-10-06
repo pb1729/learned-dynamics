@@ -38,15 +38,15 @@ def eval_sample_step(init_states, fin_statess, predictor, basis):
     compare_predictions_x(init_state, fin_states, predictor, basis)
 
 
-
-
 def main(args):
   # get comparison data
   predictor = get_predictor(args.predictor_spec)
   assert space_dim(predictor) == 3
+  box = None
+  if args.wrap:
+    box = predictor.get_box()
   def clean_for_display(x):
-    if args.wrap:
-      box = predictor.box()
+    if box is not None:
       x = (x + 0.5*box) % box - 0.5*box
     return x[0].cpu().numpy()
   state = predictor.sample_q(1)
