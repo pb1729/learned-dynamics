@@ -143,84 +143,6 @@ class ScalVecProducts(nn.Module):
     return a_out, v_out
 
 
-class EdgeRelativeEmbed(nn.Module):
-  """ input embedding for edges, where 2 positions are passed as input """
-  def __init__(self, adim, vdim):
-    super().__init__()
-    self.lin_a = nn.Linear(6, adim)
-    self.lin_v = VecLinear(6, vdim)
-  def forward(self, pos_0, pos_1, graph):
-    """ pos0: (batch, node, 3)
-        pos1: (batch, node, 3)
-        return: tuple(a_out, v_out)
-        a_out: (batch, edge, adim)
-        v_out: (batch, edge, vdim, 3) """
-    vecs = torch.stack([ # 6 = (4 choose 2) relative vectors
-        pos_0[:, graph.dst] - pos_0[:, graph.src],
-        pos_1[:, graph.dst] - pos_1[:, graph.src],
-        pos_1[:, graph.src] - pos_0[:, graph.src],
-        pos_1[:, graph.dst] - pos_0[:, graph.dst],
-        pos_1[:, graph.src] - pos_0[:, graph.dst],
-        pos_1[:, graph.dst] - pos_0[:, graph.src],
-      ], dim=2) # (batch, edges, 6, 3)
-    norms = torch.linalg.vector_norm(vecs, dim=-1) # (batch, edges, 6)
-    a_out = self.lin_a(norms)
-    v_out = self.lin_v(vecs)/3 # fudge factor of 1/3
-    return a_out, v_out
-
-
-class NodeRelativeEmbed(nn.Module):
-  """ input embedding for nodes, where 2 positions are passed as input """
-  def __init__(self, adim, vdim):
-    super().__init__()
-    self.lin_a = nn.Linear(1, adim)
-    self.lin_v = VecLinear(1, vdim)
-  def forward(self, pos_0, pos_1, graph):
-    """ pos0: (batch, node, 3)
-        pos1: (batch, node, 3)
-        return: tuple(a_out, v_out)
-        a_out: (batch, edge, adim)
-        v_out: (batch, edge, vdim, 3) """
-    vecs = torch.stack([ # 1 = (2 choose 2) relative vectors
-        pos_1 - pos_0,
-      ], dim=2) # (batch, edges, 1, 3)
-    norms = torch.linalg.vector_norm(vecs, dim=-1) # (batch, edges, 1)
-    a_out = self.lin_a(norms)
-    v_out = self.lin_v(vecs)/3 # fudge factor of 1/3
-    return a_out, v_out
-
-
-class EdgeRelativeEmbedMLP(nn.Module):
-  """ input embedding for edges, where 2 positions are passed as input """
-  def __init__(self, adim, vdim):
-    super().__init__()
-    self.lin_v = VecLinear(6, vdim)
-    self.scalar_layers = nn.Sequential(
-      nn.Linear(6, adim),
-      nn.LeakyReLU(0.2, inplace=True),
-      nn.Linear(adim, adim),
-      nn.LeakyReLU(0.2, inplace=True),
-      nn.Linear(adim, adim))
-  def forward(self, pos_0, pos_1, graph):
-    """ pos0: (batch, node, 3)
-        pos1: (batch, node, 3)
-        return: tuple(a_out, v_out)
-        a_out: (batch, edge, adim)
-        v_out: (batch, edge, vdim, 3) """
-    vecs = torch.stack([ # 6 = (4 choose 2) relative vectors
-        pos_0[:, graph.dst] - pos_0[:, graph.src],
-        pos_1[:, graph.dst] - pos_1[:, graph.src],
-        pos_1[:, graph.src] - pos_0[:, graph.src],
-        pos_1[:, graph.dst] - pos_0[:, graph.dst],
-        pos_1[:, graph.src] - pos_0[:, graph.dst],
-        pos_1[:, graph.dst] - pos_0[:, graph.src],
-      ], dim=2) # (batch, edges, 6, 3)
-    norms = torch.linalg.vector_norm(vecs, dim=-1) # (batch, edges, 6)
-    a_out = self.scalar_layers(norms)
-    v_out = self.lin_v(vecs)/3 # fudge factor of 1/3
-    return a_out, v_out
-
-
 class NodeRelativeEmbedMLP(nn.Module):
   """ input embedding for nodes, where 2 positions are passed as input """
   def __init__(self, adim, vdim):
@@ -232,7 +154,7 @@ class NodeRelativeEmbedMLP(nn.Module):
       nn.Linear(adim, adim),
       nn.LeakyReLU(0.2, inplace=True),
       nn.Linear(adim, adim))
-  def forward(self, pos_0, pos_1, graph=None):
+  def forward(self, pos_0, pos_1):
     """ pos0: (batch, node, 3)
         pos1: (batch, node, 3)
         return: tuple(a_out, v_out)
