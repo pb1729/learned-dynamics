@@ -7,6 +7,7 @@ figures/
 src_hashes/
 slides/
 videos/
+images/
 extensions/*/build/
 extensions/*/dist/
 extensions/*/*.egg-info/

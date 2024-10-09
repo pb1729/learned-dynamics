@@ -44,13 +44,15 @@ class PrintTiming:
 
 class _GradPrint(torch.autograd.Function):
   @staticmethod
-  def forward(ctx, x):
+  def forward(ctx, x, fwd_print):
+    if fwd_print: print(x)
     return x
   @staticmethod
   def backward(ctx, grad_out):
     print(grad_out)
-    return grad_out
-grad_print = _GradPrint.apply
+    return grad_out, None
+def grad_print(x, fwd_print=False):
+  return _GradPrint.apply(x, fwd_print)
 
 
 # batched evaluation:
@@ -95,5 +97,3 @@ def batched_model_eval(model, x, batch=16384):
   for i in range(0, N, batch):
     ans[i:i+batch] = model(x[i:i+batch])
   return ans
-
-

@@ -69,7 +69,7 @@ def main(args):
 
 if __name__ == "__main__":
   from argparse import ArgumentParser
-  parser = ArgumentParser(prog="test_model")
+  parser = ArgumentParser(prog="profile_memory")
   parser.add_argument("fpath")
   parser.add_argument("--batch", dest="batch", type=int, default=1)
   parser.add_argument("--length", dest="length", type=int, default=8)
