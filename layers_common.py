@@ -97,6 +97,28 @@ class VecRootS(nn.Module):
     scale = (1. + v_sq)**(-0.25)
     return v*scale
 
+class _VectorSigmoid(torch.autograd.Function):
+  """ vector activation function with a sigmoid shape in any given direction """
+  @staticmethod
+  def forward(ctx, v):
+    """ x: (..., 3) """
+    ctx.save_for_backward(v)
+    vv = (v**2).sum(-1, keepdim=True)
+    return v/torch.sqrt(1. + vv)
+  @staticmethod
+  def backward(ctx, grad_output):
+    v, = ctx.saved_tensors
+    vv = (v**2).sum(-1, keepdim=True)
+    quad = 1. + vv
+    return (quad*grad_output - (v*grad_output).sum(-1, keepdim=True)*v)*(quad**-1.5)
+vector_sigmoid = _VectorSigmoid.apply
+
+class VectorSigmoid(nn.Module):
+  def __init__(self):
+    super().__init__()
+  def forward(self, x):
+    return vector_sigmoid(x)
+
 class VecResidual(nn.Module):
   def __init__(self, dim):
     super().__init__()

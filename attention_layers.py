@@ -272,7 +272,7 @@ class ProximityAttentionV2(nn.Module):
 
 
 class ProximityFlashAttention(nn.Module):
-  def __init__(self, r0_list, adim, vdim, chan):
+  def __init__(self, r0_list, adim, vdim, chan, vec_actv_class=VecRootS):
     super().__init__()
     self.H = len(r0_list)
     self.chan = chan
@@ -285,7 +285,7 @@ class ProximityFlashAttention(nn.Module):
     self.W_vv = nn.Parameter(torch.empty(self.H, chan, vdim))
     self.W_ao = nn.Parameter(torch.empty(self.H, adim, chan))
     self.W_vo = nn.Parameter(torch.empty(self.H, vdim, chan))
-    self.vec_actv = VecRootS()
+    self.vec_actv = vec_actv_class()
   def _param_init_with_scale(self, param, scale=1.):
     must_be[self.H], fan_in, fan_out = param.shape
     std = scale*(fan_in**(-0.5))
@@ -326,8 +326,8 @@ class ProximityFlashAttention(nn.Module):
     Q, K, V = Q.contiguous(), K.contiguous(), V.contiguous()
     pos_q, pos_k = pos_q.contiguous(), pos_k.contiguous()
     # prevent q,k values from getting too large
-    Q = self.vec_actv(Q)
-    K = self.vec_actv(K)
+    Q = self.vec_actv(Q) # TODO: this is along a dimension of size 4*self.chan, not 3!
+    K = self.vec_actv(K) # consider if this is maybe really dumb (idk, could be fine...)
     # do attention
     O = proxattn(Q, K, V, pos_q.reshape(batch*self.H, nodes, 3), pos_k.reshape(batch*self.H, nodes, 3), self.r0sq)
     O /= nodes**0.5 # prevent runaway activations...
