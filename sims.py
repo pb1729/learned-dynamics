@@ -307,6 +307,10 @@ sims = SimsDict(
     torch.tensor([1.]*l), 1.0, l, float(t), 100*t,
     metadata={"poly_len": l, "space_dim": 3}
   )),
+  ("repel5a_l%d_t%d", lambda l, t: CUDASim(SimId.REPEL5,
+    torch.tensor([1.]*l), 1.0, l, float(t), 200*t,
+    metadata={"poly_len": l, "space_dim": 3}
+  )),
 )
 
 
@@ -357,7 +361,3 @@ def get_poly_tc(sim, mode_k):
       WARNING: ASSUMES that the drag is identical for all coordinates! """
   drag = sim.drag[0].item() # assume that the drag for all atoms is identical!
   return drag / mode_k
-
-
-
-
