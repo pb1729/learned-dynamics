@@ -7,6 +7,7 @@ from atoms_display import launch_atom_display
 
 from polymer_util import poly_len, space_dim
 from config import get_predictor
+from utils import must_be
 
 
 SHOW_REALSPACE_SAMPLES = 10
@@ -38,6 +39,13 @@ def eval_sample_step(init_states, fin_statess, predictor, basis):
     compare_predictions_x(init_state, fin_states, predictor, basis)
 
 
+def make_linear(state):
+  """ MUTATES state """
+  _, nodes, must_be[3] = state.x.shape
+  state.x[0, :, 1:] = 0.
+  state.x[0, :, 0] = torch.linspace(-nodes/2, nodes/2, nodes, device=state.x.device)
+
+
 def main(args):
   # get comparison data
   predictor = get_predictor(args.predictor_spec)
@@ -50,6 +58,8 @@ def main(args):
       x = (x + 0.5*box) % box - 0.5*box
     return x[0].cpu().numpy()
   state = predictor.sample_q(1)
+  if args.startlinear:
+    make_linear(state)
   display = launch_atom_display(5*np.ones(poly_len(predictor), dtype=int),
     clean_for_display(state.x))
   while True:
@@ -71,4 +81,5 @@ if __name__ == "__main__":
   parser.add_argument("--framedelay", dest="framedelay", type=float, default=0.001) # default is small, but long enough so the display can update
   parser.add_argument("--center", dest="center", action="store_true")
   parser.add_argument("--wrap", dest="wrap", action="store_true")
+  parser.add_argument("--startlinear", dest="startlinear", action="store_true")
   main(parser.parse_args())
