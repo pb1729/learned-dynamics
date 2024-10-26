@@ -119,6 +119,13 @@ class VectorSigmoid(nn.Module):
   def forward(self, x):
     return vector_sigmoid(x)
 
+def radial_encode(r, n, rmax):
+  """ r: (...)
+      ans: (..., n)"""
+  n = torch.arange(0, n, device=r.device)
+  return torch.cos(torch.pi*n*r[..., None])
+
+
 class VecResidual(nn.Module):
   def __init__(self, dim):
     super().__init__()

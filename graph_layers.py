@@ -20,7 +20,9 @@ class Graph:
         R: (batch, nodes, 3) array of node positions """
     neighbours, neighbour_counts = neighbour_grid.get_neighbours(celllist_max, neighbours_max, r0, *box, R)
     neighbours = neighbours[:, :, :neighbour_counts.max()].contiguous()
-    return Graph(neighbours, neighbour_counts)
+    ans = Graph(neighbours, neighbour_counts)
+    setattr(ans, "box", box) # since graph was created from a periodic box, we should record this
+    return ans
 
 
 class _EdgesRead(torch.autograd.Function):
