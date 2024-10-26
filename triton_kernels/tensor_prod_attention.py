@@ -5,7 +5,7 @@ from typing import Any
 
 import sys
 sys.path.append("/home/phillip/projects/torchenv/src/koopman") # TODO: should probably make this project into a package at some point...
-from utils import must_be
+from utils import must_be, avg_relative_diff
 
 
 # Q: THIS FILE IS UNUSED, WHY IS IT IN THE REPO?
@@ -239,16 +239,7 @@ if __name__ == "__main__":
     triton_out.backward(dout)
     triton_grads = (q.grad, k.grad, v.grad)
 
-    def avg_relative_diff(a, b):
-        y = (torch.abs(a - b)/torch.sqrt(0.0001 + 0.5*(a**2 + b**2))).mean(0).detach().cpu().numpy()
-        if False:
-            import matplotlib.pyplot as plt
-            plt.imshow(y)
-            plt.show()
-        return y.mean()
-
     print("value", avg_relative_diff(refimpl_out, triton_out))
     print("grad_q", avg_relative_diff(refimpl_grads[0], triton_grads[0]))
     print("grad_k", avg_relative_diff(refimpl_grads[1], triton_grads[1]))
     print("grad_v", avg_relative_diff(refimpl_grads[2], triton_grads[2]))
-

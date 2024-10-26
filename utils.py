@@ -2,17 +2,13 @@ import time
 import torch
 
 
+# SHAPE UTILS:
+
 def prod(dims):
   ans = 1
   for dim in dims:
     ans *= dim
   return ans
-
-
-def compare_tensors(t1, t2):
-  def largest_elem(t):
-    return abs(t).max().item()
-  print("magnitude:", max(largest_elem(t1), largest_elem(t2)), "  difference:", largest_elem(t1 - t2))
 
 
 class _MustBe:
@@ -29,6 +25,24 @@ class _MustBe:
 must_be = _MustBe()
 
 
+# TENSOR COMPARISON UTILS
+
+def compare_tensors(t1, t2):
+  def largest_elem(t):
+    return abs(t).max().item()
+  print("magnitude:", max(largest_elem(t1), largest_elem(t2)), "  difference:", largest_elem(t1 - t2))
+
+def avg_relative_diff(a, b):
+    y = (torch.abs(a - b)/torch.sqrt(0.0001 + 0.5*(a**2 + b**2))).mean(0).detach().cpu().numpy()
+    if False:
+        import matplotlib.pyplot as plt
+        plt.imshow(y)
+        plt.show()
+    return y.mean()
+
+
+# OTHER STUFF...
+
 class PrintTiming:
   def __init__(self, start_message):
     self.start_message = start_message
@@ -42,20 +56,20 @@ class PrintTiming:
     print(f"done after {elapsed_time:.4f} s")
 
 
-class _GradPrint(torch.autograd.Function):
+class _GradRecord(torch.autograd.Function):
   @staticmethod
-  def forward(ctx, x, fwd_print):
-    if fwd_print: print(x)
+  def forward(ctx, x, callback):
+    ctx.grad_rec_callback = callback
     return x
   @staticmethod
   def backward(ctx, grad_out):
-    print(grad_out)
+    ctx.grad_rec_callback(grad_out)
     return grad_out, None
-def grad_print(x, fwd_print=False):
-  return _GradPrint.apply(x, fwd_print)
+grad_record = _GradRecord.apply
 
 
-# batched evaluation:
+
+# BATCHED EVALUATION:
 
 def batched_xy_moment(x, y, batch=64000):
   """ compute product moment of two tensors in batches

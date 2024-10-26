@@ -5,7 +5,7 @@ from typing import Any
 
 import sys
 sys.path.append("/home/phillip/projects/torchenv/src/koopman") # TODO: should probably make this project into a package at some point...
-from utils import must_be
+from utils import must_be, avg_relative_diff
 
 
 def refimpl_proxattn(Q, K, V, X, Y, r0sq):
@@ -315,54 +315,47 @@ proxattn = _proxattn.apply
 
 # TESTING CODE
 if __name__ == "__main__":
-    for i in range(2100): # do lots of steps so we can see if there will be an illegal memory access (usually around 936)
-        print(1 + i)
-        r0sq = torch.tensor([0.2, 0.3, 0.5, 0.8, 1.3], device="cuda")
-        heads, = r0sq.shape
-        if True:
-            Z = 7*heads
-            N = 1 + i
-            dim = 128
-            q = torch.randn(Z, N, dim, device="cuda")
-            k, v = torch.randn_like(q), torch.randn_like(q)
-            x, y = 2*torch.rand(Z, N, 3, device="cuda"), 2*torch.rand(Z, N, 3, device="cuda")
-            dout = torch.randn_like(q)
-        else:
-            q = torch.tensor([[[10., *[0.]*15], *[[0.]*16]*16, [-10., *[0.]*15]]], device="cuda")
-            k = torch.clone(q)
-            v = torch.tensor([[[3., *[0.]*15], *[[0.]*16]*16, [0., 3., *[0.]*14]]], device="cuda")
-            #dout = torch.tensor([[[2., -2., *[0.]*14]]*18], device="cuda")
-            #dout = torch.tensor([[[1.0, *[0.]*15], *[[0.]*16]*16, [0., 1.0, *[0.]*14]]], device="cuda")
-            dout = torch.randn_like(q)
+    from clobbercheck import ClobberChecker
+    with ClobberChecker() as cc:
+        for i in range(2100): # do lots of steps so we can see if there will be an illegal memory access (usually around 936)
+            print(1 + i)
+            r0sq = torch.tensor([0.2, 0.3, 0.5, 0.8, 1.3], device="cuda")
+            heads, = r0sq.shape
+            if True:
+                Z = 7*heads
+                N = 1 + i
+                dim = 128
+                q = torch.randn(Z, N, dim, device="cuda")
+                k, v = torch.randn_like(q), torch.randn_like(q)
+                x, y = 2*torch.rand(Z, N, 3, device="cuda"), 2*torch.rand(Z, N, 3, device="cuda")
+                dout = torch.randn_like(q)
+            else:
+                q = torch.tensor([[[10., *[0.]*15], *[[0.]*16]*16, [-10., *[0.]*15]]], device="cuda")
+                k = torch.clone(q)
+                v = torch.tensor([[[3., *[0.]*15], *[[0.]*16]*16, [0., 3., *[0.]*14]]], device="cuda")
+                #dout = torch.tensor([[[2., -2., *[0.]*14]]*18], device="cuda")
+                #dout = torch.tensor([[[1.0, *[0.]*15], *[[0.]*16]*16, [0., 1.0, *[0.]*14]]], device="cuda")
+                dout = torch.randn_like(q)
 
-        # require grads
-        for tens in [q, k, v, x, y]:
-            tens.requires_grad = True
+            # require grads
+            for tens in [q, k, v, x, y]:
+                tens.requires_grad = True
 
-        refimpl_out = refimpl_proxattn(q, k, v, x, y, r0sq)
-        refimpl_out.backward(dout)
-        refimpl_grads = (q.grad, k.grad, v.grad, x.grad, y.grad)
+            refimpl_out = refimpl_proxattn(q, k, v, x, y, r0sq)
+            refimpl_out.backward(dout)
+            refimpl_grads = (q.grad, k.grad, v.grad, x.grad, y.grad)
 
-        # reset grads for next pass
-        q.grad, k.grad, v.grad, x.grad, y.grad = None, None, None, None, None
+            # reset grads for next pass
+            q.grad, k.grad, v.grad, x.grad, y.grad = None, None, None, None, None
 
-        triton_out = proxattn(q, k, v, x, y, r0sq)
-        triton_out.backward(dout)
-        triton_grads = (q.grad, k.grad, v.grad, x.grad, y.grad)
+            triton_out = proxattn(q, k, v, x, y, r0sq)
+            triton_out.backward(dout)
+            cc.report()
+            triton_grads = (q.grad, k.grad, v.grad, x.grad, y.grad)
 
-        def avg_relative_diff(a, b):
-            y = (torch.abs(a - b)/torch.sqrt(0.0001 + 0.5*(a**2 + b**2))).mean(0).detach().cpu().numpy()
-            if False:
-                import matplotlib.pyplot as plt
-                plt.imshow(y)
-                plt.show()
-            return y.mean()
-
-        print("value", avg_relative_diff(refimpl_out, triton_out))
-        print("grad_q", avg_relative_diff(refimpl_grads[0], triton_grads[0]))
-        print("grad_k", avg_relative_diff(refimpl_grads[1], triton_grads[1]))
-        print("grad_v", avg_relative_diff(refimpl_grads[2], triton_grads[2]))
-        print("grad_x", avg_relative_diff(refimpl_grads[3], triton_grads[3]))
-        print("grad_y", avg_relative_diff(refimpl_grads[4], triton_grads[4]))
-
-
+            print("value", avg_relative_diff(refimpl_out, triton_out))
+            print("grad_q", avg_relative_diff(refimpl_grads[0], triton_grads[0]))
+            print("grad_k", avg_relative_diff(refimpl_grads[1], triton_grads[1]))
+            print("grad_v", avg_relative_diff(refimpl_grads[2], triton_grads[2]))
+            print("grad_x", avg_relative_diff(refimpl_grads[3], triton_grads[3]))
+            print("grad_y", avg_relative_diff(refimpl_grads[4], triton_grads[4]))
