@@ -9,10 +9,10 @@ from utils import must_be
 
 class HoomdSim:
   def __init__(self,
-      integrator:hoomd.md.Integrator,
+      get_integrator:Callable[[], hoomd.md.Integrator],
       sample_frame: Callable[[int, Tuple[float, float, float]], gsd.hoomd.Frame],
       nsteps: int, n_particles: int, box: Tuple[float, float, float], kT: float):
-    self.integrator = integrator
+    self.get_integrator = get_integrator
     self.sample_frame = sample_frame
     self.n_particles = n_particles
     self.box = box
@@ -39,7 +39,7 @@ class HoomdSim:
     frame = self.sample_frame(self.n_particles, self.box)
     simulation = hoomd.Simulation(device=hoomd.device.CPU(), seed=1)
     simulation.create_state_from_snapshot(frame)
-    simulation.operations.integrator = self.integrator
+    simulation.operations.integrator = self.get_integrator()
     simulation.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=self.kT)
     self._settle_simulation(simulation)
     return simulation
@@ -58,21 +58,23 @@ def particles_1_frame(n_particles: int, box:Tuple[float, float, float]):
   frame.particles.types = ["A"]
   return frame
 
-def integrator_particles_1(kT):
-  integrator = hoomd.md.Integrator(dt=0.005)
-  cell = hoomd.md.nlist.Cell(buffer=0.4)
-  lj = hoomd.md.pair.LJ(nlist=cell)
-  lj.params[("A", "A")] = {"epsilon":1, "sigma":1}
-  lj.r_cut[("A", "A")] = 2.5
-  integrator.forces.append(lj)
-  nvt = hoomd.md.methods.ConstantVolume(filter=hoomd.filter.All(), thermostat=hoomd.md.methods.thermostats.Bussi(kT=kT))
-  integrator.methods.append(nvt)
-  return integrator
+def integrator_particles_1_cons(kT):
+  def get_integrator_particles_1() -> hoomd.md.Integrator:
+    integrator = hoomd.md.Integrator(dt=0.005)
+    cell = hoomd.md.nlist.Cell(buffer=0.4)
+    lj = hoomd.md.pair.LJ(nlist=cell)
+    lj.params[("A", "A")] = {"epsilon":1, "sigma":1}
+    lj.r_cut[("A", "A")] = 2.5
+    integrator.forces.append(lj)
+    nvt = hoomd.md.methods.ConstantVolume(filter=hoomd.filter.All(), thermostat=hoomd.md.methods.thermostats.Bussi(kT=kT))
+    integrator.methods.append(nvt)
+    return integrator
+  return get_integrator_particles_1
 
 
 hoomd_sims = SimsDict(
   ("particles_1_n%d_t%d_L%d", lambda n, t, L10: HoomdSim(
-    integrator_particles_1(1.5), particles_1_frame,
+    integrator_particles_1_cons(1.5), particles_1_frame,
     t, n, (0.1*L10, 0.1*L10, 0.1*L10), 1.5
   ))
 )

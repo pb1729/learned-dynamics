@@ -125,7 +125,7 @@ class HoomdPredictor(Predictor):
       def sim2pos(simulation):
         snapshot = simulation.state.get_snapshot()
         return snapshot.particles.position + np.array(snapshot.configuration.box[:3])*snapshot.particles.image
-      ans = [sim2pos(sim) for sim in self.simulations]
+      ans = np.array([sim2pos(sim) for sim in self.simulations])
       return torch.tensor(ans, dtype=torch.float32, device="cuda")
     @property
     def batch(self):
