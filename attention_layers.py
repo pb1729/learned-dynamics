@@ -3,6 +3,7 @@ import torch.nn as nn
 
 from utils import must_be
 from triton_kernels.proxattn import proxattn
+from triton_kernels.proxattn_periodic import proxattn_periodic
 from layers_common import VecRootS
 
 
@@ -330,6 +331,73 @@ class ProximityFlashAttention(nn.Module):
     K = self.vec_actv(K) # consider if this is maybe really dumb (idk, could be fine...)
     # do attention
     O = proxattn(Q, K, V, pos_q.reshape(batch*self.H, nodes, 3), pos_k.reshape(batch*self.H, nodes, 3), self.r0sq)
+    O /= nodes**0.5 # prevent runaway activations...
+    ay, vy = self.split_av(O)
+    ay = torch.einsum("hji, bhni -> bnj", self.W_ao, ay.reshape(batch, self.H, nodes, self.chan))
+    vy = torch.einsum("hji, bhniv -> bnjv", self.W_vo, vy.reshape(batch, self.H, nodes, self.chan, 3))
+    return ay, vy
+
+
+class ProximityFlashAttentionPeriodic(nn.Module):
+  def __init__(self, r0_list, adim, vdim, chan, vec_actv_class:type=VecRootS):
+    super().__init__()
+    self.H = len(r0_list)
+    self.chan = chan
+    self.register_buffer("r0sq", torch.tensor(r0_list)**2, persistent=False)
+    self.W_aq = nn.Parameter(torch.empty(self.H, chan, adim))
+    self.W_vq = nn.Parameter(torch.empty(self.H, chan, vdim))
+    self.W_ak = nn.Parameter(torch.empty(self.H, chan, adim))
+    self.W_vk = nn.Parameter(torch.empty(self.H, chan, vdim))
+    self.W_av = nn.Parameter(torch.empty(self.H, chan, adim))
+    self.W_vv = nn.Parameter(torch.empty(self.H, chan, vdim))
+    self.W_ao = nn.Parameter(torch.empty(self.H, adim, chan))
+    self.W_vo = nn.Parameter(torch.empty(self.H, vdim, chan))
+    self.vec_actv = vec_actv_class()
+  def _param_init_with_scale(self, param, scale=1.):
+    must_be[self.H], fan_in, fan_out = param.shape
+    std = scale*(fan_in**(-0.5))
+    nn.init.normal_(param, std=std)
+  def self_init(self):
+    self._param_init_with_scale(self.W_aq)
+    self._param_init_with_scale(self.W_vq)
+    self._param_init_with_scale(self.W_ak)
+    self._param_init_with_scale(self.W_vk)
+    self._param_init_with_scale(self.W_av)
+    self._param_init_with_scale(self.W_vv)
+  def stack_av(self, a, v):
+    """ stack scalars and vectors
+        a: (..., chan)
+        v: (..., chan, 3)
+        out: (..., 4*chan) """
+    *rest, chan = a.shape
+    *must_be[rest], must_be[chan], must_be[3] = v.shape
+    return torch.cat([a[..., None], v], dim=-1).reshape(*rest, 4*chan)
+  def split_av(self, tens):
+    """ reverse of stack_av """
+    *rest, chan4 = tens.shape
+    chan = chan4 // 4
+    return tens[..., :chan], tens[..., chan:].reshape(*rest, chan, 3)
+  def forward(self, ax, vx, pos_k, pos_q, box):
+    """ simple version of proximity attention
+        ax, ay: (batch, nodes, adim)
+        vx, vy: (batch, nodes, vdim, 3)
+        pos_k, pos_q: (batch, heads, nodes, 3)
+        box: tuple(Lx, Ly, Lz) """
+    batch, nodes, adim = ax.shape
+    must_be[batch], must_be[nodes], vdim, must_be[3] = vx.shape
+    must_be[batch], must_be[self.H], must_be[nodes], must_be[3] = pos_k.shape
+    must_be[batch], must_be[self.H], must_be[nodes], must_be[3] = pos_q.shape
+    # get Q, K, V matrices
+    Q = self.stack_av(torch.einsum("hij, bnj -> bhni", self.W_aq, ax), torch.einsum("hij, bnjv -> bhniv", self.W_vq, vx)).reshape(batch*self.H, nodes, 4*self.chan)
+    K = self.stack_av(torch.einsum("hij, bnj -> bhni", self.W_ak, ax), torch.einsum("hij, bnjv -> bhniv", self.W_vk, vx)).reshape(batch*self.H, nodes, 4*self.chan)
+    V = self.stack_av(torch.einsum("hij, bnj -> bhni", self.W_av, ax), torch.einsum("hij, bnjv -> bhniv", self.W_vv, vx)).reshape(batch*self.H, nodes, 4*self.chan)
+    Q, K, V = Q.contiguous(), K.contiguous(), V.contiguous()
+    pos_q, pos_k = pos_q.contiguous(), pos_k.contiguous()
+    # prevent q,k values from getting too large
+    Q = self.vec_actv(Q) # TODO: this is along a dimension of size 4*self.chan, not 3!
+    K = self.vec_actv(K) # consider if this is maybe really dumb (idk, could be fine...)
+    # do attention
+    O = proxattn_periodic(Q, K, V, pos_q.reshape(batch*self.H, nodes, 3), pos_k.reshape(batch*self.H, nodes, 3), self.r0sq, box)
     O /= nodes**0.5 # prevent runaway activations...
     ay, vy = self.split_av(O)
     ay = torch.einsum("hji, bhni -> bnj", self.W_ao, ay.reshape(batch, self.H, nodes, self.chan))
