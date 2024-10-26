@@ -43,7 +43,7 @@ def make_linear(state):
   """ MUTATES state """
   _, nodes, must_be[3] = state.x.shape
   state.x[0, :, 1:] = 0.
-  state.x[0, :, 0] = torch.linspace(-nodes/2, nodes/2, nodes, device=state.x.device)
+  state.x[0, :, 0] = 0.8*torch.linspace(-nodes/2, nodes/2, nodes, device=state.x.device)
 
 
 def main(args):

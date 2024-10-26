@@ -11,8 +11,8 @@ def gaussian_kl_div(x_actual, x_predicted):
   """ approximate given distributions as Gaussians with the same mean and standard deviation.
       returns the KL divergence between the distributions, the expectation being taken over x_actual.
       https://ra1ndeer.github.io/posts/kl_divergence_gaussians.html
-      x_actual:    (samples, dim)
-      x_predicted: (samples, dim) """
+      x_actual:    (samples, ...)
+      x_predicted: (samples, ...) """
   samples,          *rest           = x_actual.shape
   must_be[samples], *must_be[rest]  = x_predicted.shape
   dim = prod(rest)
@@ -145,11 +145,9 @@ if __name__ == "__main__":
   from argparse import ArgumentParser
   parser = ArgumentParser(prog="model_perf_estimates")
   parser.add_argument("fpath")
-  parser.add_argument("--iter", dest="iter", type=int, action="append", default=[1])
+  parser.add_argument("--iter", dest="iter", type=int, nargs="+", default=[1])
   parser.add_argument("--contins", dest="contins", type=int, default=10000)
   parser.add_argument("--samples", dest="samples", type=int, default=24)
   parser.add_argument("--plot", dest="plot", action="store_true") # plot previously recorded datas
   parser.add_argument("--trainsteps", dest="trainsteps", action="store_true") # get or data for training steps elapsed rather than # iterations
   main(parser.parse_args())
-
-

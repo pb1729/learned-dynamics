@@ -3,7 +3,7 @@ import importlib
 
 from sims import sims
 from hoomd_sims import hoomd_sims
-from predictor import ModelPredictor, SimPredictor, HoomdPredictor
+from predictor import Predictor, ModelPredictor, SimPredictor, HoomdPredictor
 
 
 ARCH_PREFIX = "archs."
@@ -34,7 +34,7 @@ class Config:
                arch_specific=None, **kwargs_rest):
     self.pred_spec = pred_spec
     self.arch_name = arch_name
-    self.predictor = get_predictor(pred_spec)
+    self.predictor:Predictor = get_predictor(pred_spec)
     self.device = device
     self.batch = batch
     self.simlen = simlen
