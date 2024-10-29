@@ -4,16 +4,16 @@ import matplotlib.pyplot as plt
 
 from test_model import model_list_to_predictor_list
 from config import load, Config
-from utils import PrintTiming
+from utils import PrintTiming, avg_relative_diff
 
 
 def get_x(args, predictor):
-  print("GET X")
-  state = predictor.sample_q(args.batch)
-  print(torch.all(~torch.isnan(state.x)))
-  predictor.predict(args.tmax, state)
-  print(torch.all(~torch.isnan(state.x)))
-  return state.x
+  ans = []
+  for j in range(0, args.batch, 128):
+    state = predictor.sample_q(min(128, args.batch - j))
+    predictor.predict(args.tmax, state)
+    ans.append(state.x)
+  return torch.cat(ans, dim=0)
 
 
 def structure_factor(q, x):
@@ -40,10 +40,21 @@ def main(args):
   for predictor in predictors:
     x_list.append(get_x(args, predictor))
     labels.append(predictor.name)
-  q = np.exp(np.linspace(np.log(0.15915494309189535/max([x.shape[2] for x in x_list])) - 2.3, np.log(6.283185307179586) + 2.3, 200))
-  for x, label in zip(x_list, labels):
+  for predictor, x, label in zip(predictors, x_list, labels):
+    box = predictor.get_box()
+    if box is None:
+      q = np.exp(np.linspace(np.log(0.15915494309189535/max([x.shape[2] for x in x_list])) - 2.3, np.log(6.283185307179586) + 2.3, 200))
+    else:
+      assert box[0] == box[1] == box[2], "structure factor plot for uneven box dimensions not supported"
+      # pick only q values consistent with periodicity
+      q0 = (2*np.pi/box[0]).item()
+      qmax_q0 = int(63/q0)
+      q = q0*np.arange(1, qmax_q0)
     S = structure_factor(q, x).cpu().numpy()
-    plt.plot(q, S, label=label)
+    if box is None:
+      plt.plot(q, S, label=label)
+    else:
+      plt.scatter(q, S, label=label)
   plt.xscale("log")
   plt.yscale("log")
   plt.xlabel("q")
