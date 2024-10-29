@@ -1,0 +1,3 @@
+[submodule "seq2pdbchain"]
+	path = seq2pdbchain
+	url = https://github.com/pb1729/seq2pdbchain
