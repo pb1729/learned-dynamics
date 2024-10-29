@@ -62,6 +62,7 @@ class Block(nn.Module):
     self.node_embed = GraphEmbedLayer(config["r_cut"])
     self.emb_a = nn.Linear(8, adim)
     self.emb_v = VecLinear(8, vdim)
+    self.lin_emb_v = VecLinear(1, vdim)
     self.local_res = LocalResidual(config)
     self.probe_pts_q = ProbePoints3(len(config["r0_list"]), vdim)
     self.probe_pts_k = ProbePoints3(len(config["r0_list"]), vdim)
@@ -72,7 +73,7 @@ class Block(nn.Module):
     box, pos_0, pos_1, graph, x_a, x_v = tup
     emb_a, emb_v = self.node_embed(graph, pos_0)
     y_a = x_a + self.emb_a(emb_a)
-    y_v = x_v + self.emb_v(emb_v)
+    y_v = x_v + self.emb_v(emb_v) + self.lin_emb_v((pos_1 - pos_0)[:, :, None])
     z_a, z_v = self.local_res(y_a, y_v)
     probes_q = self.probe_pts_q(z_v, pos_0)
     probes_k = self.probe_pts_k(z_v, pos_0)

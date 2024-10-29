@@ -9,12 +9,12 @@ from train import training_run
 
 SIMTYPE = "particles_1"
 ARCH = "wgan_3d_particles"
-RUN_ID = "R4"
+RUN_ID = "R6"
 
 L = 160
 N_LIST = [200]
 T_LIST = [2000]
-NSTEPS_LIST = [128*i for i in range(1, 13)]
+NSTEPS_LIST = [512*i for i in range(1, 33)]
 
 
 arch_specific = {
