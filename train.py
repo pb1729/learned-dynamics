@@ -13,13 +13,13 @@ def dataset_gen(config):
   """ generate many datasets in a separate thread
       one should use the send() method for controlling this generator, calling
       send(True) if more data will be required and send(False) otherwise """
-  data_queue = Queue(maxsize=32) # we set a maxsize to control the number of items taking up memory on GPU
+  data_queue = Queue(maxsize=8) # we set a maxsize to control the number of items taking up memory on GPU
   control_queue = Queue()
   def thread_main():
     while True: # queue maxsize stops us from going crazy here
-      state = config.predictor.sample_q(128*config.batch)
+      state = config.predictor.sample_q(16*config.batch)
       next_dataset = config.predictor.predict(config.simlen, state)
-      for i in range(0, 128*config.batch, config.batch):
+      for i in range(0, 16*config.batch, config.batch):
         if not control_queue.empty():
           command = control_queue.get_nowait()
           if command == "halt":
