@@ -120,12 +120,13 @@ class HoomdPredictor(Predictor):
   class State(Predictor.State):
     def __init__(self, simulations):
       self.simulations = simulations
+    @staticmethod
+    def sim2pos(simulation):
+      snapshot = simulation.state.get_snapshot()
+      return snapshot.particles.position + np.array(snapshot.configuration.box[:3])*snapshot.particles.image
     @property
     def x(self) -> torch.Tensor:
-      def sim2pos(simulation):
-        snapshot = simulation.state.get_snapshot()
-        return snapshot.particles.position + np.array(snapshot.configuration.box[:3])*snapshot.particles.image
-      ans = np.array([sim2pos(sim) for sim in self.simulations])
+      ans = np.array([self.sim2pos(sim) for sim in self.simulations])
       return torch.tensor(ans, dtype=torch.float32, device="cuda")
     @property
     def batch(self):
@@ -146,10 +147,11 @@ class HoomdPredictor(Predictor):
     if ret:
       trajectory = torch.zeros((state.batch, L, *self.shape) ,
         dtype=torch.float32, device="cuda")
-    for i in range(L):
-      for sim in state.simulations:
+    for i, sim in enumerate(state.simulations):
+      for j in range(L): # probably slightly faster/more cache friendly to make this the inside loop
         self.hoomd_sim.step(sim)
-      if ret: trajectory[:, i] = state.x
+        if ret:
+          trajectory[i, j] = torch.tensor(state.sim2pos(sim), device="cuda")
     if ret:
       return trajectory
   def get_box(self):
