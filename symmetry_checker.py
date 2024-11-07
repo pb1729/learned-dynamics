@@ -6,31 +6,31 @@ from utils import must_be, avg_relative_diff
 
 class Symmetry:
   """ base symmetry class corresponding to the trivial symmetry group """
-  def scalar(self, x_a):
-    """ x_a: (...) """
-    return x_a
-  def vector(self, x_v):
-    """ (..., 3) """
-    return x_v
-  def matrix(self, x_d):
-    """ (..., 3) """
-    return x_d
+  def tens(self, inds:int, x:torch.Tensor):
+    """ x: (..., (3,)^inds) """
+    return x
   def pos(self, p_v):
     """ (..., nodes, 3) """
     return p_v
   def apply(self, tens_list, tens_type_list):
     ans = []
     for tens, tens_type in zip(tens_list, tens_type_list):
-      if tens_type == "a":
-        ans.append(self.scalar(tens))
-      elif tens_type == "v":
-        ans.append(self.vector(tens))
-      elif tens_type == "d":
-        ans.append(self.matrix(tens))
+      if isinstance(tens_type, int):
+        ans.append(self.tens(tens_type, tens))
       elif tens_type == "p":
         ans.append(self.pos(tens))
       else: assert False, f"symmetry {tens_type} not supported"
     return ans
+
+def tensor_matrix_transform(inds:int, x, R):
+  """ transform all indices of the matrix by matrix R
+      x:(..., (3,)^inds)
+      R: (3, 3) """
+  cap_indices = "".join([chr(ord("I") + n) for n in range(inds)])
+  lower_indices = "".join([chr(ord("i") + n) for n in range(inds)])
+  pairs = "".join([", " + cap + lower for cap, lower in zip(cap_indices, lower_indices)])
+  einsum_str = f"...{cap_indices}{pairs} -> ...{lower_indices}"
+  return torch.einsum(einsum_str, x, *([R]*inds))
 
 class RotSymm(Symmetry):
   """ Check that rotating input by a rotation matrix is the same as rotating the output by that matrix. """
@@ -38,10 +38,8 @@ class RotSymm(Symmetry):
     [-0.2590, -0.5228,  0.8121],
     [ 0.6468, -0.7184, -0.2562],
     [ 0.7174,  0.4589,  0.5242]], device="cuda")
-  def vector(self, x_v):
-    return x_v @ self.random_rot
-  def matrix(self, x_d):
-    return torch.einsum("...ij, ik, jl -> ...kl", x_d, self.random_rot, self.random_rot)
+  def tens(self, inds:int, x:torch.Tensor):
+    return tensor_matrix_transform(inds, x, self.random_rot)
   def pos(self, p_v):
     return p_v @ self.random_rot
 
@@ -53,10 +51,8 @@ class AxisRotSymm(Symmetry):
     [ 1.,  0.,  0.]], device="cuda")
   def __init__(self, box):
     assert box[0] == box[1] == box[2]
-  def vector(self, x_v):
-    return x_v @ self.axis_rot
-  def matrix(self, x_d):
-    assert False, "not implemented!"
+  def tens(self, inds:int, x:torch.Tensor):
+    return tensor_matrix_transform(inds, x, self.axis_rot)
   def pos(self, p_v):
     return p_v @ self.axis_rot
 
@@ -94,7 +90,7 @@ def main(args):
     inputs = [x, pos_noies, z_a, z_v]
     y = model.gen(*inputs)
     for symm in symms:
-      inputs_s = symm.apply(inputs, ["p", "v", "a", "v"])
+      inputs_s = symm.apply(inputs, ["p", 1, 0, 1])
       y_s = symm.pos(y)
       y_s_pred = model.gen(*inputs_s)
       print(symm.__class__.__name__, avg_relative_diff(y_s, y_s_pred))
@@ -117,7 +113,7 @@ def main(args):
     pos_q = box*torch.rand(batch, len(r0_list), nodes, 3, device="cuda")
     ay, vy = proxattn.forward(ax, vx, pos_k, pos_q, box_tuple)
     for symm in symms:
-      ax_s, vx_s, pos_k_s, pos_q_s, ay_s, vy_s = symm.apply([ax, vx, pos_k, pos_q, ay, vy], ["a", "v", "p", "p", "a", "v"])
+      ax_s, vx_s, pos_k_s, pos_q_s, ay_s, vy_s = symm.apply([ax, vx, pos_k, pos_q, ay, vy], [0, 1, "p", "p", 0, 1])
       ay_s_pred, vy_s_pred = proxattn.forward(ax_s, vx_s, pos_k_s, pos_q_s, box_tuple)
       print(symm.__class__.__name__)
       print(avg_relative_diff(ay_s, ay_s_pred))
@@ -137,7 +133,7 @@ def main(args):
     graph = Graph.radius_graph(r_cut, box_tuple, pos)
     y_a, y_v = embed.forward(graph, pos)
     for symm in symms:
-      pos_s, y_a_s, y_v_s = symm.apply([pos, y_a, y_v], ["p", "a", "v"])
+      pos_s, y_a_s, y_v_s = symm.apply([pos, y_a, y_v], ["p", 0, 1])
       graph_s = Graph.radius_graph(r_cut, box_tuple, pos_s)
       y_a_s_pred, y_v_s_pred = embed.forward(graph_s, pos_s)
       print(symm.__class__.__name__)
@@ -149,7 +145,6 @@ def main(args):
     nodes = 20
     dim = 32
     symms = [RotSymm()]
-    symmap = ["a", "v", "d"]
     for inds in range(3):
       print(f"\n\nINDS: {inds}")
       tens_lin = TensLinear(inds, dim, dim)
@@ -158,7 +153,7 @@ def main(args):
       y = tens_lin(x)
       for symm in symms:
         print(symm.__class__.__name__)
-        x_s, y_s = symm.apply([x, y], [symmap[inds]]*2)
+        x_s, y_s = symm.apply([x, y], [inds, inds])
         y_s_pred = tens_lin(x_s)
         print(avg_relative_diff(y_s, y_s_pred))
   elif args.test == "tensor_products":
@@ -167,7 +162,6 @@ def main(args):
     nodes = 40
     dim = 32
     symms = [RotSymm()]
-    symmap = ["a", "v", "d"]
     for inds_l in range(3):
       for inds_r in range(3):
         for inds_o in range(3):
@@ -183,7 +177,7 @@ def main(args):
           x_o = tensprod(x_l, x_r)
           for symm in symms:
             print(symm.__class__.__name__)
-            x_l_s, x_r_s, x_o_s = symm.apply([x_l, x_r, x_o], [symmap[inds_l], symmap[inds_r], symmap[inds_o]])
+            x_l_s, x_r_s, x_o_s = symm.apply([x_l, x_r, x_o], [inds_l, inds_r, inds_o])
             x_o_s_pred = tensprod(x_l_s, x_r_s)
             print(avg_relative_diff(x_o_s, x_o_s_pred))
 

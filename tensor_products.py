@@ -68,5 +68,25 @@ class TensorProds(nn.Module):
     return self.lin_o(x_o)
 
 
+class TensorRandGen:
+  """ A class the generated random torch tensors with a SO(3)-symmetric
+      probability distribution. Number of spatial indices of the tensor
+      is arbitrary. Can also specify a non-spatial shape, of course. By
+      setting a seed can get reproducible results. These repeated results
+      can be transformed using set_transform. """
+  def __init__(self):
+    self.transform = None
+  def set_transform(self, transform):
+    """ transform: indices, (..., (3,)^indices) -> (..., (3,)^indices) """
+    self.transform = transform
+  def clear_transform(self):
+    self.transform = None
+  def randn(self, spatial_indices, *shape, device="cuda", dtype=torch.float32):
+    ans = torch.randn(*shape, *([3]*spatial_indices), device=device, dtype=dtype)
+    if self.transform is not None:
+      ans = self.transform(spatial_indices, ans)
+    return ans
+
+
 if __name__ == "__main__":
   print(ε_ijk)
