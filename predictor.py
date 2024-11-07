@@ -1,9 +1,10 @@
 import torch
 import numpy as np
-from typing_extensions import Self
+from typing_extensions import Self, List
 
 from utils import batched_model_eval
 from hoomd_sims import HoomdSim
+from openmm_sims import OpenMMConfig, OpenMMMetadata, XReporter
 
 
 EVAL_BATCHSZ = 1024
@@ -23,6 +24,15 @@ class Predictor:
     @property
     def batch(self) -> int:
       assert False, "this class not concretely implemented!"
+    @property
+    def atomic_nums(self) -> np.ndarray|None:
+      return None
+    @property
+    def x(self) -> torch.Tensor:
+      assert False, "this class not concretely implemented"
+    @property
+    def x_npy(self) -> np.ndarray:
+      return self.x.cpu().numpy()
     def __getitem__(self, key) -> Self:
       assert False, "this class not concretely implemented!"
     def expand(self, n) -> Self:
@@ -46,20 +56,23 @@ class Predictor:
 class SimPredictor(Predictor):
   class State(Predictor.State):
     def __init__(self, x, v):
-      self.x = x
-      self.v = v
+      self._x = x
+      self._v = v
       assert x.shape == v.shape
     @property
     def batch(self):
-      return self.x.shape[0]
+      return self._x.shape[0]
+    @property
+    def x(self) -> torch.Tensor:
+      return self._x
     def __getitem__(self, key):
-      return SimPredictor.State(self.x[key], self.v[key])
+      return SimPredictor.State(self._x[key], self._v[key])
     def expand(self, n):
       return SimPredictor.State(
-        self.x[None].expand(n, *[-1]*self.x.dim()).reshape(n*self.batch, *self.x.shape[1:]).clone(),
-        self.v[None].expand(n, *[-1]*self.x.dim()).reshape(n*self.batch, *self.x.shape[1:]).clone())
+        self._x[None].expand(n, *[-1]*self._x.dim()).reshape(n*self.batch, *self._x.shape[1:]).clone(),
+        self._v[None].expand(n, *[-1]*self._x.dim()).reshape(n*self.batch, *self._x.shape[1:]).clone())
     def to_model_predictor_state(self):
-      return ModelPredictor.State(self.x.clone()) # model predictors only use x coordinate
+      return ModelPredictor.State(self._x.clone()) # model predictors only use x coordinate
   def __init__(self, sim, t_eql=4):
     self.sim = sim
     self.t_eql = t_eql
@@ -76,18 +89,22 @@ class SimPredictor(Predictor):
 
 class ModelPredictor(Predictor):
   class State(Predictor.State):
-    def __init__(self, x):
-      self.x = x
+    def __init__(self, x, **kwargs):
+      self._x = x
+      self.kwargs = kwargs
     @property
     def batch(self):
-      return self.x.shape[0]
+      return self._x.shape[0]
+    @property
+    def x(self) -> torch.Tensor:
+      return self._x
     def __getitem__(self, key):
-      return ModelPredictor.State(self.x[key])
+      return ModelPredictor.State(self._x[key])
     def expand(self, n):
       return ModelPredictor.State(
-        self.x[None].expand(n, *[-1]*self.x.dim()).reshape(n*self.batch, *self.x.shape[1:]).clone())
+        self._x[None].expand(n, *[-1]*self._x.dim()).reshape(n*self.batch, *self._x.shape[1:]).clone())
     def to_model_predictor_state(self):
-      return ModelPredictor.State(self.x.clone())
+      return ModelPredictor.State(self._x.clone())
   def __init__(self, model):
     model.set_eval(True)
     self.model = model
@@ -102,7 +119,7 @@ class ModelPredictor(Predictor):
     with torch.no_grad():
       for i in range(L):
         new_x = batched_model_eval(
-          (lambda x: self.model.predict(x)),
+          (lambda x: self.model.predict(x, **state.kwargs)),
           state.x, batch=EVAL_BATCHSZ)
         if ret: trajectory[:, i] = new_x
         state.x[:] = new_x
@@ -126,8 +143,10 @@ class HoomdPredictor(Predictor):
       return snapshot.particles.position + np.array(snapshot.configuration.box[:3])*snapshot.particles.image
     @property
     def x(self) -> torch.Tensor:
-      ans = np.array([self.sim2pos(sim) for sim in self.simulations])
-      return torch.tensor(ans, dtype=torch.float32, device="cuda")
+      return torch.tensor(self.x_npy, dtype=torch.float32, device="cuda")
+    @property
+    def x_npy(self) -> np.ndarray:
+      return np.array([self.sim2pos(sim) for sim in self.simulations])
     @property
     def batch(self):
       return len(self.simulations)
@@ -145,8 +164,7 @@ class HoomdPredictor(Predictor):
   def predict(self, L, state, ret=True):
     """ MUTATES state """
     if ret:
-      trajectory = torch.zeros((state.batch, L, *self.shape) ,
-        dtype=torch.float32, device="cuda")
+      trajectory = torch.zeros((state.batch, L, *self.shape), dtype=torch.float32, device="cuda")
     for i, sim in enumerate(state.simulations):
       for j in range(L): # probably slightly faster/more cache friendly to make this the inside loop
         self.hoomd_sim.step(sim)
@@ -156,3 +174,53 @@ class HoomdPredictor(Predictor):
       return trajectory
   def get_box(self):
     return torch.tensor(self.hoomd_sim.box, dtype=torch.float32, device="cuda")
+
+
+class OpenMMPredictor(Predictor):
+  class State(Predictor.State):
+    def __init__(self, metadata:OpenMMMetadata, sims:List, reporters:List[XReporter]):
+      self.metadata = metadata
+      self.sims = sims
+      self.reporters = reporters
+    @property
+    def x(self) -> torch.Tensor:
+      return torch.tensor(self.x_npy, dtype=torch.float32, device="cuda")
+    @property
+    def x_npy(self) -> np.ndarray:
+      return np.array([self.reporter_x(reporter) for reporter in self.reporters])
+    def reporter_x(self, reporter) -> np.ndarray:
+      x = reporter.x
+      assert x is not None, "trying to read uninitialized reporter"
+      return x[self.metadata.atom_indices]
+    @property
+    def batch(self):
+      return len(self.sims)
+    @property
+    def atomic_nums(self) -> np.ndarray:
+      return self.metadata.atomic_nums
+    def __getitem__(self, key) -> Self:
+      return OpenMMPredictor.State(self.metadata, self.sims[key], self.reporters[key])
+    def to_model_predictor_state(self):
+      return ModelPredictor.State(self.x, metadata=self.metadata)
+  def __init__(self, openmm_config:OpenMMConfig):
+    self.openmm_config = openmm_config
+  @property
+  def shape(self):
+    return (-1, 3) # number of atoms can vary
+  def sample_q(self, batch) -> State:
+    metadata, sims, reporters = self.openmm_config.sample_q(batch)
+    return OpenMMPredictor.State(metadata, sims, reporters)
+  def predict(self, L, state, ret=True):
+    """ MUTATES state """
+    if ret:
+      trajectory = torch.zeros((state.batch, L, *self.shape), dtype=torch.float32, device="cuda")
+    for i, sim in enumerate(state.sims):
+      for j in range(L):
+        sim.step(self.openmm_config.dt)
+        if ret:
+          trajectory[i, j] = torch.tensor(state.reporter_x(state.reporters[i]), dtype=torch.float32, device="cuda")
+    if ret:
+      return trajectory
+  def get_box(self):
+    boxsz = self.openmm_config.boxsz
+    return torch.tensor((boxsz, boxsz, boxsz), device="cuda")

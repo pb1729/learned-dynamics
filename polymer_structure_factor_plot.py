@@ -33,17 +33,11 @@ def structure_factor(q, x):
   return S
 
 
-def main(args):
-  predictors = model_list_to_predictor_list(args.models)
-  x_list = []
-  labels = []
-  for predictor in predictors:
-    x_list.append(get_x(args, predictor))
-    labels.append(predictor.name)
+def structure_factor_plot(args, predictors, x_list, labels):
   for predictor, x, label in zip(predictors, x_list, labels):
     box = predictor.get_box()
     if box is None:
-      q = np.exp(np.linspace(np.log(0.15915494309189535/max([x.shape[2] for x in x_list])) - 2.3, np.log(6.283185307179586) + 2.3, 200))
+      q = np.exp(np.linspace(np.log(0.15915494309189535/max([x.shape[2] for x in x_list])) - 2.3, np.log(6.283185307179586) + 2.3, args.res))
     else:
       assert box[0] == box[1] == box[2], "structure factor plot for uneven box dimensions not supported"
       # pick only q values consistent with periodicity
@@ -63,10 +57,40 @@ def main(args):
   plt.show()
 
 
+def rdf_plot(args, predictors, x_list, labels):
+  for predictor, x, label in zip(predictors, x_list, labels):
+    delta_x = x[:, :, None] - x[:, None, :] # (batch, nodes, nodes, 3)
+    box = predictor.get_box()
+    if box is not None:
+      rmax = (box.min()/2).item()
+      delta_x =(delta_x + box/2)%box - box/2
+    else:
+      rmax = torch.sqrt((delta_x**2).sum(-1).max()).item()
+    r = torch.sqrt((delta_x**2).sum(-1).flatten()).cpu().numpy()
+    plt.hist(r, bins=args.res, range=(0., rmax), label=label, weights=1/r**2, alpha=0.5) # weight by 1/r^2 because shell area
+  plt.legend()
+  plt.show()
+
+
+def main(args):
+  predictors = model_list_to_predictor_list(args.models)
+  x_list = []
+  labels = []
+  for predictor in predictors:
+    x_list.append(get_x(args, predictor))
+    labels.append(predictor.name)
+  if args.rdf:
+    rdf_plot(args, predictors, x_list, labels)
+  else:
+    structure_factor_plot(args, predictors, x_list, labels)
+
+
 if __name__ == "__main__":
   from argparse import ArgumentParser
   parser = ArgumentParser(prog="structure_factor_plot")
   parser.add_argument("tmax", type=int) # positional: we make the user think about how many equililbration steps they want
   parser.add_argument("-M", dest="models", action="extend", nargs="+", type=str)
   parser.add_argument("--batch", dest="batch", type=int, default=256)
+  parser.add_argument("--rdf", dest="rdf", action="store_true")
+  parser.add_argument("--res", dest="res", type=int, default=100)
   main(parser.parse_args())

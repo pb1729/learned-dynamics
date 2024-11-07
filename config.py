@@ -3,7 +3,8 @@ import importlib
 
 from sims import sims
 from hoomd_sims import hoomd_sims
-from predictor import Predictor, ModelPredictor, SimPredictor, HoomdPredictor
+from openmm_sims import openmm_sims
+from predictor import Predictor, ModelPredictor, SimPredictor, HoomdPredictor, OpenMMPredictor
 
 
 ARCH_PREFIX = "archs."
@@ -20,6 +21,8 @@ def get_predictor(predictor_spec):
     ans = SimPredictor(sims[rest])
   elif "hoomd" == pred_type:
     ans = HoomdPredictor(hoomd_sims[rest])
+  elif "openmm" == pred_type:
+    ans = OpenMMPredictor(openmm_sims[rest])
   elif "model" == pred_type: # treat "rest" as a path
     ans = ModelPredictor(load(rest))
   else: assert False, "unknown predictor type"

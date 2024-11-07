@@ -53,20 +53,21 @@ def main(args):
   box = None
   if args.wrap:
     box = predictor.get_box()
+  if box is not None: box = box.cpu().numpy()
   def clean_for_display(x):
     if box is not None:
       x = (x + 0.5*box) % box - 0.5*box
-    return x[0].cpu().numpy()
+    return x[0]
   state = predictor.sample_q(1)
   if args.startlinear:
     make_linear(state)
-  display = launch_atom_display(5*np.ones(poly_len(predictor), dtype=int),
-    clean_for_display(state.x))
+  atomic_nums = state.atomic_nums if state.atomic_nums is not None else 5*np.ones(poly_len(predictor), dtype=int)
+  display = launch_atom_display(atomic_nums, clean_for_display(state.x_npy))
   while True:
     predictor.predict(1, state, ret=False)
     if args.slideshow:
       input("...")
-    display.update_pos(clean_for_display(state.x))
+    display.update_pos(clean_for_display(state.x_npy))
     if args.center:
       display.center_pos()
     if args.framedelay > 0:

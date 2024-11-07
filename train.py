@@ -1,6 +1,6 @@
 import itertools
 from threading import Thread
-from queue import Queue
+from queue import Queue, Empty
 import os
 
 import torch
@@ -17,14 +17,17 @@ def dataset_gen(config):
   control_queue = Queue()
   def thread_main():
     while True: # queue maxsize stops us from going crazy here
-      state = config.predictor.sample_q(16*config.batch)
+      state = config.predictor.sample_q(config.batch)
       next_dataset = config.predictor.predict(config.simlen, state)
-      for i in range(0, 16*config.batch, config.batch):
-        if not control_queue.empty():
-          command = control_queue.get_nowait()
-          if command == "halt":
-            return
-        data_queue.put(next_dataset[i:i+config.batch])
+      data_queue.put(next_dataset)
+      try:
+        command = control_queue.get(block=False)
+        if command == "halt":
+          return
+        else:
+          print("Training data queue system got unknown command ", command)
+      except Empty:
+        continue
   t = Thread(target=thread_main)
   t.start()
   while True:
@@ -74,3 +77,6 @@ def training_run(save_path, src):
   else:
     raise TypeError("incorrect source for training run!")
   train(model, save_path)
+
+
+

@@ -12,6 +12,9 @@ class Symmetry:
   def vector(self, x_v):
     """ (..., 3) """
     return x_v
+  def matrix(self, x_d):
+    """ (..., 3) """
+    return x_d
   def pos(self, p_v):
     """ (..., nodes, 3) """
     return p_v
@@ -22,6 +25,8 @@ class Symmetry:
         ans.append(self.scalar(tens))
       elif tens_type == "v":
         ans.append(self.vector(tens))
+      elif tens_type == "d":
+        ans.append(self.matrix(tens))
       elif tens_type == "p":
         ans.append(self.pos(tens))
       else: assert False, f"symmetry {tens_type} not supported"
@@ -35,6 +40,8 @@ class RotSymm(Symmetry):
     [ 0.7174,  0.4589,  0.5242]], device="cuda")
   def vector(self, x_v):
     return x_v @ self.random_rot
+  def matrix(self, x_d):
+    return torch.einsum("...ij, ik, jl -> ...kl", x_d, self.random_rot, self.random_rot)
   def pos(self, p_v):
     return p_v @ self.random_rot
 
@@ -48,6 +55,8 @@ class AxisRotSymm(Symmetry):
     assert box[0] == box[1] == box[2]
   def vector(self, x_v):
     return x_v @ self.axis_rot
+  def matrix(self, x_d):
+    assert False, "not implemented!"
   def pos(self, p_v):
     return p_v @ self.axis_rot
 
@@ -134,11 +143,54 @@ def main(args):
       print(symm.__class__.__name__)
       print(avg_relative_diff(y_a_s, y_a_s_pred))
       print(avg_relative_diff(y_v_s, y_v_s_pred))
+  elif args.test == "tensor_linear":
+    from tensor_products import TensLinear
+    batch = 4
+    nodes = 20
+    dim = 32
+    symms = [RotSymm()]
+    symmap = ["a", "v", "d"]
+    for inds in range(3):
+      print(f"\n\nINDS: {inds}")
+      tens_lin = TensLinear(inds, dim, dim)
+      tens_lin.to("cuda")
+      x = torch.randn(batch, nodes, dim, *([3]*inds), device="cuda")
+      y = tens_lin(x)
+      for symm in symms:
+        print(symm.__class__.__name__)
+        x_s, y_s = symm.apply([x, y], [symmap[inds]]*2)
+        y_s_pred = tens_lin(x_s)
+        print(avg_relative_diff(y_s, y_s_pred))
+  elif args.test == "tensor_products":
+    from tensor_products import TensorProds
+    batch = 4
+    nodes = 40
+    dim = 32
+    symms = [RotSymm()]
+    symmap = ["a", "v", "d"]
+    for inds_l in range(3):
+      for inds_r in range(3):
+        for inds_o in range(3):
+          print(f"\n\nL: {inds_l}, R:{inds_r} -> O:{inds_o}")
+          try:
+            tensprod = TensorProds(inds_l, inds_r, inds_o, dim, dim, dim, 16)
+          except AssertionError as e:
+            print(e)
+            continue
+          tensprod.to("cuda")
+          x_l = torch.randn(batch, nodes, dim, *([3]*inds_l), device="cuda")
+          x_r = torch.randn(batch, nodes, dim, *([3]*inds_r), device="cuda")
+          x_o = tensprod(x_l, x_r)
+          for symm in symms:
+            print(symm.__class__.__name__)
+            x_l_s, x_r_s, x_o_s = symm.apply([x_l, x_r, x_o], [symmap[inds_l], symmap[inds_r], symmap[inds_o]])
+            x_o_s_pred = tensprod(x_l_s, x_r_s)
+            print(avg_relative_diff(x_o_s, x_o_s_pred))
 
 
 
 if __name__ == "__main__":
   from argparse import ArgumentParser
   parser = ArgumentParser(prog="symmetry_checker")
-  parser.add_argument("test", choices=["modelfile", "proxattn", "graph_embed"])
+  parser.add_argument("test", choices=["modelfile", "proxattn", "graph_embed", "tensor_linear", "tensor_products"])
   main(parser.parse_args())

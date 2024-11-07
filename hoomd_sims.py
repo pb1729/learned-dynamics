@@ -2,6 +2,7 @@ from typing_extensions import Callable, Tuple
 import gsd.hoomd
 import hoomd
 import numpy as np
+import time
 
 from sims import SimsDict
 from utils import must_be
@@ -19,9 +20,11 @@ class HoomdSim:
     self.kT = kT
     self.nsteps = nsteps
   def _settle_simulation(self, simulation:hoomd.Simulation):
+    """ MUTATES simulation
+        returns True if settling failed and we need to retry, False otherwise"""
     old_dt = simulation.operations.integrator.dt
     simulation.operations.integrator.dt = old_dt / 20 # smaller time step improves success odds
-    while True: # could need several retries before the sim settles
+    for i in range(4): # could need several retries before the sim settles
       try:
         simulation.run(1024)
       except RuntimeError as e:
@@ -33,15 +36,21 @@ class HoomdSim:
         continue
       else:
         break
+    else:
+      return True # failed!
     simulation.operations.integrator.dt = old_dt
     simulation.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=self.kT)
+    return False
   def sample_q(self):
     frame = self.sample_frame(self.n_particles, self.box)
-    simulation = hoomd.Simulation(device=hoomd.device.CPU(), seed=1)
+    # using GPU device. it seems to be slower than CPU, due to small system size, but
+    # we get weird memory corruption errors when using CPU, so this avoids such problems
+    simulation = hoomd.Simulation(device=hoomd.device.GPU(), seed=1)
     simulation.create_state_from_snapshot(frame)
     simulation.operations.integrator = self.get_integrator()
     simulation.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=self.kT)
-    self._settle_simulation(simulation)
+    if self._settle_simulation(simulation): # MUTATES simulation
+      return self.sample_q() # must retry, simulation failed to settle
     return simulation
   def step(self, simulation:hoomd.Simulation):
     """ MUTATES simulation """

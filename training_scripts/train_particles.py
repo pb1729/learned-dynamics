@@ -8,11 +8,11 @@ from train import training_run
 
 
 SIMTYPE = "particles_1"
-ARCH = "wgan_3d_particles"
-RUN_ID = "R6"
+ARCH = "wgan_3d_particles2"
+RUN_ID = "R7"
 
 L = 160
-N_LIST = [200]
+N_LIST = [240, 300, 400, 500]
 T_LIST = [2000]
 NSTEPS_LIST = [512*i for i in range(1, 33)]
 

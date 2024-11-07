@@ -316,7 +316,8 @@ proxattn = _proxattn.apply
 # TESTING CODE
 if __name__ == "__main__":
     from clobbercheck import ClobberChecker
-    with ClobberChecker() as cc:
+    if True:#with ClobberChecker() as cc:
+        print("\n"*20, "STARTING TEST\n\n")
         for i in range(2100): # do lots of steps so we can see if there will be an illegal memory access (usually around 936)
             print(1 + i)
             r0sq = torch.tensor([0.2, 0.3, 0.5, 0.8, 1.3], device="cuda")
@@ -350,7 +351,7 @@ if __name__ == "__main__":
 
             triton_out = proxattn(q, k, v, x, y, r0sq)
             triton_out.backward(dout)
-            cc.report()
+            #cc.report()
             triton_grads = (q.grad, k.grad, v.grad, x.grad, y.grad)
 
             print("value", avg_relative_diff(refimpl_out, triton_out))

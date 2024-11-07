@@ -32,13 +32,14 @@ def compare_tensors(t1, t2):
     return abs(t).max().item()
   print("magnitude:", max(largest_elem(t1), largest_elem(t2)), "  difference:", largest_elem(t1 - t2))
 
-def avg_relative_diff(a, b):
-    y = (torch.abs(a - b)/torch.sqrt(0.0001 + 0.5*(a**2 + b**2))).mean(0).detach().cpu().numpy()
-    if False:
-        import matplotlib.pyplot as plt
-        plt.imshow(y)
-        plt.show()
-    return y.mean()
+def avg_relative_diff(a, b, show_as_plot=False):
+  assert a.shape == b.shape
+  y = (torch.abs(a - b)/torch.sqrt(0.0001 + 0.5*(a**2 + b**2))).mean(0).detach().cpu().numpy()
+  if show_as_plot:
+    import matplotlib.pyplot as plt
+    plt.imshow(y)
+    plt.show()
+  return y.mean()
 
 
 # OTHER STUFF...

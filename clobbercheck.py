@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import matplotlib.pyplot as plt
 
@@ -8,21 +9,36 @@ FLOAT_SZ = 4
 
 
 class ClobberChecker:
-  def __init__(self, chunk_sz=1_000_000):
-    self.chunk_sz = chunk_sz
+  def __init__(self, array_sizes):
+    self.array_sizes = array_sizes
   def __enter__(self):
     self.tensors = []
-    free_mem, _ = torch.cuda.mem_get_info()
-    used_mem = 0
-    while free_mem - used_mem > MEM_MARGIN*FLOAT_SZ*self.chunk_sz:
-      self.tensors.append(torch.zeros(self.chunk_sz, device="cuda"))
-      used_mem += FLOAT_SZ*self.chunk_sz
+    for sz in self.array_sizes:
+      self.tensors.append(torch.ones(sz, dtype=torch.int8, device="cuda"))
     return self
   def __exit__(self, exc_type, exc_val, exc_tb):
     self.tensors.clear()
   def report(self):
     clobber_count = 0
     for x in self.tensors:
-      clobbers = (x != 0)
-      clobber_count += clobbers.to(torch.int32).sum()
-    print(f"Clobber count: {clobber_count}")
+      clobbers = (x != 1)
+      clobber_count += clobbers.sum()
+    print(f"GPU Clobber count: {clobber_count}")
+
+class CPUClobberChecker:
+  def __init__(self, array_sizes):
+    self.array_sizes = array_sizes
+  def __enter__(self):
+    self.arrays = []
+    for sz in self.array_sizes:
+      self.arrays.append(np.ones(sz, dtype=np.int8))
+    return self
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    self.report()
+    self.arrays.clear()
+  def report(self):
+    clobber_count = 0
+    for x in self.arrays:
+      clobbers = (x != 1)
+      clobber_count += clobbers.sum()
+    print(f"CPU Clobber count: {clobber_count}")
