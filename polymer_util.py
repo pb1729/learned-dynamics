@@ -24,9 +24,21 @@ def sinhc(x):
       product approximation used here is a truncation of (1080) in Jolley's Summation of Series """
   ans = 1.
   z = x.copy()
-  for _ in range(5):
+  for _ in range(128):
     z *= 0.5
     ans *= np.cosh(z)
+  return ans
+
+def sinhc_x_exp_neg_x(x):
+  """ compute sinhc(x)exp(-x)
+      where sinhc(x) = sinh(x)/x is the hyperbolic analog of the sinc function, though without scaling by π.
+      implementation is basically the same as sinhc(x), but more numerically stable thanks to the exp(-x) """
+  ans = 1.
+  z = -x.copy()
+  for _ in range(128):
+    ans *= 0.5*(1. + np.exp(z))
+    z *= 0.5
+  ans *= np.exp(z)
   return ans
 
 def rouse(n, length):
@@ -64,7 +76,7 @@ class RouseEvolver:
     drag = get_poly_tc(sim, 1.)
     mode_k = rouse_k(np.arange(0, length), sim.k, length)
     quickness = sim.delta_t/drag
-    self.sigmas = np.sqrt(np.exp(-quickness*mode_k)*2*quickness*sinhc(quickness*mode_k))
+    self.sigmas = np.sqrt(2*quickness*sinhc_x_exp_neg_x(quickness*mode_k))
     self.decays = np.exp(-quickness*mode_k)
     self.rouse_block = rouse_block_unitary(length)
     # now move everything to a torch tensor on the device
@@ -132,6 +144,3 @@ if __name__ == "__main__":
   for n in range(poly_len):
     plt.scatter(x, rouse(n, poly_len))
     plt.show()
-
-
-
