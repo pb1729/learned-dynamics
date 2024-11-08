@@ -81,7 +81,7 @@ class SimPredictor(Predictor):
     return self.sim.shape
   def predict(self, L, state, ret=True):
     """ MUTATES state """
-    return self.sim.generate_trajectory(state.x, state.v, L, ret=ret)
+    return self.sim.generate_trajectory(state._x, state._v, L, ret=ret)
   def sample_q(self, batch):
     x, v = self.sim.sample_equilibrium(batch, self.t_eql)
     return SimPredictor.State(x, v)
