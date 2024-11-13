@@ -134,7 +134,7 @@ __global__ void createNeighbourListsKern(
                         for (int j = 0; j < cellCounts[idx]; j++) {
                             Particle other = cellLists[idx*listmax + j];
                             float3 delta = box_delta_pos(self.pos, other.pos, box);
-                            if (dot(delta, delta) <= r0sq) {
+                            if (self.index != other.index && dot(delta, delta) <= r0sq) {
                                 int oldCount = atomicAdd(&neighbourCounts[b*N + self.index], 1);
                                 if (oldCount < neighboursmax) {
                                     neighbourLists[(b*N + self.index)*neighboursmax + oldCount] = other.index;
@@ -154,7 +154,7 @@ __global__ void createNeighbourListsKern(
 
 void createNeighbourLists(
     const float3* positions,
-    int* neighbourLists,  // (batch, N, neighbourmax)
+    int* neighbourLists,  // (batch, N, neighboursmax)
     int* neighbourCounts, // (batch, N)
     float3 box,
     int3 ndiv,

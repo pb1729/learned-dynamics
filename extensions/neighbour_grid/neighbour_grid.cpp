@@ -143,8 +143,41 @@ torch::Tensor edges_reduce(torch::Tensor neighbourCounts, torch::Tensor neighbou
     return reducedData;
 }
 
+std::tuple<torch::Tensor, torch::Tensor> get_edges(
+        int listmax, int neighboursmax, float cutoff,
+        float box_x, float box_y, float box_z,
+        torch::Tensor x) {
+    std::tuple<torch::Tensor, torch::Tensor> neighbourData = get_neighbours(
+        listmax, neighboursmax, cutoff, box_x, box_y, box_z, x);
+    torch::Tensor neighbours = std::get<0>(neighbourData);
+    torch::Tensor neighbourCounts = std::get<1>(neighbourData);
+    int batch = neighbourCounts.size(0);
+    int N     = neighbourCounts.size(1);
+    torch::Tensor cumCounts = neighbourCounts.cumsum(1);
+    std::vector<torch::Tensor> src; src.reserve(batch);
+    std::vector<torch::Tensor> dst; dst.reserve(batch);
+    for (int i = 0; i < batch; i++) {
+        src.push_back(torch::empty({cumCounts.index({i, -1}).item<int>()}, torch::dtype(torch::kInt32).device(torch::kCUDA)));
+        dst.push_back(torch::empty({cumCounts.index({i, -1}).item<int>()}, torch::dtype(torch::kInt32).device(torch::kCUDA)));
+    }
+    for (int i = 0; i < batch; i++) {
+        int start = 0; int end;
+        for (int j = 0; j < N; j++) {
+            end = cumCounts.index({i, j}).item<int>();
+            src[i].slice(0, start, end).fill_(j);
+            dst[i].slice(0, start, end).copy_(neighbours.index({i, j}).slice(0, 0, end - start));
+            start = end;
+        }
+    }
+    return std::make_tuple(
+        torch::nested::as_nested_tensor(src),
+        torch::nested::as_nested_tensor(dst));
+}
+
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("get_neighbours", &get_neighbours, "Define neighbours based on cutoff radius using a grid method.");
     m.def("edges_read", &edges_read, "Read data from nodes to edges.");
     m.def("edges_reduce", &edges_reduce, "Reduce data from edges to nodes.");
+    m.def("get_edges", &get_edges, "Like get_neighbours, except it returns lists of edge tensors.");
 }
