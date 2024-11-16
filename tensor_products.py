@@ -91,7 +91,6 @@ class TensorProds(nn.Module):
     x_l = self.lin_l(x_l)
     x_r = self.lin_r(x_r)
     x_o = torch.einsum(self.einsum_str, x_l, x_r)
-    # TODO: if this is causing instability, we *could* divide by sqrt(1 + x_l^2 + x_r^2)
     return self.lin_o(x_o)
 
 

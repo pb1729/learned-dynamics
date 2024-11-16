@@ -45,6 +45,15 @@ def edges_read(graph:Graph, x_node:torch.Tensor):
     for i in range(graph.batch)])
   return x_src, x_dst
 
+def edges_read_dst(graph:Graph, x_node:torch.Tensor):
+  """ x_node: (batch, nodes, ...)
+      x_dst: nested(batch, (edges, ...)) """
+  # nested tensors currently don't support torch.gather, but this function would be equivalent to this:
+  # torch.gather(x_node, 1, graph.dst)
+  return nested_tensor([
+    x_node[i, graph.dst[i]]
+    for i in range(graph.batch)])
+
 def edges_reduce_src(graph:Graph, x_edge:torch.Tensor):
   """ sum data on graph from edges to src nodes
       x_edge: nested(batch, (edges, ...)) """
@@ -52,6 +61,16 @@ def edges_reduce_src(graph:Graph, x_edge:torch.Tensor):
     segment_coo(x_edge[i], graph.src[i], dim_size=graph.nodes)
     for i in range(graph.batch)])
 
+def boxwrap(box:torch.Tensor, delta_pos:torch.Tensor):
+  """ take a difference in positions in a periodic box and wrap it to the shortest possible displacement
+      box: (3)
+      delta_pos: (..., 3) """
+  if delta_pos.is_nested:
+    return torch.nested.nested_tensor([
+      (delta_pos[i] + 0.5*box)%box - 0.5*box
+      for i in range(delta_pos.size(0))])
+  else:
+    return (delta_pos + 0.5*box)%box - 0.5*box
 
 if __name__ == "__main__":
   print("Testing graph layers.")
@@ -92,5 +111,10 @@ if __name__ == "__main__":
     [0., 0., 0., 0.]
   ], device="cuda")[None]
   assert torch.allclose(sumprod, expected_sumprod)
+
+  # test boxwrap
+  pos_src, pos_dst = edges_read(graph, positions)
+  delta_pos = boxwrap(torch.tensor((100., 100., 100.), device="cuda"), pos_dst - pos_src)
+  assert torch.all(delta_pos[0]**2 < 2.001**2)
 
   print("All tests passed!")
