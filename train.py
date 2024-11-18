@@ -17,9 +17,14 @@ def dataset_gen(config):
   control_queue = Queue()
   def thread_main():
     while True: # queue maxsize stops us from going crazy here
-      state = config.predictor.sample_q(config.batch)
-      next_dataset = config.predictor.predict(config.simlen, state)
-      data_queue.put(next_dataset)
+      try:
+        state = config.predictor.sample_q(config.batch)
+        next_dataset = config.predictor.predict(config.simlen, state)
+      except RuntimeError as e:
+        print("Got an error while generating training data...")
+        print(e)
+      else:
+        data_queue.put(next_dataset)
       try:
         command = control_queue.get(block=False)
         if command == "halt":
@@ -77,6 +82,3 @@ def training_run(save_path, src):
   else:
     raise TypeError("incorrect source for training run!")
   train(model, save_path)
-
-
-
