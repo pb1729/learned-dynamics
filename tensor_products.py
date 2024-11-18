@@ -152,6 +152,13 @@ class _TensSigmoid(torch.autograd.Function):
     return None, (quad*grad_output - (x*grad_output).sum(ctx.dimtup, keepdim=True)*x)*(quad**-1.5)
 tens_sigmoid = _TensSigmoid.apply
 
+class TensSigmoid(nn.Module):
+  def __init__(self, inds):
+    super().__init__()
+    self.inds = inds
+  def forward(self, x):
+    return tens_sigmoid(self.inds, x)
+
 
 class TensGroupNorm(nn.Module):
   def __init__(self, inds, chan, groups, epsilon=1e-5):
