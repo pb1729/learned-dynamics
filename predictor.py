@@ -40,11 +40,11 @@ class Predictor:
   @property
   def shape(self) -> tuple:
     assert False, "this class not concretely implemented!"
-  def sample_q(self, batch) -> State:
+  def sample_q(self, batch:int) -> State:
     """ Some predictors may provide a way to sample States from some distribution q. (not necessarily
         the equilibrium distribution.) If so, you can sample a State of size batch by calling this function. """
     assert False, "q sampling not implemented for this class"
-  def predict(self, L, state, ret=True) -> torch.Tensor | None:
+  def predict(self, L:int, state:State, ret:bool=True) -> torch.Tensor | None:
     """ predict L steps based on initial state.
         MUTATES state
         ret: return the trajectory? """

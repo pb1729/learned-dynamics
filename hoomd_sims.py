@@ -80,10 +80,51 @@ def integrator_particles_1_cons(kT):
     return integrator
   return get_integrator_particles_1
 
+def polymer_1_frame(length: int, box:Tuple[float, float, float]):
+  npbox = np.array(box)
+  polymer_displacements = np.random.randn(length, 3)
+  position = (np.cumsum(polymer_displacements, axis=0) + 0.5*npbox)%npbox - 0.5*npbox
+  frame = gsd.hoomd.Frame()
+  # add particles
+  frame.particles.N = length
+  frame.particles.position = position
+  frame.particles.typeid = [0]*length
+  frame.configuration.box = box + (0, 0, 0)
+  frame.particles.types = ["A"]
+  # add bonds
+  frame.bonds.N = length - 1
+  frame.bonds.types = ["A-A"]
+  frame.bonds.typeid = [0]*(length - 1)
+  frame.bonds.group = [[i, i + 1] for i in range(length - 1)]
+  return frame
+
+def integrator_polymer_1_cons(kT):
+  def get_integrator_polymer_1() -> hoomd.md.Integrator:
+    integrator = hoomd.md.Integrator(dt=0.002)
+    cell = hoomd.md.nlist.Cell(buffer=0.6)
+    # lennard-jones interaction potential
+    lj = hoomd.md.pair.LJ(nlist=cell)
+    lj.params[("A", "A")] = dict(epsilon=0.1, sigma=1.)
+    lj.r_cut[("A", "A")] = 2.5
+    integrator.forces.append(lj)
+    # Harmonic bond potential
+    harmonic_bond = hoomd.md.bond.Harmonic()
+    harmonic_bond.params['A-A'] = dict(k=3., r0=1.)
+    integrator.forces.append(harmonic_bond)
+    # set thermostat
+    nvt = hoomd.md.methods.Langevin(filter=hoomd.filter.All(), kT=kT)
+    integrator.methods.append(nvt)
+    return integrator
+  return get_integrator_polymer_1
+
 
 hoomd_sims = SimsDict(
   ("particles_1_n%d_t%d_L%d", lambda n, t, L10: HoomdSim(
     integrator_particles_1_cons(1.5), particles_1_frame,
     t, n, (0.1*L10, 0.1*L10, 0.1*L10), 1.5
+  )),
+  ("polymer_1_l%d_t%d_L%d", lambda l, t, L10: HoomdSim(
+    integrator_polymer_1_cons(0.5), polymer_1_frame,
+    t, l, (0.1*L10, 0.1*L10, 0.1*L10), 0.5
   ))
 )
