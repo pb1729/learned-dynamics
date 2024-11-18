@@ -47,7 +47,12 @@ def main(args):
   model = predictor.model
   model.set_eval(False)
   # get input
-  inp = torch.randn(args.batch, args.length, *predictor.shape, device=model.config.device)
+  if args.usepredictor:
+    base_pred = predictor.get_base_predictor()
+    state = predictor.sample_q(args.batch)
+    inp = predictor.predict(args.length, state)
+  else:
+    inp = torch.randn(args.batch, args.length, *predictor.shape, device=model.config.device)
   # setup profiling
   profiler = MemoryProfiler()
   profiler.register_global_hooks()
@@ -73,4 +78,5 @@ if __name__ == "__main__":
   parser.add_argument("fpath")
   parser.add_argument("--batch", dest="batch", type=int, default=1)
   parser.add_argument("--length", dest="length", type=int, default=8)
+  parser.add_argument("--usepredictor", dest="usepredictor", action="store_true")
   main(parser.parse_args())

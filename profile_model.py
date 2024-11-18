@@ -11,7 +11,12 @@ def main(args):
   model = predictor.model
   model.set_eval(False)
   # get input
-  inp = torch.randn(args.batch, args.length, *predictor.shape, device=model.config.device)
+  if args.usepredictor:
+    base_pred = predictor.get_base_predictor()
+    state = predictor.sample_q(args.batch)
+    inp = predictor.predict(args.length, state)
+  else:
+    inp = torch.randn(args.batch, args.length, *predictor.shape, device=model.config.device)
   for i in range(args.burnin):
     print("burn-in %d" % i)
     model.train_step(inp)
@@ -34,4 +39,5 @@ if __name__ == "__main__":
   parser.add_argument("--length", dest="length", type=int, default=8)
   parser.add_argument("--burnin", dest="burnin", type=int, default=5)
   parser.add_argument("--saveto", dest="saveto", type=str, default="/tmp/chrome_trace.json")
+  parser.add_argument("--usepredictor", dest="usepredictor", action="store_true")
   main(parser.parse_args())
