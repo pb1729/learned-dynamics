@@ -19,9 +19,10 @@ def edgeify(*arg_is_nested_tensor):
 
 @edgeify(True, False)
 def _edgefn_radial_encode_edge(x, npi):
-  return torch.cos(npi*x[..., None])*torch.relu(1. - x**2)
+  x_sq = (x**2).sum(-1)
+  return torch.cos(npi*torch.sqrt(x_sq)[..., None])*torch.relu(1. - x_sq)[..., None]
 def radial_encode_edge(r, n, rmax):
-  """ r: (...)
+  """ r: (..., 3)
       ans: (..., n)"""
   npi = torch.pi*torch.arange(0, n, device=r.device)
   x = r/rmax
