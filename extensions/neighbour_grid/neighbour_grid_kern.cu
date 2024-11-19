@@ -331,3 +331,41 @@ void reduceEdgeData(
         chan
     );
 }
+
+__global__ void writeSrcDstKern(
+    const int* neighbours,      // (batch, N, neighboursmax)
+    const int* cumCounts,       // (batch, N)
+    const int* edgeCounts,      // (batch)
+    int* __restrict__ src,      // (edges)
+    int* __restrict__ dst,      // (edges)
+    int N, int neighboursmax
+) {
+    int idx_batch = blockIdx.y;
+    int idx_node = blockIdx.x;
+    int idx_thread = threadIdx.x;
+    int batch_offset = idx_batch > 0 ? edgeCounts[idx_batch - 1] : 0;
+    int node_offset = idx_node > 0 ? cumCounts[idx_batch*N + idx_node - 1] : 0;
+    int neighbours_count = cumCounts[idx_batch*N + idx_node] - node_offset;
+    for (int i = threadIdx.x; i < neighbours_count; i += blockDim.x) {
+        src[batch_offset + node_offset + i] = idx_batch*N + idx_node;
+        dst[batch_offset + node_offset + i] = idx_batch*N + neighbours[(idx_batch*N + idx_node)*neighboursmax + i];
+    }
+}
+
+void writeSrcDst(
+    const int* neighbours,      // (batch, N, neighboursmax)
+    const int* cumCounts,       // (batch, N)
+    const int* edgeCounts,      // (batch)
+    int* src,                   // (edges)
+    int* dst,                   // (edges)
+    int batch, int N, int neighboursmax
+) {
+    dim3 blocksPerGrid = dim3(N, batch);
+    int threadsPerBlock = 32; // pick a small guy since neighboursmax is usually small
+
+    writeSrcDstKern<<<blocksPerGrid, threadsPerBlock>>>(
+        neighbours, cumCounts, edgeCounts,
+        src, dst,
+        N, neighboursmax
+    );
+}

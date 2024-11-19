@@ -45,6 +45,15 @@ void reduceEdgeData(
     int chan
 );
 
+void writeSrcDst(
+    const int* neighbours,      // (batch, N, neighboursmax)
+    const int* cumCounts,       // (batch, N)
+    const int* edgeCounts,      // (batch)
+    int* src,                   // (edges)
+    int* dst,                   // (edges)
+    int batch, int N, int neighboursmax
+);
+
 
 // C++ interface
 std::tuple<torch::Tensor, torch::Tensor> get_neighbours(
@@ -153,25 +162,19 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> get_edges(
     torch::Tensor neighbourCounts = std::get<1>(neighbourData);
     int batch = neighbourCounts.size(0);
     int N     = neighbourCounts.size(1);
-    torch::Tensor cumCounts = neighbourCounts.cumsum(1);
-    torch::Tensor edgeCounts = cumCounts.index({torch::indexing::Slice(), -1}).cumsum(0);
+    torch::Tensor cumCounts = neighbourCounts.cumsum(1, torch::kInt32); // must specify dtype to avoid autoconv to int64 for some reason
+    torch::Tensor edgeCounts = cumCounts.index({torch::indexing::Slice(), -1}).cumsum(0, torch::kInt32);
     torch::Tensor src = torch::empty({edgeCounts.index({-1}).item<int>()}, torch::dtype(torch::kInt32).device(torch::kCUDA));
     torch::Tensor dst = torch::empty({edgeCounts.index({-1}).item<int>()}, torch::dtype(torch::kInt32).device(torch::kCUDA));
-    // copy the data...
-    int batch_offset = 0;
-    for (int i = 0; i < batch; i++) {
-        int start = 0; int end;
-        for (int j = 0; j < N; j++) {
-            end = cumCounts.index({i, j}).item<int>();
-            if (end > start) {
-                src.slice(0, batch_offset + start, batch_offset + end).fill_(j + N*i); // add N*i so that indices are into the batch*N dim
-                dst.slice(0, batch_offset + start, batch_offset + end).fill_(N*i); // rest of index added in the next line
-                dst.slice(0, batch_offset + start, batch_offset + end).add_(neighbours.index({i, j}).slice(0, 0, end - start));
-            }
-            start = end;
-        }
-        batch_offset = edgeCounts[i].item<int>();
-    }
+    // use kernel to copy the data...
+    writeSrcDst(
+        reinterpret_cast<int*>(neighbours.data_ptr<int>()),
+        reinterpret_cast<int*>(cumCounts.data_ptr<int>()),
+        reinterpret_cast<int*>(edgeCounts.data_ptr<int>()),
+        reinterpret_cast<int*>(src.data_ptr<int>()),
+        reinterpret_cast<int*>(dst.data_ptr<int>()),
+        batch, N, neighboursmax
+    );
     return std::make_tuple(src, dst, edgeCounts);
 }
 
