@@ -1,5 +1,4 @@
 import torch
-from torch.nested import nested_tensor
 from torch_scatter import segment_coo
 
 import neighbour_grid_cuda as neighbour_grid
@@ -8,25 +7,26 @@ from utils import must_be
 
 
 class Graph:
-  """ Graph class. Supports batch of graphs which have the same number of nodes,
+  """ Graph class. Supports batch of graphs which each have the same number of nodes,
       but may have different connectivity. Graphs can be symmetric or directed.
-      Implementation uses nested tensors. So various tensors in a batch may have
-      differing numbers of edges. The number of nodes is still shared, though. """
-  def __init__(self, src, dst, batch, nodes):
-    """ src, dst: nested(batch, (edges))
-        elems are node indices in range(0, nodes). forall i src[i] must be in increasing order """
+      Since total number of edges may differ between graphs, edges are stored in a
+      flat tensor that indexes into a dimension of shape batch*N. """
+  def __init__(self, src, dst, edge_indices, batch, nodes):
+    """ src, dst: (edges)
+        elems are node indices in range(0, batch*nodes). forall i src[i] must be in increasing order """
     self.src = src.to(torch.int64) # torch-scatter wants int64s
     self.dst = dst.to(torch.int64) # torch-scatter wants int64s
+    edge_indices = edge_indices
     self.batch = batch
     self.nodes = nodes
   @staticmethod
-  def radius_graph(r0, box, pos, celllist_max=32, neighbours_max=40):
+  def radius_graph(r0, box, pos, celllist_max=32, neighbours_max=64):
     """ Return an instance of graph where nodes are connected if they are within r0 of each other.
         Boundary conditions are periodic, defined by box: tuple(float, float, float).
         pos: (batch, nodes, 3) is an array of node positions. """
     batch, nodes, must_be[3] = pos.shape
-    src, dst = neighbour_grid.get_edges(celllist_max, neighbours_max, r0, *box, pos)
-    ans = Graph(src, dst, batch, nodes)
+    src, dst, edge_indices = neighbour_grid.get_edges(celllist_max, neighbours_max, r0, *box, pos)
+    ans = Graph(src, dst, edge_indices, batch, nodes)
     setattr(ans, "box", box) # since graph was created from a periodic box, we should record this
     return ans
 
@@ -34,43 +34,34 @@ class Graph:
 def edges_read(graph:Graph, x_node:torch.Tensor):
   """ x_node: (batch, nodes, ...)
       ans: tuple(x_src, x_dst)
-      x_src, x_dst: nested(batch, (edges, ...)) """
-  # nested tensors currently don't support torch.gather, but this function would be equivalent to this:
-  # return torch.gather(x_node, 1, graph.src), torch.gather(x_node, 1, graph.dst)
-  x_src = nested_tensor([
-    x_node[i, graph.src[i]]
-    for i in range(graph.batch)])
-  x_dst = nested_tensor([
-    x_node[i, graph.dst[i]]
-    for i in range(graph.batch)])
+      x_src, x_dst: (edges, ...) """
+  must_be[graph.batch], must_be[graph.nodes], *rest = x_node.shape
+  x_node = x_node.reshape(graph.batch*graph.nodes, *rest)
+  x_src = x_node[graph.src]
+  x_dst = x_node[graph.dst]
   return x_src, x_dst
 
 def edges_read_dst(graph:Graph, x_node:torch.Tensor):
   """ x_node: (batch, nodes, ...)
-      x_dst: nested(batch, (edges, ...)) """
-  # nested tensors currently don't support torch.gather, but this function would be equivalent to this:
-  # torch.gather(x_node, 1, graph.dst)
-  return nested_tensor([
-    x_node[i, graph.dst[i]]
-    for i in range(graph.batch)])
+      x_dst: (edges, ...) """
+  must_be[graph.batch], must_be[graph.nodes], *rest = x_node.shape
+  x_node = x_node.reshape(graph.batch*graph.nodes, *rest)
+  return x_node[graph.dst]
 
 def edges_reduce_src(graph:Graph, x_edge:torch.Tensor):
   """ sum data on graph from edges to src nodes
-      x_edge: nested(batch, (edges, ...)) """
-  return torch.stack([
-    segment_coo(x_edge[i], graph.src[i], dim_size=graph.nodes)
-    for i in range(graph.batch)])
+      x_edge: (edges, ...) """
+  ans = segment_coo(x_edge, graph.src, dim_size=graph.batch*graph.nodes)
+  must_be[graph.batch*graph.nodes], *rest = ans.shape
+  return ans.reshape(graph.batch, graph.nodes, *rest)
+
 
 def boxwrap(box:torch.Tensor, delta_pos:torch.Tensor):
   """ take a difference in positions in a periodic box and wrap it to the shortest possible displacement
       box: (3)
       delta_pos: (..., 3) """
-  if delta_pos.is_nested:
-    return torch.nested.nested_tensor([
-      (delta_pos[i] + 0.5*box)%box - 0.5*box
-      for i in range(delta_pos.size(0))])
-  else:
-    return (delta_pos + 0.5*box)%box - 0.5*box
+  return (delta_pos + 0.5*box)%box - 0.5*box
+
 
 if __name__ == "__main__":
   print("Testing graph layers.")
@@ -89,8 +80,7 @@ if __name__ == "__main__":
   graph = Graph.radius_graph(2., (100., 100., 100.), positions)
 
   # check src elements are in increasing order
-  for i in range(graph.batch):
-    assert torch.all(graph.src[i][1:] >= graph.src[i][:-1])
+  assert torch.all(graph.src[1:] >= graph.src[:-1])
 
   # test edges_read and edges_reduce_src by computing node degrees
   ones = torch.ones_like(graph.dst, dtype=torch.float)

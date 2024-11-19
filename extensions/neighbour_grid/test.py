@@ -46,7 +46,7 @@ assert abs(edge_reduce_data[:, :, 0] - neighbour_counts).sum() < 0.0001, "detect
 print("done.")
 
 print("Testing via display...")
-batch_idx = 0
+batch_idx = 3
 X = x[batch_idx].cpu().numpy()
 neighbours = neighbours[batch_idx].cpu().numpy()
 neighbour_counts = neighbour_counts[batch_idx].cpu().numpy()
@@ -84,13 +84,13 @@ display = launch_atom_display(atomic_numbers,
 input("Kill existing display before we continue...")
 print("Testing get_edges via display")
 
-src, dst = get_edges(32, 32, 7., *box, x)
+src, dst, edge_counts = get_edges(32, 32, 7., *box, x)
 print(src[0])
 print(dst[0])
 
 X = x[batch_idx].cpu().numpy()
-SRC = src[batch_idx].cpu().numpy()
-DST = dst[batch_idx].cpu().numpy()
+SRC = src[(0 if batch_idx == 0 else edge_counts[batch_idx - 1]):edge_counts[batch_idx]].cpu().numpy() - batch_idx*n_particles
+DST = dst[(0 if batch_idx == 0 else edge_counts[batch_idx - 1]):edge_counts[batch_idx]].cpu().numpy() - batch_idx*n_particles
 
 atomic_numbers = 6*np.ones(n_particles, dtype=int)
 additional_atoms = []

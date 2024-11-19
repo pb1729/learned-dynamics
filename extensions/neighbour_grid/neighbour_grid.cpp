@@ -143,7 +143,7 @@ torch::Tensor edges_reduce(torch::Tensor neighbourCounts, torch::Tensor neighbou
     return reducedData;
 }
 
-std::tuple<torch::Tensor, torch::Tensor> get_edges(
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> get_edges(
         int listmax, int neighboursmax, float cutoff,
         float box_x, float box_y, float box_z,
         torch::Tensor x) {
@@ -154,24 +154,25 @@ std::tuple<torch::Tensor, torch::Tensor> get_edges(
     int batch = neighbourCounts.size(0);
     int N     = neighbourCounts.size(1);
     torch::Tensor cumCounts = neighbourCounts.cumsum(1);
-    std::vector<torch::Tensor> src; src.reserve(batch);
-    std::vector<torch::Tensor> dst; dst.reserve(batch);
-    for (int i = 0; i < batch; i++) {
-        src.push_back(torch::empty({cumCounts.index({i, -1}).item<int>()}, torch::dtype(torch::kInt32).device(torch::kCUDA)));
-        dst.push_back(torch::empty({cumCounts.index({i, -1}).item<int>()}, torch::dtype(torch::kInt32).device(torch::kCUDA)));
-    }
+    torch::Tensor edgeCounts = cumCounts.index({torch::indexing::Slice(), -1}).cumsum(0);
+    torch::Tensor src = torch::empty({edgeCounts.index({-1}).item<int>()}, torch::dtype(torch::kInt32).device(torch::kCUDA));
+    torch::Tensor dst = torch::empty({edgeCounts.index({-1}).item<int>()}, torch::dtype(torch::kInt32).device(torch::kCUDA));
+    // copy the data...
+    int batch_offset = 0;
     for (int i = 0; i < batch; i++) {
         int start = 0; int end;
         for (int j = 0; j < N; j++) {
             end = cumCounts.index({i, j}).item<int>();
-            src[i].slice(0, start, end).fill_(j);
-            dst[i].slice(0, start, end).copy_(neighbours.index({i, j}).slice(0, 0, end - start));
+            if (end > start) {
+                src.slice(0, batch_offset + start, batch_offset + end).fill_(j + N*i); // add N*i so that indices are into the batch*N dim
+                dst.slice(0, batch_offset + start, batch_offset + end).fill_(N*i); // rest of index added in the next line
+                dst.slice(0, batch_offset + start, batch_offset + end).add_(neighbours.index({i, j}).slice(0, 0, end - start));
+            }
             start = end;
         }
+        batch_offset = edgeCounts[i].item<int>();
     }
-    return std::make_tuple(
-        torch::nested::as_nested_tensor(src),
-        torch::nested::as_nested_tensor(dst));
+    return std::make_tuple(src, dst, edgeCounts);
 }
 
 
