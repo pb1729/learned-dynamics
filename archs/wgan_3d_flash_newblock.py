@@ -80,9 +80,9 @@ class Block(nn.Module):
     x_v = x_v + self.randgen.randn(1, x_v.shape[:-1])
     x_d = x_d + self.randgen.randn(2, x_d.shape[:-2])
     # convolutional MLP
-    x_a = self.conv2_a(torch.relu(self.conv1_a(torch.relu(self.conv0_a(x_a)))))
-    x_v = self.conv2_v(tens_sigmoid(1, self.conv1_v(tens_sigmoid(1, self.conv0_v(x_v)))))
-    x_d = self.conv2_d(tens_sigmoid(2, self.conv1_d(tens_sigmoid(2, self.conv0_d(x_d)))))
+    x_a = self.conv2_a(torch.relu(self.conv1_a(torch.relu(self.conv0_a(x_a))))).contiguous()
+    x_v = self.conv2_v(tens_sigmoid(1, self.conv1_v(tens_sigmoid(1, self.conv0_v(x_v))))).contiguous()
+    x_d = self.conv2_d(tens_sigmoid(2, self.conv1_d(tens_sigmoid(2, self.conv0_d(x_d))))).contiguous()
     # linear mix
     x_a, x_v, x_d = self.linear_mix(x_a, x_v, x_d)
     # tensor products
