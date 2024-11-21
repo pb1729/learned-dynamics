@@ -8,8 +8,8 @@ from train import training_run
 
 
 SIMTYPE = "polymer_1"
-ARCH = "wgan_3d_flash_newblock2"
-RUN_ID = "S2"
+ARCH = "wgan_3d_newblock3"
+RUN_ID = "S3"
 
 L_LIST = [48] # [80]
 # rouse time for repel5 and repel5a is 317
