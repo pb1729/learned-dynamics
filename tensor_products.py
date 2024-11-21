@@ -44,7 +44,7 @@ class TensLinear(nn.Module):
     nn.init.normal_(self.W, std=fan_in**-0.5)
   def forward(self, x):
     if x.is_cuda:
-      return _TensLinearCuda.apply(self.inds, self.W, x)
+      return _TensLinearCuda.apply(self.inds, self.W, x.contiguous())
     else:
       return torch.einsum(self.einsum_str, self.W, x)
 
@@ -100,26 +100,36 @@ class TensDelta(nn.Module):
     return self.lin(x)[..., None, None]*identity
 
 
-class TensorProds(nn.Module):
-  def __init__(self, inds_l:int, inds_r:int, inds_o:int, dim_l:int, dim_r:int, dim_o:int, rank:int):
+class TensorProdBare(nn.Module):
+  """ Tensor product class with no linear transformations sandwiching it """
+  def __init__(self, inds_l, inds_r, inds_o):
     super().__init__()
     def assert_div_2(a):
       assert a%2 == 0, "parity mismatch"
       return a//2
     contracts = assert_div_2(inds_l + inds_r - inds_o) # number of tensor contractions
     assert 0 <= contracts <= min(inds_l, inds_r), f"{contracts} contractions is out of range for {inds_l}, {inds_r} index tensors"
-    self.lin_l = TensLinear(inds_l, dim_l, rank)
-    self.lin_r = TensLinear(inds_r, dim_r, rank)
-    self.lin_o = TensLinear(inds_o, rank, dim_o)
     tensor_indices = "".join([chr(ord("i") + n) for n in range(inds_l + inds_r - contracts)])
     to_contract = tensor_indices[:contracts]
     keep_l      = tensor_indices[contracts:inds_l]
     keep_r      = tensor_indices[inds_l:]
     self.einsum_str = f"...{keep_l + to_contract}, ...{keep_r + to_contract} -> ...{keep_l + keep_r}"
   def forward(self, x_l, x_r):
+    return torch.einsum(self.einsum_str, x_l, x_r)
+
+
+class TensorProds(nn.Module):
+  """ Tensor product class sandwiched by linear transformations. """
+  def __init__(self, inds_l:int, inds_r:int, inds_o:int, dim_l:int, dim_r:int, dim_o:int, rank:int):
+    super().__init__()
+    self.prod = TensorProdBare(inds_l, inds_r, inds_o)
+    self.lin_l = TensLinear(inds_l, dim_l, rank)
+    self.lin_r = TensLinear(inds_r, dim_r, rank)
+    self.lin_o = TensLinear(inds_o, rank, dim_o)
+  def forward(self, x_l, x_r):
     x_l = self.lin_l(x_l)
     x_r = self.lin_r(x_r)
-    x_o = torch.einsum(self.einsum_str, x_l, x_r)
+    x_o = self.prod(x_l, x_r)
     return self.lin_o(x_o)
 
 
@@ -277,6 +287,3 @@ if __name__ == "__main__":
     print("y", avg_relative_diff(y_cpu.to("cuda"), y_gpu))
     print("dx", avg_relative_diff(x_cpu.grad.to("cuda"), x_gpu.grad))
     print("dW", avg_relative_diff(lin_cpu.W.grad.to("cuda"), lin_gpu.W.grad))
-
-
-
