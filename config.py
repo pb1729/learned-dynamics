@@ -33,7 +33,7 @@ def get_predictor(predictor_spec):
 class Config:
   """ configuration class for training runs """
   def __init__(self, pred_spec, arch_name,
-               device="cuda", batch=16, simlen=16, nsteps=65536, save_every=512,
+               device="cuda", batch=1, simlen=16, nsteps=65536, save_every=512,
                arch_specific=None, **kwargs_rest):
     self.pred_spec = pred_spec
     self.arch_name = arch_name
