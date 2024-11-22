@@ -98,9 +98,9 @@ def polymer_1_frame(length: int, box:Tuple[float, float, float]):
   frame.bonds.group = [[i, i + 1] for i in range(length - 1)]
   return frame
 
-def integrator_polymer_1_cons(kT):
+def integrator_polymer_1_cons(kT, dt=0.002):
   def get_integrator_polymer_1() -> hoomd.md.Integrator:
-    integrator = hoomd.md.Integrator(dt=0.002)
+    integrator = hoomd.md.Integrator(dt=dt)
     cell = hoomd.md.nlist.Cell(buffer=0.6)
     # lennard-jones interaction potential
     lj = hoomd.md.pair.LJ(nlist=cell)
@@ -125,6 +125,10 @@ hoomd_sims = SimsDict(
   )),
   ("polymer_1_l%d_t%d_L%d", lambda l, t, L10: HoomdSim(
     integrator_polymer_1_cons(0.5), polymer_1_frame,
+    t, l, (0.1*L10, 0.1*L10, 0.1*L10), 0.5
+  )),
+  ("polymer_2_l%d_t%d_L%d", lambda l, t, L10: HoomdSim(
+    integrator_polymer_1_cons(0.5, 0.0001), polymer_1_frame,
     t, l, (0.1*L10, 0.1*L10, 0.1*L10), 0.5
   ))
 )
