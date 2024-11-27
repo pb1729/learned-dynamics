@@ -12,13 +12,18 @@ class HoomdSim:
   def __init__(self,
       get_integrator:Callable[[], hoomd.md.Integrator],
       sample_frame: Callable[[int, Tuple[float, float, float]], gsd.hoomd.Frame],
-      nsteps: int, n_particles: int, box: Tuple[float, float, float], kT: float):
+      nsteps: int, n_particles: int, box: Tuple[float, float, float], kT: float,
+      sim_has_velocites:bool=True):
     self.get_integrator = get_integrator
     self.sample_frame = sample_frame
     self.n_particles = n_particles
     self.box = box
     self.kT = kT
     self.nsteps = nsteps
+    self.sim_has_velocities = sim_has_velocites
+  def _thermalize_any_momenta(self, simulation):
+    if self.sim_has_velocities:
+      simulation.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=self.kT)
   def _settle_simulation(self, simulation:hoomd.Simulation):
     """ MUTATES simulation
         returns True if settling failed and we need to retry, False otherwise"""
@@ -32,14 +37,14 @@ class HoomdSim:
         snapshot = simulation.state.get_snapshot()
         snapshot.particles.position[:] = (snapshot.particles.position + 0.5*box) % box - 0.5*box
         simulation.state.set_snapshot(snapshot)
-        simulation.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=self.kT)
+        self._thermalize_any_momenta(simulation)
         continue
       else:
         break
     else:
       return True # failed!
     simulation.operations.integrator.dt = old_dt
-    simulation.state.thermalize_particle_momenta(filter=hoomd.filter.All(), kT=self.kT)
+    self._thermalize_any_momenta(simulation)
     return False
   def sample_q(self):
     frame = self.sample_frame(self.n_particles, self.box)
@@ -79,6 +84,19 @@ def integrator_particles_1_cons(kT):
     integrator.methods.append(nvt)
     return integrator
   return get_integrator_particles_1
+
+def integrator_particles_2_cons(kT):
+  def get_integrator_particles_2() -> hoomd.md.Integrator:
+    integrator = hoomd.md.Integrator(dt=0.0002)
+    cell = hoomd.md.nlist.Cell(buffer=0.4)
+    lj = hoomd.md.pair.LJ(nlist=cell)
+    lj.params[("A", "A")] = {"epsilon":1, "sigma":1}
+    lj.r_cut[("A", "A")] = 2.5
+    integrator.forces.append(lj)
+    nvt = hoomd.md.methods.Brownian(filter=hoomd.filter.All(), kT=kT)
+    integrator.methods.append(nvt)
+    return integrator
+  return get_integrator_particles_2
 
 def polymer_1_frame(length: int, box:Tuple[float, float, float]):
   npbox = np.array(box)
@@ -121,6 +139,10 @@ def integrator_polymer_1_cons(kT, dt=0.002):
 hoomd_sims = SimsDict(
   ("particles_1_n%d_t%d_L%d", lambda n, t, L10: HoomdSim(
     integrator_particles_1_cons(1.5), particles_1_frame,
+    t, n, (0.1*L10, 0.1*L10, 0.1*L10), 1.5
+  )),
+  ("particles_2_n%d_t%d_L%d", lambda n, t, L10: HoomdSim(
+    integrator_particles_2_cons(1.5), particles_1_frame,
     t, n, (0.1*L10, 0.1*L10, 0.1*L10), 1.5
   )),
   ("polymer_1_l%d_t%d_L%d", lambda l, t, L10: HoomdSim(
