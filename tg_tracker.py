@@ -1,8 +1,10 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
 
-from utils import grad_record
+from utils import grad_record, must_be
+from atoms_display import launch_atom_display
 
 
 def magdata(x):
@@ -16,20 +18,25 @@ class TGTracker(nn.Module):
   """ Tensor/Gradient Tracker.
       Insert this class into various parts of your model... """
   all_trackers = [] # static list of all trackers that have been created
-  def __init__(self, name):
+  def __init__(self, name, print_on_callback=False):
     super().__init__()
     self.x_mags,  self.x_intns  = [], []
     self.dx_mags, self.dx_intns = [], []
     self.all_trackers.append(self)
     self.name = name
+    self.print_on_callback = print_on_callback
   def fwd_callback(self, x):
     mag, intn = magdata(x)
     self.x_mags.append(mag)
     self.x_intns.append(intn)
+    if self.print_on_callback:
+      print("FWD", self.name, mag, intn)
   def bwd_callback(self, dx):
     mag, intn = magdata(dx)
     self.dx_mags.append(mag)
     self.dx_intns.append(intn)
+    if self.print_on_callback:
+      print("BWD", self.name, mag, intn)
   def create_figure(self):
     fig = plt.figure()
     ax_x = fig.add_subplot(111)
@@ -53,6 +60,28 @@ class TGTracker(nn.Module):
     for tracker in TGTracker.all_trackers:
       tracker.create_figure()
     plt.show()
+
+class PosTracker(nn.Module):
+  """ Class to track particle positions and their gradient. """
+  def __init__(self, grad_scale=1.):
+    super().__init__()
+    self.grad_scale = grad_scale
+    PosTracker.tracker = self
+    self.display = None
+  def forward(self, pos_0, pos_1):
+    pos_0_np = pos_0[0].detach().cpu().numpy()
+    pos_1_np = pos_1[0].detach().cpu().numpy()
+    poses_np = np.concatenate([pos_0_np, pos_1_np], axis=0)
+    if self.display is None:
+      nodes, must_be[3] = pos_0_np.shape
+      atomic_nums = 6*np.ones(2*nodes, dtype=int)
+      atomic_nums[:nodes] = 5
+      self.display = launch_atom_display(atomic_nums, poses_np)
+    else:
+      self.display.update_pos(poses_np)
+    return pos_1
+
+
 
 if __name__ == "__main__":
   # TESTING
