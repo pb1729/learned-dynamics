@@ -16,15 +16,17 @@ class Graph:
         elems are node indices in range(0, batch*nodes). forall i src[i] must be in increasing order """
     self.src = src.to(torch.int64) # torch-scatter wants int64s
     self.dst = dst.to(torch.int64) # torch-scatter wants int64s
-    edge_indices = edge_indices
+    self.edge_indices = edge_indices
     self.batch = batch
     self.nodes = nodes
+    assert self.src.shape[0] > 0, "Tried to create a graph with 0 edges."
   @staticmethod
   def radius_graph(r0, box, pos, celllist_max=32, neighbours_max=64):
     """ Return an instance of graph where nodes are connected if they are within r0 of each other.
         Boundary conditions are periodic, defined by box: tuple(float, float, float).
         pos: (batch, nodes, 3) is an array of node positions. """
     batch, nodes, must_be[3] = pos.shape
+    assert torch.all(~torch.isnan(pos)), "some positions are NaN!"
     src, dst, edge_indices = neighbour_grid.get_edges(celllist_max, neighbours_max, r0, *box, pos)
     ans = Graph(src, dst, edge_indices, batch, nodes)
     setattr(ans, "box", box) # since graph was created from a periodic box, we should record this
