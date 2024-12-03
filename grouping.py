@@ -9,7 +9,7 @@ DEFAULT = "default"
 def param_group_to_condition(params):
   return torch.cat([param.detach().flatten() for param in params])[None, :]
 
-def get_grouped_parameters(module, as_lists=False):
+def get_grouped_parameters(*modules, as_lists=False):
   """ Returns parameters of the module organized by group.
       This function allows you to define modules that produce
       parameters that can belong to a variety of different
@@ -24,18 +24,30 @@ def get_grouped_parameters(module, as_lists=False):
       ans[group] = chain(ans[group], params)
     else:
       ans[group] = params
-  if hasattr(module, "list_groups"):
-    for group in module.list_groups():
-      append_params(group, module.grouped_parameters(group))
-  else:
-    # this is a normal module, its direct parameters are "default"
-    append_params(DEFAULT, module.parameters(recurse=False))
-  # get grouped parameters for all children
-  for child in module.children():
-    child_ans = get_grouped_parameters(child) # recursive call to get parameters
-    for group in child_ans:
-      append_params(group, child_ans[group])
+  for module in modules:
+    if hasattr(module, "list_groups"):
+      for group in module.list_groups():
+        append_params(group, module.grouped_parameters(group))
+    else:
+      # this is a normal module, its direct parameters are "default"
+      append_params(DEFAULT, module.parameters(recurse=False))
+    # get grouped parameters for all children
+    for child in module.children():
+      child_ans = get_grouped_parameters(child) # recursive call to get parameters
+      for group in child_ans:
+        append_params(group, child_ans[group])
   if as_lists: return {group: list(ans[group]) for group in ans}
+  return ans
+
+def get_params_for_optim(*modules, **overrides):
+  param_groups = get_grouped_parameters(*modules)
+  ans = []
+  for group_nm in param_groups:
+    ans.append({
+      "params": param_groups[group_nm]
+    })
+    if group_nm in overrides:
+      ans[-1].update(overrides[group_nm])
   return ans
 
 
@@ -80,13 +92,3 @@ class FastParamsConv1d(nn.Module):
     if group == "fast":
       return (p for p in [self.w_mid])
     return chain(self.conv_in.parameters(), self.conv_out.parameters())
-
-
-
-
-
-
-
-
-
-
