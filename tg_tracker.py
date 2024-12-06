@@ -77,7 +77,10 @@ class PosTracker(nn.Module):
       atomic_nums = 6*np.ones(2*nodes, dtype=int)
       atomic_nums[:nodes] = 5
       self.display = launch_atom_display(atomic_nums, poses_np)
+      print("display launched!")
     else:
+      print("about to update the display")
+      input(">")
       self.display.update_pos(poses_np)
     return pos_1
 

@@ -7,6 +7,7 @@ import torch
 
 from run_visualization import TensorBoard
 from config import Config, load, save, makenew
+from predictor import ModelState
 
 
 def dataset_gen(config):
@@ -19,12 +20,13 @@ def dataset_gen(config):
     while True: # queue maxsize stops us from going crazy here
       try:
         state = config.predictor.sample_q(config.batch)
-        next_dataset = config.predictor.predict(config.simlen, state)
+        trajs:ModelState = config.predictor.predict(config.simlen, state)
       except RuntimeError as e:
         print("Got an error while generating training data...")
         print(e)
+        raise e
       else:
-        data_queue.put(next_dataset)
+        data_queue.put(trajs)
       try:
         command = control_queue.get(block=False)
         if command == "halt":
@@ -63,8 +65,9 @@ def train(model, save_path):
     checkpoints = []
   for i in itertools.count():
     trajs = data_generator.send(None if i < nsteps else True)
-    if trajs is None: break
-    trainer.step(i, trajs) # main training step
+    # main training step
+    trainer.step(i, trajs)
+    # save a checkpoint
     if (i + 1) % config.save_every == 0:
       print("\nsaving...")
       save(model, save_path)

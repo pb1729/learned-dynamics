@@ -48,9 +48,9 @@ def get_contin_states(state, args, predictors):
   state_contins = []
   for predictor in predictors:
     if isinstance(predictor, ModelPredictor):
-      state_contins.append(state.expand(args.contins).to_model_predictor_state())
+      state_contins.append(state.expand(args.contins, 1).to_model_predictor_state())
     else:
-      state_contins.append(state.expand(args.contins))
+      state_contins.append(state.expand(args.contins, 1))
   for state_contin, predictor in zip(state_contins, predictors):
     predictor.predict(args.iter, state_contin, ret=False) # MUTATE state_contins
   return state_contins
@@ -58,14 +58,13 @@ def get_contin_states(state, args, predictors):
 
 def eval_predictors(args, predictors):
   """ compare a predictor to its base predictor """
-  shape = predictors[0].shape
   state = predictors[0].sample_q(args.samples) # get our set of initial conditions from the first predictor in the list
   # evaluate the base predictor and model predictor dynamics
   state_contins = get_contin_states(state, args, predictors)
   for i in range(args.samples):
     x_init = state[i].x
     x_preds = [state_contin.x[i::args.samples] for state_contin in state_contins]
-    comparison_plot(x_init, x_preds, shape, args)
+    comparison_plot(x_init, x_preds, state[i].shape, args)
 
 
 def model_list_to_predictor_list(models) -> List[Predictor]:

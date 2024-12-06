@@ -1,7 +1,7 @@
 import io
 import random
 from collections import namedtuple
-from typing_extensions import List, Tuple
+from typing_extensions import List, Tuple, Callable
 import warnings
 
 import numpy as np
@@ -69,21 +69,22 @@ def hydrogenate_and_solvate(pdb:PDBFile, ff:ForceField, boxsz:float):
 OpenMMMetadata = namedtuple("OpenMMMetadata", ["seq", "atomic_nums", "atom_indices", "residue_indices"])
 
 
+def get_get_random_seq(lmin:int, lmax:int):
+  def get_random_seq():
+    length = random.randint(lmin, lmax)
+    return "".join([random.choice(LETTERS) for _ in range(length)])
+  return get_random_seq
+
+
 class OpenMMConfig:
   ff = FF
-  def __init__(self, dt:int, boxsz:float, temp:float, lmin:int, lmax:int):
+  def __init__(self, dt:int, boxsz:float, temp:float, sample_seq:Callable[[], str]):
     self.dt = dt # number of simulation steps, in units of [0.002ps]
     self.boxsz = boxsz
     self.temp = temp
-    self.lmin = lmin
-    self.lmax = lmax
-    # empirically okay (not too many retries due to small box) lmax, boxsz pairs
-    # 60, 40.
-  def _sample_seq(self):
-    length = random.randint(self.lmin, self.lmax)
-    return "".join([random.choice(LETTERS) for _ in range(length)])
+    self.sample_seq = sample_seq
   def _sample_pdb(self, seq):
-    for _ in range(100):
+    for _ in range(10):
       pdb = init_pdb(seq)
       if pdb_check_box(pdb, self.boxsz - 1.):
         return pdb
@@ -100,6 +101,7 @@ class OpenMMConfig:
       seq.append(RES_CODE[res.name])
       residue_indices.append(len(atom_indices))
       nonhydrogens = [atom for atom in res.atoms() if atom.element.atomic_number != 1]
+      nonhydrogens = [atom for atom in nonhydrogens if atom.name != "OXT"] # don't include OXT so amino acid sized can be uniform
       atoms_ref = structures[res.name][0].atoms
       for atom, atom_ref in zip(nonhydrogens, atoms_ref):
         assert atom_ref.name.replace("N_next", "OXT") == atom.name, "atom ordering in simulation inconsistent with standard order!"
@@ -109,7 +111,7 @@ class OpenMMConfig:
   def _pdb_to_sim(self, pdb):
     modeller = hydrogenate_and_solvate(pdb, self.ff, self.boxsz)
     metadata = self._get_sys_metadata(modeller)
-    integrator = openmm.LangevinMiddleIntegrator(self.temp*kelvin, 1/PICOSEC, 0.002*PICOSEC)
+    integrator = openmm.LangevinMiddleIntegrator(self.temp*kelvin, 1/PICOSEC, 0.001*PICOSEC)
     system = self.ff.createSystem(modeller.topology, nonbondedMethod=PME)
     simulation = Simulation(modeller.topology, system, integrator)
     simulation.context.setPositions(modeller.positions)
@@ -117,7 +119,7 @@ class OpenMMConfig:
   def _settle_sim(self, sim:Simulation):
     sim.minimizeEnergy(tolerance=10)
   def sample_q(self, batch) -> Tuple[OpenMMMetadata, List[Simulation], List[XReporter]]:
-    seq = self._sample_seq()
+    seq = self.sample_seq()
     if batch > 1:
       warnings.warn("""WARNING: Using batch size larger than 1 in openmm sims will affect the distribution of chain lengths and sequences!""")
     sims:List[Simulation] = []
@@ -146,5 +148,6 @@ class OpenMMConfig:
 
 openmm_sims = SimsDict(
   # A_ sims have T at 300K. example: A_t6000_L40_m20_M60
-  ("A_t%d_L%d_m%d_M%d", lambda t, L, m, M: OpenMMConfig(t, float(L), 300., m, M))
+  ("A_t%d_L%d_m%d_M%d", lambda t, L, m, M: OpenMMConfig(t, float(L), 300., get_get_random_seq(m, M))),
+  ("SEQ_t%d_L%d_seq%Q", lambda t, L, seq: OpenMMConfig(t, float(L), 300., lambda: seq))
 )

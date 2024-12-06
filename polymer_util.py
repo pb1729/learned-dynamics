@@ -9,13 +9,14 @@ from utils import must_be
 def poly_len(obj):
   if isinstance(obj, Config):
     obj = obj.predictor
-  ans, _ = obj.shape # obj is the predictor
+  ans, _ = obj.shape() # obj is the predictor
+  assert ans != -1, "can't get length for a predictor that allows polymers of variable length!"
   return ans
 
 def space_dim(obj):
   if isinstance(obj, Config):
     obj = obj.predictor
-  _, ans = obj.shape # obj is the predictor
+  _, ans = obj.shape() # obj is the predictor
   return ans
 
 def sinhc(x):

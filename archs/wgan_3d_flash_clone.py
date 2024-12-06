@@ -214,9 +214,10 @@ class WGAN3D:
         "discs": [disc.state_dict() for disc in self.discs],
         "gen": self.gen.state_dict(),
       }
-  def train_step(self, x):
-    """ x: (batch, L, poly_len, 3) """
-    batch, L, must_be[self.n_nodes], must_be[3] = x.shape
+  def train_step(self, traj_state):
+    """ x: (L, batch, poly_len, 3) """
+    x = traj_state.x
+    L, batch, must_be[self.n_nodes], must_be[3] = x.shape
     loss_d = self.discs_step(x)
     loss_g = self.gen_step(x)
     self.step_count += 1
@@ -235,18 +236,18 @@ class WGAN3D:
     for group in self.optim_d.param_groups: # learning rate schedule
       group["lr"] *= lr_d_fac
   def discs_step(self, x):
-    """ x: (batch, L, poly_len, 3) """
-    batch, L, must_be[self.n_nodes], must_be[3] = x.shape
+    """ x: (L, batch, poly_len, 3) """
+    L, batch, must_be[self.n_nodes], must_be[3] = x.shape
     x_g = x
     loss = 0.
     for nsteps, disc in enumerate(self.discs, start=1):
-      x_g = self.generate(x_g[:, :-1])
-      x_r = x[:, nsteps:]
-      x_0 = x[:, :-nsteps]
+      x_g = self.generate(x_g[:-1])
+      x_r = x[nsteps:]
+      x_0 = x[:-nsteps]
       loss = loss + self.disc_loss(disc,
-        x_0.reshape(batch*(L - nsteps), self.n_nodes, 3),
-        x_r.reshape(batch*(L - nsteps), self.n_nodes, 3),
-        x_g.reshape(batch*(L - nsteps), self.n_nodes, 3))
+        x_0.reshape((L - nsteps)*batch, self.n_nodes, 3),
+        x_r.reshape((L - nsteps)*batch, self.n_nodes, 3),
+        x_g.reshape((L - nsteps)*batch, self.n_nodes, 3))
     # backprop, update
     self.optim_d.zero_grad()
     loss.backward()
@@ -277,8 +278,8 @@ class WGAN3D:
     x_g = x
     loss = 0.
     for nsteps, disc in enumerate(self.discs, start=1):
-      x_g = self.generate(x_g[:, :-1])
-      x_0 = x[:, :-nsteps]
+      x_g = self.generate(x_g[:-1])
+      x_0 = x[:-nsteps]
       y_g = disc(x_0.reshape(-1, self.n_nodes, 3), x_g.reshape(-1, self.n_nodes, 3))
       loss = loss + y_g.mean()
     # backprop, update
@@ -341,9 +342,9 @@ class WGAN3D:
       for disc in self.discs:
         disc.train()
       self.gen.train()
-  def predict(self, cond):
+  def predict(self, state):
     with torch.no_grad():
-      return self.generate(cond)
+      return self.generate(state.x)
 
 
 class GANTrainer:

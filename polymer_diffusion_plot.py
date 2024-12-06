@@ -13,16 +13,16 @@ def get_traj(args, predictor):
     state = predictor.sample_q(args.batch)
   with PrintTiming("evolving forwards with predictor %s" % predictor.name):
     traj = predictor.predict(args.tmax, state)
-  return traj
+  return traj.x
 
 def atom_0_msd(x):
   """ mean square displacement of atom 0 in the chain relative to start as a function of time """
-  return ((x[:, :, 0] - x[:, 0, None, 0])**2).sum(-1).mean(0)
+  return ((x[:, :, 0] - x[0, None :, 0])**2).sum(-1).mean(1)
 
 def com_msd(x):
   """ mean square displacement of chain center of mass relative to start as a function of time """
   x = x.mean(2)
-  return ((x - x[:, 0, None])**2).sum(-1).mean(0)
+  return ((x - x[:, 0, None])**2).sum(-1).mean(1)
 
 MSD_FNS = {
   "atom_0": atom_0_msd,

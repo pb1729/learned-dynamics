@@ -213,11 +213,16 @@ class SimsDict:
     """ constructors is a list of (regex, constructor_fn) tuples """
     self.cache = {}
     self.constructors = constructors
+  def _decode(self, match_group):
+    try:
+      return int(match_group)
+    except ValueError:
+      return match_group
   def _match(self, pattern, string):
-    regex = "^" + pattern.replace("%d", r"(\d+)") + "$"
+    regex = "^" + pattern.replace("%d", r"(\d+)").replace("%Q", r"([A-Z]+)") + "$"
     match = re.match(regex, string)
     if match:
-      return tuple([int(num) for num in match.groups()])
+      return tuple([self._decode(num) for num in match.groups()])
     return None
   def _construct(self, sim_nm):
     for pattern, constructor in self.constructors:

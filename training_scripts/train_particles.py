@@ -9,7 +9,7 @@ from train import training_run
 
 SIMTYPE = "particles_2"
 ARCH = "wgan_3d_newblock9_particles"
-RUN_ID = "R16"
+RUN_ID = "R17"
 
 L = 80
 N_LIST = [30]
