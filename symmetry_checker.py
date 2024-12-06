@@ -2,6 +2,7 @@ import torch
 
 from config import get_predictor
 from utils import must_be, avg_relative_diff
+from predictor import ModelState
 
 
 class Symmetry:
@@ -86,14 +87,17 @@ def main(args):
     model = predictor.model
     state = predictor.sample_q(1)
     x = state.x.clone()
-    pos_noies, z_a, z_v = model.get_latents(1)
-    inputs = [x, pos_noies, z_a, z_v]
-    y = model.gen(*inputs)
+    # fix a random seed
+    model.randgen.set_transform(None, seed=0x947)
+    y = model.predict(state)
     for symm in symms:
-      inputs_s = symm.apply(inputs, ["p", 1, 0, 1])
+      x_s = symm.pos(x)
+      state_s = ModelState(state.shape, x_s, **state.kwargs)
       y_s = symm.pos(y)
-      y_s_pred = model.gen(*inputs_s)
-      print(symm.__class__.__name__, avg_relative_diff(y_s, y_s_pred))
+      # fix the same seed, but with a transform on generated tensors
+      model.randgen.set_transform(symm.tens, seed=0x947)
+      y_s_pred = model.predict(state_s)
+      print(symm.__class__.__name__, avg_relative_diff(y_s - x, y_s_pred - x))
   elif args.test == "proxattn":
     from attention_layers import ProximityFlashAttentionPeriodic
     from layers_common import VectorSigmoid

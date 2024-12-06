@@ -141,8 +141,10 @@ class TensorRandGen:
       can be transformed using set_transform. """
   def __init__(self):
     self.transform = None
-  def set_transform(self, transform):
+  def set_transform(self, transform, seed=None):
     """ transform: indices, (..., (3,)^indices) -> (..., (3,)^indices) """
+    if seed is not None:
+      torch.manual_seed(seed)
     self.transform = transform
   def clear_transform(self):
     self.transform = None
