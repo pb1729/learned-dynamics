@@ -8,7 +8,7 @@ from layers_common import VecLinear
 
 def get_residue_len(letter:str) -> int:
   struct = structures[letter_code[letter]][0]
-  return len(struct.atoms)
+  return len(struct.atoms) - 1 # subtract 1 to prevent N_next from being included
 
 
 class SingleResidueEncode(nn.Module):
@@ -66,14 +66,7 @@ class ResiduesDecode(nn.Module):
     """ pos_ca: (batch, residues, 3)
         x_v: (batch, residues, vdim, 3)
         ans: (batch, atoms, 3) """
-    def decode(res_dec, i):
-      res_idx = metadata.residue_indices[i]
-      return res_dec(pos_ca[:, i], x_v[:, res_idx:res_idx+res_dec.natom])
-    return torch.stack([
-      decode(self.res_dec[letter], i)
+    return torch.cat([
+      self.res_dec[letter](pos_ca[:, i], x_v[:, i])
       for i, letter in enumerate(metadata.seq)
     ], dim=1) # dim=1 because batch
-
-
-
-
