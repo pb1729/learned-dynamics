@@ -1,6 +1,7 @@
 .ipynb_checkpoints/
 __pycache__/
 models/
+datasets/
 error_dumps/
 runs/
 figures/
@@ -12,4 +13,3 @@ images/
 extensions/*/build/
 extensions/*/dist/
 extensions/*/*.egg-info/
-
