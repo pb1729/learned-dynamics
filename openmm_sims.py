@@ -111,7 +111,7 @@ class OpenMMConfig:
   def _pdb_to_sim(self, pdb):
     modeller = hydrogenate_and_solvate(pdb, self.ff, self.boxsz)
     metadata = self._get_sys_metadata(modeller)
-    integrator = openmm.LangevinMiddleIntegrator(self.temp*kelvin, 1/PICOSEC, 0.001*PICOSEC)
+    integrator = openmm.LangevinMiddleIntegrator(self.temp*kelvin, 1/PICOSEC, 0.002*PICOSEC)
     system = self.ff.createSystem(modeller.topology, nonbondedMethod=PME)
     simulation = Simulation(modeller.topology, system, integrator)
     simulation.context.setPositions(modeller.positions)

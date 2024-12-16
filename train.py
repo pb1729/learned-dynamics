@@ -4,6 +4,7 @@ from queue import Queue, Empty
 import os
 
 import torch
+from openmm import OpenMMException
 
 from run_visualization import TensorBoard
 from config import Config, load, save, makenew
@@ -25,6 +26,10 @@ def dataset_gen(config):
         print("Got an error while generating training data...")
         print(e)
         raise e
+      except OpenMMException as e:
+        print("Got an OpenMM error while generating training data...")
+        print(e)
+        print("We will try ignoring and continuing...")
       else:
         data_queue.put(trajs)
       try:
