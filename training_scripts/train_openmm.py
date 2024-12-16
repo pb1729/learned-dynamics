@@ -7,9 +7,9 @@ from config import Config
 from train import training_run
 
 
-SIMTYPE = "A_t6000_L40_m30_M45"
+SIMTYPE = "A_t9900_L40_m20_M45"
 ARCH = "wgan_3d_newblock9_res"
-RUN_ID = "T1"
+RUN_ID = "T2"
 
 NSTEPS_LIST = [512*i for i in range(1, 33)]
 

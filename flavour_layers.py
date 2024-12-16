@@ -49,6 +49,9 @@ class SingleResidueDecode(nn.Module):
     super().__init__()
     self.natom = natom
     self.lin = VecLinear(vdim, natom)
+  def init_to_zeros(self):
+    with torch.no_grad():
+      self.lin.W.zero_()
   def forward(self, pos_ca:torch.Tensor, x_v:torch.Tensor):
     """ pos_ca: (batch, 3)
         x_v: (batch, vdim, 3)
@@ -62,6 +65,9 @@ class ResiduesDecode(nn.Module):
       letter: SingleResidueDecode(get_residue_len(letter), vdim)
       for letter in letter_code
     })
+  def init_to_zeros(self):
+    for res in self.res_dec:
+      self.res_dec[res].init_to_zeros()
   def forward(self, pos_ca:torch.Tensor, x_v:torch.Tensor, metadata:OpenMMMetadata):
     """ pos_ca: (batch, residues, 3)
         x_v: (batch, residues, vdim, 3)

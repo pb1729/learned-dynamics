@@ -32,7 +32,7 @@ class PosEmbed(nn.Module):
   def forward(self, pos_0, pos_1, pos_2):
     """ pos_0, pos_1, pos_2: (batch, nodes, 3) """
     pos_0, pos_1, pos_2 = pos_0[:, :, None], pos_1[:, :, None], pos_2[:, :, None]
-    dpos_v = torch.cat([
+    dpos_v = 0.3*torch.cat([
       pos_1 - pos_0,
       pos_2 - pos_1,
       pos_0 - pos_2], dim=2)
@@ -165,7 +165,7 @@ class SubBlock(nn.Module):
     # linear mix
     x_a, x_v, x_d = self.linear_mix(x_a, x_v, x_d)
     # tensor products
-    Δx_a, Δx_v, Δx_d = self.tens_prods(x_a, x_v, x_d)
+    Δx_a, Δx_v, Δx_d = self.tens_prods(0.3*x_a, 0.3*x_v, 0.3*x_d) # scale down to prevent from blowing up
     x_a, x_v, x_d = x_a + self.gn_a(Δx_a), x_v + self.gn_v(Δx_v), x_d + self.gn_d(Δx_d)
     # multilayer perceptrons
     return (
@@ -347,6 +347,8 @@ class Generator(nn.Module):
       Block(z_scale, config, randgen)
       for z_scale in config["z_scale"]
     ])
+  def self_init(self):
+    self.decode_2.init_to_zeros()
   def forward(self, pos_0, box, metadata):
     device = pos_0.device
     pos_0, x_v_0 = self.encode_0(pos_0, metadata)
