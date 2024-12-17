@@ -4,6 +4,7 @@ from os import listdir, path
 import pickle
 import numpy as np
 import torch
+import random
 
 from predictor import State, Predictor, ModelState
 
@@ -73,6 +74,7 @@ class DatasetPredictor(Predictor):
     self._box = params["box"]
     self._shape = params["shape"]
     self.file_list = [fnm for fnm in listdir(dataset_dir) if fnm[-4:] == ".bin"]
+    random.shuffle(self.file_list)
     self.file_index = 0
   def get_box(self):
     return self._box

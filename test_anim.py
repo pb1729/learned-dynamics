@@ -58,7 +58,13 @@ def main(args):
     if box is not None:
       x = (x + 0.5*box) % box - 0.5*box
     return x[0]
-  state = predictor.sample_q(1)
+  if args.override is not None:
+    override_predictor = get_predictor(args.override)
+    override_state = override_predictor.sample_q(1)
+    # actual state will be a ModelState (overrides only supported if main predictor is a ModelPredictor)
+    state = override_predictor.predict(1, override_state)[0]
+  else:
+    state = predictor.sample_q(1)
   if args.startlinear:
     make_linear(state)
   atomic_nums = state.metadata.atomic_nums if state.metadata is not None else 5*np.ones(poly_len(predictor), dtype=int)
@@ -83,4 +89,5 @@ if __name__ == "__main__":
   parser.add_argument("--center", dest="center", action="store_true")
   parser.add_argument("--wrap", dest="wrap", action="store_true")
   parser.add_argument("--startlinear", dest="startlinear", action="store_true")
+  parser.add_argument("--override", dest="override", type=str, default=None)
   main(parser.parse_args())
