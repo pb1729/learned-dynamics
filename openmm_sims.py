@@ -1,6 +1,5 @@
 import io
 import random
-from collections import namedtuple
 from typing_extensions import List, Tuple, Callable
 import warnings
 
@@ -20,7 +19,7 @@ sys.path.append(path.join(path.dirname(path.abspath(__file__)), "seq2pdbchain"))
 from amino_data import letter_code, structures
 from seq2pdbchain import pdb_chain
 
-from sims import SimsDict
+from sim_utils import RegexDict, OpenMMMetadata
 
 
 # constants
@@ -64,9 +63,6 @@ def hydrogenate_and_solvate(pdb:PDBFile, ff:ForceField, boxsz:float):
   modeller.addHydrogens(ff)
   modeller.addSolvent(ff, boxSize=Vec3(boxsz, boxsz, boxsz)*angstrom)
   return modeller
-
-
-OpenMMMetadata = namedtuple("OpenMMMetadata", ["seq", "atomic_nums", "atom_indices", "residue_indices"])
 
 
 def get_get_random_seq(lmin:int, lmax:int):
@@ -146,7 +142,7 @@ class OpenMMConfig:
     return metadata, sims, reporters
 
 
-openmm_sims = SimsDict(
+openmm_sims = RegexDict(
   # A_ sims have T at 300K. example: A_t6000_L40_m20_M60
   ("A_t%d_L%d_m%d_M%d", lambda t, L, m, M: OpenMMConfig(t, float(L), 300., get_get_random_seq(m, M))),
   ("SEQ_t%d_L%d_seq%Q", lambda t, L, seq: OpenMMConfig(t, float(L), 300., lambda: seq))

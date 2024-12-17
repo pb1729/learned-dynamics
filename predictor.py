@@ -3,8 +3,8 @@ import numpy as np
 from typing_extensions import Self, List
 
 from utils import prod, batched_model_eval
-from hoomd_sims import HoomdSim
-from openmm_sims import OpenMMConfig, OpenMMMetadata, XReporter
+from sim_utils import OpenMMMetadata
+from sims import sims
 
 
 EVAL_BATCHSZ = 1024
@@ -124,6 +124,8 @@ class SimPredictor(Predictor):
   def sample_q(self, batch):
     x, v = self.sim.sample_equilibrium(batch, self.t_eql)
     return SimState(self.sim.shape, x, v)
+def get_sim_predictor(key):
+  return SimPredictor(sims[key])
 
 
 class ModelState(State):
@@ -179,91 +181,109 @@ class ModelPredictor(Predictor):
 
 
 
-class HoomdState(State):
-  def __init__(self, shape, simulations):
-    self.simulations = simulations
-    super().__init__((len(simulations),), shape)
-  @staticmethod
-  def sim2pos(simulation):
-    snapshot = simulation.state.get_snapshot()
-    return snapshot.particles.position + np.array(snapshot.configuration.box[:3])*snapshot.particles.image
-  @property
-  def x(self) -> torch.Tensor:
-    return torch.tensor(self.x_npy, dtype=torch.float32, device="cuda")
-  @property
-  def x_npy(self) -> np.ndarray:
-    return np.array([self.sim2pos(sim) for sim in self.simulations])
-  def __getitem__(self, key):
-    return HoomdState(self.shape, self.simulations[key])
-  def to_model_predictor_state(self):
-    return ModelState(self.shape, self.x)
-class HoomdPredictor(Predictor):
-  def __init__(self, hoomd_sim:HoomdSim):
-    self.hoomd_sim = hoomd_sim
-  def shape(self):
-    return (self.hoomd_sim.n_particles, 3)
-  def sample_q(self, batch) -> State:
-    return HoomdState(self.shape(), [self.hoomd_sim.sample_q() for _ in range(batch)])
-  def predict(self, L, state, ret=True):
-    """ MUTATES state """
-    if ret:
-      assert len(state.size) == 1, "multi-dimensional HoomdState's not supported"
-      trajectory = torch.zeros(L, *state.size, *state.shape, dtype=torch.float32, device="cuda")
-    for i, sim in enumerate(state.simulations):
-      for j in range(L): # probably slightly faster/more cache friendly to make this the inside loop
-        self.hoomd_sim.step(sim)
-        if ret:
-          trajectory[j, i] = torch.tensor(state.sim2pos(sim), device="cuda")
-    if ret:
-      return ModelState(state.shape, trajectory)
-  def get_box(self):
-    return torch.tensor(self.hoomd_sim.box, dtype=torch.float32, device="cuda")
+try:
+  from hoomd_sims import HoomdSim, hoomd_sims
+except ModuleNotFoundError:
+  print("Warning: import of hoomd failed, skipping.")
+  def get_hoomd_predictor(key):
+    assert False, "hoomd failed to import, so construction of predictor is impossible"
+else:
+  class HoomdState(State):
+    def __init__(self, shape, simulations):
+      self.simulations = simulations
+      super().__init__((len(simulations),), shape)
+    @staticmethod
+    def sim2pos(simulation):
+      snapshot = simulation.state.get_snapshot()
+      return snapshot.particles.position + np.array(snapshot.configuration.box[:3])*snapshot.particles.image
+    @property
+    def x(self) -> torch.Tensor:
+      return torch.tensor(self.x_npy, dtype=torch.float32, device="cuda")
+    @property
+    def x_npy(self) -> np.ndarray:
+      return np.array([self.sim2pos(sim) for sim in self.simulations])
+    def __getitem__(self, key):
+      return HoomdState(self.shape, self.simulations[key])
+    def to_model_predictor_state(self):
+      return ModelState(self.shape, self.x)
+  class HoomdPredictor(Predictor):
+    def __init__(self, hoomd_sim:HoomdSim):
+      self.hoomd_sim = hoomd_sim
+    def shape(self):
+      return (self.hoomd_sim.n_particles, 3)
+    def sample_q(self, batch) -> State:
+      return HoomdState(self.shape(), [self.hoomd_sim.sample_q() for _ in range(batch)])
+    def predict(self, L, state, ret=True):
+      """ MUTATES state """
+      if ret:
+        assert len(state.size) == 1, "multi-dimensional HoomdState's not supported"
+        trajectory = torch.zeros(L, *state.size, *state.shape, dtype=torch.float32, device="cuda")
+      for i, sim in enumerate(state.simulations):
+        for j in range(L): # probably slightly faster/more cache friendly to make this the inside loop
+          self.hoomd_sim.step(sim)
+          if ret:
+            trajectory[j, i] = torch.tensor(state.sim2pos(sim), device="cuda")
+      if ret:
+        return ModelState(state.shape, trajectory)
+    def get_box(self):
+      return torch.tensor(self.hoomd_sim.box, dtype=torch.float32, device="cuda")
+  def get_hoomd_predictor(key):
+    return HoomdPredictor(hoomd_sims[key])
 
 
-class OpenMMState(State):
-  def __init__(self, metadata:OpenMMMetadata, sims:List, reporters:List[XReporter]):
-    self._metadata = metadata
-    self.sims = sims
-    self.reporters = reporters
-    size = (len(sims),)
-    shape = (metadata.atomic_nums.shape[0], 3)
-    super().__init__(size, shape)
-  @property
-  def x(self) -> torch.Tensor:
-    return torch.tensor(self.x_npy, dtype=torch.float32, device="cuda")
-  @property
-  def x_npy(self) -> np.ndarray:
-    return np.array([self.reporter_x(reporter) for reporter in self.reporters])
-  def reporter_x(self, reporter) -> np.ndarray:
-    x = reporter.x
-    assert x is not None, "trying to read uninitialized reporter"
-    return x[self._metadata.atom_indices]
-  def __getitem__(self, key) -> Self:
-    return OpenMMState(self._metadata, self.sims[key], self.reporters[key])
-  def to_model_predictor_state(self):
-    return ModelState(self.shape, self.x, metadata=self._metadata)
-  @property
-  def metadata(self) -> OpenMMMetadata | None:
-    return self._metadata
-class OpenMMPredictor(Predictor):
-  def __init__(self, openmm_config:OpenMMConfig):
-    self.openmm_config = openmm_config
-  def shape(self):
-    return (-1, 3) # number of atoms can vary
-  def sample_q(self, batch) -> State:
-    metadata, sims, reporters = self.openmm_config.sample_q(batch)
-    return OpenMMState(metadata, sims, reporters)
-  def predict(self, L, state, ret=True):
-    """ MUTATES state """
-    if ret:
-      trajectory = torch.zeros(L, *state.size, *state.shape, dtype=torch.float32, device="cuda")
-    for i, sim in enumerate(state.sims):
-      for j in range(L):
-        sim.step(self.openmm_config.dt)
-        if ret:
-          trajectory[j, i] = torch.tensor(state.reporter_x(state.reporters[i]), dtype=torch.float32, device="cuda")
-    if ret:
-      return ModelState(state.shape, trajectory, metadata=state.metadata)
-  def get_box(self):
-    boxsz = self.openmm_config.boxsz
-    return torch.tensor((boxsz, boxsz, boxsz), device="cuda")
+try:
+  from openmm_sims import OpenMMConfig, OpenMMMetadata, XReporter, openmm_sims
+except ModuleNotFoundError:
+  print("Warning: import of openmm failed, skipping.")
+  def get_openmm_predictor(key):
+    assert False, "openmm failed to import, so construction of predictor is impossible"
+else:
+  class OpenMMState(State):
+    def __init__(self, metadata:OpenMMMetadata, sims:List, reporters:List[XReporter]):
+      self._metadata = metadata
+      self.sims = sims
+      self.reporters = reporters
+      size = (len(sims),)
+      shape = (metadata.atomic_nums.shape[0], 3)
+      super().__init__(size, shape)
+    @property
+    def x(self) -> torch.Tensor:
+      return torch.tensor(self.x_npy, dtype=torch.float32, device="cuda")
+    @property
+    def x_npy(self) -> np.ndarray:
+      return np.array([self.reporter_x(reporter) for reporter in self.reporters])
+    def reporter_x(self, reporter) -> np.ndarray:
+      x = reporter.x
+      assert x is not None, "trying to read uninitialized reporter"
+      return x[self._metadata.atom_indices]
+    def __getitem__(self, key) -> Self:
+      return OpenMMState(self._metadata, self.sims[key], self.reporters[key])
+    def to_model_predictor_state(self):
+      return ModelState(self.shape, self.x, metadata=self._metadata)
+    @property
+    def metadata(self) -> OpenMMMetadata | None:
+      return self._metadata
+  class OpenMMPredictor(Predictor):
+    def __init__(self, openmm_config:OpenMMConfig):
+      self.openmm_config = openmm_config
+    def shape(self):
+      return (-1, 3) # number of atoms can vary
+    def sample_q(self, batch) -> State:
+      metadata, sims, reporters = self.openmm_config.sample_q(batch)
+      return OpenMMState(metadata, sims, reporters)
+    def predict(self, L, state, ret=True):
+      """ MUTATES state """
+      if ret:
+        trajectory = torch.zeros(L, *state.size, *state.shape, dtype=torch.float32, device="cuda")
+      for i, sim in enumerate(state.sims):
+        for j in range(L):
+          sim.step(self.openmm_config.dt)
+          if ret:
+            trajectory[j, i] = torch.tensor(state.reporter_x(state.reporters[i]), dtype=torch.float32, device="cuda")
+      if ret:
+        return ModelState(state.shape, trajectory, metadata=state.metadata)
+    def get_box(self):
+      boxsz = self.openmm_config.boxsz
+      return torch.tensor((boxsz, boxsz, boxsz), device="cuda")
+  def get_openmm_predictor(key):
+    return OpenMMPredictor(openmm_sims[key])

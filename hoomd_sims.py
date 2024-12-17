@@ -4,7 +4,7 @@ import hoomd
 import numpy as np
 import time
 
-from sims import SimsDict
+from sim_utils import RegexDict
 from utils import must_be
 
 
@@ -136,7 +136,7 @@ def integrator_polymer_1_cons(kT, dt=0.002):
   return get_integrator_polymer_1
 
 
-hoomd_sims = SimsDict(
+hoomd_sims = RegexDict(
   ("particles_1_n%d_t%d_L%d", lambda n, t, L10: HoomdSim(
     integrator_particles_1_cons(1.5), particles_1_frame,
     t, n, (0.1*L10, 0.1*L10, 0.1*L10), 1.5

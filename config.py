@@ -1,11 +1,8 @@
 import torch
 import importlib
 
-from sims import sims
-from hoomd_sims import hoomd_sims
-from openmm_sims import openmm_sims
 from statefiles import DatasetPredictor
-from predictor import Predictor, ModelPredictor, SimPredictor, HoomdPredictor, OpenMMPredictor
+from predictor import Predictor, ModelPredictor, get_sim_predictor, get_hoomd_predictor, get_openmm_predictor
 
 
 ARCH_PREFIX = "archs."
@@ -19,11 +16,11 @@ def get_predictor(predictor_spec):
   else:
     pred_type, rest = "sim", predictor_spec
   if "sim" == pred_type:
-    ans = SimPredictor(sims[rest])
+    ans = get_sim_predictor(rest)
   elif "hoomd" == pred_type:
-    ans = HoomdPredictor(hoomd_sims[rest])
+    ans = get_hoomd_predictor(rest)
   elif "openmm" == pred_type:
-    ans = OpenMMPredictor(openmm_sims[rest])
+    ans = get_openmm_predictor(rest)
   elif "dataset" == pred_type:
     ans = DatasetPredictor(rest)
   elif "model" == pred_type: # treat "rest" as a path
