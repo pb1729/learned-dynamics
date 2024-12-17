@@ -4,6 +4,7 @@ import importlib
 from sims import sims
 from hoomd_sims import hoomd_sims
 from openmm_sims import openmm_sims
+from statefiles import DatasetPredictor
 from predictor import Predictor, ModelPredictor, SimPredictor, HoomdPredictor, OpenMMPredictor
 
 
@@ -23,6 +24,8 @@ def get_predictor(predictor_spec):
     ans = HoomdPredictor(hoomd_sims[rest])
   elif "openmm" == pred_type:
     ans = OpenMMPredictor(openmm_sims[rest])
+  elif "dataset" == pred_type:
+    ans = DatasetPredictor(rest)
   elif "model" == pred_type: # treat "rest" as a path
     ans = ModelPredictor(load(rest))
   else: assert False, "unknown predictor type"

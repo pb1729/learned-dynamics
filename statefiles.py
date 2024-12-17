@@ -1,11 +1,11 @@
 from io import BufferedReader, BufferedWriter, BytesIO
 from struct import pack, unpack
+from os import listdir, path
 import pickle
 import numpy as np
 import torch
 
-from predictor import ModelState
-from config import get_predictor
+from predictor import State, Predictor, ModelState
 
 
 def save_state_to_file(file:BufferedWriter, state:ModelState):
@@ -36,10 +36,59 @@ def read_state_from_file(file:BufferedReader):
   x_npy = np.load(BytesIO(subfiles[2]), allow_pickle=False)
   return ModelState(shape, torch.tensor(x_npy, device="cuda"), metadata=metadata)
 
-if __name__ == "__main__":
-  predictor = get_predictor("openmm:SEQ_t10_L20_seqAAAA")
-  state = predictor.sample_q(1)
-  buffer = BytesIO()
-  save_state_to_file(buffer, predictor.predict(3, state))
-  buffer.seek(0) # reset position as though we were just reopening the file now
-  read_state_from_file(buffer)
+def save_predictor_params_to_file(file:BufferedWriter, predictor):
+  box = predictor.get_box()
+  if box is not None:
+    box = tuple(box.cpu().numpy())
+  pickle.dump({
+    "box": box,
+    "shape": predictor.shape()
+  }, file)
+
+def read_predictor_params_from_file(file:BufferedReader):
+  metadata = pickle.load(file)
+  metadata["box"] = torch.tensor(metadata["box"], device="cuda")
+  return metadata
+
+
+class DatasetState(State):
+  def __init__(self, fnm):
+    with open(fnm, "rb") as f:
+      self.traj = read_state_from_file(f)
+    self.L, *self._size = self.traj.size
+    self._shape = self.traj.shape
+    self.t = 0
+  @property
+  def x(self) -> torch.Tensor:
+    return self.traj[self.t].x
+  @property
+  def metadata(self):
+    return self.traj.metadata
+
+class DatasetPredictor(Predictor):
+  def __init__(self, dataset_dir):
+    self.dataset_dir = dataset_dir
+    with open(path.join(dataset_dir, "predictor_params.pickle"), "rb") as f:
+      params = read_predictor_params_from_file(f)
+    self._box = params["box"]
+    self._shape = params["shape"]
+    self.file_list = [fnm for fnm in listdir(dataset_dir) if fnm[-4:] == ".bin"]
+    self.file_index = 0
+  def get_box(self):
+    return self._box
+  def shape(self):
+    return self._shape
+  def sample_q(self, batch):
+    assert self.file_index < len(self.file_list), "out of files in dataset!"
+    ans = DatasetState(path.join(self.dataset_dir, self.file_list[self.file_index]))
+    self.file_index += 1
+    saved_batch, = ans.size
+    assert batch == saved_batch, f"requested batch {batch} should match saved batch {saved_batch}"
+    return ans
+  def predict(self, L, state, ret=True):
+    assert isinstance(state, DatasetState), "DatasetPredictor can only handle DatasetState's"
+    assert L < state.L - state.t, f"DatasetPredictor tried to predict {L} steps, but only {state.L - state.t - 1} data remains"
+    t_old = state.t
+    state.t += L
+    if ret:
+      return state.traj[t_old + 1:state.t + 1]

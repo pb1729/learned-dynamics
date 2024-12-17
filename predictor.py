@@ -58,9 +58,6 @@ class State:
     assert prod(newsize) == prod(self.size), f"can't reshape {self.size} to {newsize}"
     return tens.reshape(*(newsize + self.size))
   @property
-  def atomic_nums(self) -> np.ndarray|None:
-    return None
-  @property
   def metadata(self) -> OpenMMMetadata|None:
     return None
 class Predictor:
@@ -148,10 +145,6 @@ class ModelState(State):
     return ModelState(self.shape, self._reshape_tens(self._x, newsize), **self.kwargs)
   def to_model_predictor_state(self):
     return ModelState(self.shape, self._x.clone(), **self.kwargs)
-  @property
-  def atomic_nums(self) -> np.ndarray|None:
-    if self.metadata is None: return None
-    return self.metadata.atomic_nums
   @property
   def metadata(self):
     if "metadata" in self.kwargs:
@@ -245,9 +238,6 @@ class OpenMMState(State):
     x = reporter.x
     assert x is not None, "trying to read uninitialized reporter"
     return x[self._metadata.atom_indices]
-  @property
-  def atomic_nums(self) -> np.ndarray:
-    return self._metadata.atomic_nums
   def __getitem__(self, key) -> Self:
     return OpenMMState(self._metadata, self.sims[key], self.reporters[key])
   def to_model_predictor_state(self):

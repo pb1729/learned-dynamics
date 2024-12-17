@@ -2,11 +2,14 @@ import argparse
 from os import path
 
 from config import get_predictor
-from statefiles import save_state_to_file
+from statefiles import save_state_to_file, save_predictor_params_to_file
 
 
 def main(args):
   predictor = get_predictor(args.predictor)
+  if args.sequence_num == 0: # saving predictor metadata need only be done once
+    with open(path.join(args.folder, "predictor_params.pickle"), "wb") as f:
+      save_predictor_params_to_file(f, predictor)
   for i in range(args.loop):
     state = predictor.sample_q(args.batch)
     for j in range(args.chunks):

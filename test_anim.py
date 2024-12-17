@@ -61,7 +61,7 @@ def main(args):
   state = predictor.sample_q(1)
   if args.startlinear:
     make_linear(state)
-  atomic_nums = state.atomic_nums if state.atomic_nums is not None else 5*np.ones(poly_len(predictor), dtype=int)
+  atomic_nums = state.metadata.atomic_nums if state.metadata is not None else 5*np.ones(poly_len(predictor), dtype=int)
   display = launch_atom_display(atomic_nums, clean_for_display(state.x_npy))
   while True:
     predictor.predict(1, state, ret=False)
