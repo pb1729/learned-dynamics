@@ -1,5 +1,4 @@
 #include <cuda_runtime.h>
-#include <curand_kernel.h>
 #include <device_atomic_functions.h>
 #include <stdio.h>
 #include <vector_functions.h>

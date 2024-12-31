@@ -14,6 +14,8 @@ class RegexDict:
     """ constructors is a list of (regex, constructor_fn) tuples """
     self.cache = {}
     self.constructors = constructors
+  def add_constructor(self, pattern, constructor):
+    self.constructors.append((pattern, constructor))
   def _decode(self, match_group):
     try:
       return int(match_group)

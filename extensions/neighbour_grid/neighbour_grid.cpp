@@ -65,6 +65,11 @@ std::tuple<torch::Tensor, torch::Tensor> get_neighbours(
     // 8 * listmax is a decent choice for redundancy
     CHECK_INPUT(x);
 
+    // run kernel on same device as input tensors
+    at::Device device = x.device();
+    cudaSetDevice(device.index());
+    
+    // dimension checks:
     TORCH_CHECK(x.dim() == 3 && x.size(2) == 3, "x must have shape (batch, nodes, 3)");
     int batch = x.size(0);
     int nodes = x.size(1);
@@ -78,8 +83,8 @@ std::tuple<torch::Tensor, torch::Tensor> get_neighbours(
 
     float3* x_ptr = reinterpret_cast<float3*>(x.data_ptr<float>());
 
-    auto neighbourLists = torch::empty({batch, nodes, neighboursmax}, torch::dtype(torch::kInt32).device(torch::kCUDA));
-    auto neighbourCounts = torch::empty({batch, nodes}, torch::dtype(torch::kInt32).device(torch::kCUDA));
+    auto neighbourLists = torch::empty({batch, nodes, neighboursmax}, torch::dtype(torch::kInt32).device(device));
+    auto neighbourCounts = torch::empty({batch, nodes}, torch::dtype(torch::kInt32).device(device));
 
     createNeighbourLists(
         x_ptr,
@@ -102,6 +107,11 @@ torch::Tensor edges_read(torch::Tensor neighbourCounts, torch::Tensor neighbours
     CHECK_INPUT(neighbours);
     CHECK_INPUT(x);
 
+    // run kernel on same device as input tensors
+    at::Device device = neighbourCounts.device();
+    cudaSetDevice(device.index());
+
+    // dimension checks:
     TORCH_CHECK(neighbourCounts.dim() == 2, "neighbourCounts must have shape (batch, nodes)");
     TORCH_CHECK(neighbours.dim() == 3, "neighbourCounts must have shape (batch, nodes, neighboursmax)");
     TORCH_CHECK(x.dim() == 3, "x must have shape (batch, nodes, chan)");
@@ -112,7 +122,7 @@ torch::Tensor edges_read(torch::Tensor neighbourCounts, torch::Tensor neighbours
     int neighboursmax = neighbours.size(2);
     int chan = x.size(2);
 
-    auto edgeData = torch::empty({batch, nodes, neighboursmax, chan}, torch::dtype(torch::kFloat32).device(torch::kCUDA));
+    auto edgeData = torch::empty({batch, nodes, neighboursmax, chan}, torch::dtype(torch::kFloat32).device(device));
 
     fillEdgeData(
         reinterpret_cast<int*>(neighbours.data_ptr<int>()),
@@ -129,6 +139,11 @@ torch::Tensor edges_reduce(torch::Tensor neighbourCounts, torch::Tensor neighbou
     CHECK_INPUT(neighbours);
     CHECK_INPUT(x);
 
+    // run kernel on same device as input tensors
+    at::Device device = neighbours.device();
+    cudaSetDevice(device.index());
+
+    // dimension checks:
     TORCH_CHECK(neighbourCounts.dim() == 2, "neighbourCounts must have shape (batch, nodes)");
     TORCH_CHECK(neighbours.dim() == 3, "neighbours must have shape (batch, nodes, neighboursmax)");
     TORCH_CHECK(x.dim() == 4, "x must have shape (batch, nodes, neighboursmax, chan)");
@@ -140,7 +155,7 @@ torch::Tensor edges_reduce(torch::Tensor neighbourCounts, torch::Tensor neighbou
     TORCH_CHECK(neighboursmax == x.size(2), "neighboursmax dimension must match between neighbours and x");
     int chan = x.size(3);
 
-    auto reducedData = torch::empty({batch, nodes, chan}, torch::dtype(torch::kFloat32).device(torch::kCUDA));
+    auto reducedData = torch::empty({batch, nodes, chan}, torch::dtype(torch::kFloat32).device(device));
 
     reduceEdgeData(
         reinterpret_cast<int*>(neighbours.data_ptr<int>()),
@@ -164,8 +179,9 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> get_edges(
     int N     = neighbourCounts.size(1);
     torch::Tensor cumCounts = neighbourCounts.cumsum(1, torch::kInt32); // must specify dtype to avoid autoconv to int64 for some reason
     torch::Tensor edgeCounts = cumCounts.index({torch::indexing::Slice(), -1}).cumsum(0, torch::kInt32);
-    torch::Tensor src = torch::empty({edgeCounts.index({-1}).item<int>()}, torch::dtype(torch::kInt32).device(torch::kCUDA));
-    torch::Tensor dst = torch::empty({edgeCounts.index({-1}).item<int>()}, torch::dtype(torch::kInt32).device(torch::kCUDA));
+    at::Device device = edgeCounts.device();
+    torch::Tensor src = torch::empty({edgeCounts.index({-1}).item<int>()}, torch::dtype(torch::kInt32).device(device));
+    torch::Tensor dst = torch::empty({edgeCounts.index({-1}).item<int>()}, torch::dtype(torch::kInt32).device(device));
     // use kernel to copy the data...
     writeSrcDst(
         reinterpret_cast<int*>(neighbours.data_ptr<int>()),

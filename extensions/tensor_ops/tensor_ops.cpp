@@ -30,6 +30,10 @@ void tensorLinearBackward(
 torch::Tensor tensor_linear(int inds, torch::Tensor W, torch::Tensor x) {
     CHECK_INPUT(W);
     CHECK_INPUT(x);
+    // run kernel on same device as input tensors
+    at::Device device = W.device();
+    cudaSetDevice(device.index());
+    // dimension checks:
     TORCH_CHECK(W.dim() == 2, "expected W to be a matrix (2 dims)");
     int dim_out = W.size(0);
     int dim_in  = W.size(1);
@@ -38,7 +42,7 @@ torch::Tensor tensor_linear(int inds, torch::Tensor W, torch::Tensor x) {
     int passed_dim_inds = x.size(2);
     if (inds == 0) { // TODO: should we fall back to a regular torch linear here?
         TORCH_CHECK(passed_dim_inds == 1, "last dim of x should be 3^inds");
-        torch::Tensor ans = torch::empty({batch, dim_out, 1}, torch::dtype(torch::kFloat32).device(torch::kCUDA));
+        torch::Tensor ans = torch::empty({batch, dim_out, 1}, torch::dtype(torch::kFloat32).device(device));
         tensorLinear<1>(
             reinterpret_cast<float*>(W.data_ptr<float>()),
             reinterpret_cast<float*>(x.data_ptr<float>()),
@@ -48,7 +52,7 @@ torch::Tensor tensor_linear(int inds, torch::Tensor W, torch::Tensor x) {
     }
     if (inds == 1) {
         TORCH_CHECK(passed_dim_inds == 3, "last dim of x should be 3^inds");
-        torch::Tensor ans = torch::empty({batch, dim_out, 3}, torch::dtype(torch::kFloat32).device(torch::kCUDA));
+        torch::Tensor ans = torch::empty({batch, dim_out, 3}, torch::dtype(torch::kFloat32).device(device));
         tensorLinear<3>(
             reinterpret_cast<float*>(W.data_ptr<float>()),
             reinterpret_cast<float*>(x.data_ptr<float>()),
@@ -58,7 +62,7 @@ torch::Tensor tensor_linear(int inds, torch::Tensor W, torch::Tensor x) {
     }
     if (inds == 2) {
         TORCH_CHECK(passed_dim_inds == 9, "last dim of x should be 3^inds");
-        torch::Tensor ans = torch::empty({batch, dim_out, 9}, torch::dtype(torch::kFloat32).device(torch::kCUDA));
+        torch::Tensor ans = torch::empty({batch, dim_out, 9}, torch::dtype(torch::kFloat32).device(device));
         tensorLinear<9>(
             reinterpret_cast<float*>(W.data_ptr<float>()),
             reinterpret_cast<float*>(x.data_ptr<float>()),
@@ -74,6 +78,10 @@ torch::Tensor tensor_linear(int inds, torch::Tensor W, torch::Tensor x) {
 torch::Tensor tensor_linear_backward(int inds, torch::Tensor x, torch::Tensor dout) {
     CHECK_INPUT(x);
     CHECK_INPUT(dout);
+    // run kernel on same device as input tensors
+    at::Device device = x.device();
+    cudaSetDevice(device.index());
+    // dimension checks:
     TORCH_CHECK(x.dim() == 3, "expected x to have shape (batch, dim_in, inds_dim)");
     int batch = x.size(0);
     int dim_in = x.size(1);
@@ -82,7 +90,7 @@ torch::Tensor tensor_linear_backward(int inds, torch::Tensor x, torch::Tensor do
     int dim_out  = dout.size(1);
     if (inds == 0) { // TODO: should we fall back to a regular torch linear here?
         TORCH_CHECK(passed_dim_inds == 1, "last dim of x should be 3^inds");
-        torch::Tensor dW = torch::empty({dim_out, dim_in}, torch::dtype(torch::kFloat32).device(torch::kCUDA));
+        torch::Tensor dW = torch::empty({dim_out, dim_in}, torch::dtype(torch::kFloat32).device(device));
         tensorLinearBackward<1>(
             reinterpret_cast<float*>(x.data_ptr<float>()),
             reinterpret_cast<float*>(dout.data_ptr<float>()),
@@ -92,7 +100,7 @@ torch::Tensor tensor_linear_backward(int inds, torch::Tensor x, torch::Tensor do
     }
     if (inds == 1) { // TODO: should we fall back to a regular torch linear here?
         TORCH_CHECK(passed_dim_inds == 3, "last dim of x should be 3^inds");
-        torch::Tensor dW = torch::empty({dim_out, dim_in}, torch::dtype(torch::kFloat32).device(torch::kCUDA));
+        torch::Tensor dW = torch::empty({dim_out, dim_in}, torch::dtype(torch::kFloat32).device(device));
         tensorLinearBackward<3>(
             reinterpret_cast<float*>(x.data_ptr<float>()),
             reinterpret_cast<float*>(dout.data_ptr<float>()),
@@ -102,7 +110,7 @@ torch::Tensor tensor_linear_backward(int inds, torch::Tensor x, torch::Tensor do
     }
     if (inds == 2) { // TODO: should we fall back to a regular torch linear here?
         TORCH_CHECK(passed_dim_inds == 9, "last dim of x should be 3^inds");
-        torch::Tensor dW = torch::empty({dim_out, dim_in}, torch::dtype(torch::kFloat32).device(torch::kCUDA));
+        torch::Tensor dW = torch::empty({dim_out, dim_in}, torch::dtype(torch::kFloat32).device(device));
         tensorLinearBackward<9>(
             reinterpret_cast<float*>(x.data_ptr<float>()),
             reinterpret_cast<float*>(dout.data_ptr<float>()),

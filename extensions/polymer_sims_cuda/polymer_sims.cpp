@@ -18,6 +18,10 @@ void polymer_sim(SimId sim_id, torch::Tensor x, torch::Tensor v, torch::Tensor d
     CHECK_INPUT(x);
     CHECK_INPUT(v);
     CHECK_INPUT(drag);
+    
+    // run kernel on same device as input tensors
+    at::Device device = x.device();
+    cudaSetDevice(device.index());
 
     TORCH_CHECK(x.dim() == 3 && v.dim() == 3 && drag.dim() == 1, "Input tensors must have correct dimensions");
     TORCH_CHECK(x.size(0) == v.size(0), "Batch sizes must match");

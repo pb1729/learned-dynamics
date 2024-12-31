@@ -1,7 +1,5 @@
 import torch
 
-from polymer_sims_cuda import polymer_sim, SimId
-
 from utils import must_be
 from sim_utils import RegexDict
 
@@ -90,57 +88,6 @@ class TrajectorySim:
         vvel_lng_batch(x, v, self.acc_fn, self.drag, self.T, self.dt, self.t_res)
         return x, v
 
-
-class CUDASim:
-  def __init__(self, sim_id, drag, T, l, delta_t, t_res, metadata=None):
-    self.sim_id = sim_id
-    self.drag = drag.to("cuda")
-    self.T = T
-    self.l = l
-    self.delta_t = delta_t
-    self.t_res = t_res
-    self.dt = delta_t/t_res
-    self.shape = (l, 3)
-    if metadata is not None:
-      for key in metadata:
-        setattr(self, key, metadata[key])
-  def _integrate(self, x, v, drag, T, steps):
-    polymer_sim(self.sim_id, x, v, drag, T, self.dt, steps)
-  def generate_trajectory(self, x, v, time, ret=True):
-    """ generate trajectory from initial conditions x, v
-        WARNING: initial condition tensors *will* be overwritten
-        we construct and return the trajectory if ret is True.
-        x: (batch, self.dim)
-        v: (batch, self.dim)
-        ans: (batch, time, self.dim) """
-    batch,          must_be[self.l], must_be[3] = x.shape
-    must_be[batch], must_be[self.l], must_be[3] = v.shape
-    if ret:
-      ans = torch.zeros((batch, time, *self.shape), device="cuda")
-    for i in range(time):
-      self._integrate(x, v, self.drag, self.T, self.t_res)
-      if ret: ans[:, i] = x
-    if ret:
-      return ans
-  def sample_equilibrium(self, batch, iterations, t_noise=None, t_ballistic=None,
-            drag_const=20.): # TODO: come up with a better way to pick the drag constant?
-    """ Do our best to sample from the equilibrium distribution by alternately setting drag to be high/zero. """
-    if t_noise is None:
-      t_noise = self.delta_t
-    if t_ballistic is None:
-      t_ballistic = self.delta_t
-    high_drag = self.drag + drag_const
-    zero_drag = torch.zeros_like(self.drag)
-    # start from 0:
-    x = torch.randn(batch, *self.shape, device="cuda") # spread out the particles initially for numerical stability
-    v = torch.zeros(batch, *self.shape, device="cuda")
-    # do several iterations:
-    for i in range(iterations):
-      self._integrate(x, v, high_drag, self.T, int(t_noise/self.dt))
-      self._integrate(x, v, zero_drag, self.T, int(t_ballistic/self.dt))
-    # then cooldown with the regular amount of drag for a bit:
-    self._integrate(x, v, self.drag, self.T, self.t_res)
-    return x, v
 
 
 def get_polymer_a(k, n, dim=3):
@@ -276,15 +223,75 @@ sims = RegexDict(
     float(t), 32*t,
     metadata={"poly_len": l, "space_dim": 3, "k": 1.0}
   )),
-  ("repel5_l%d_t%d", lambda l, t: CUDASim(SimId.REPEL5,
+)
+
+
+try:
+  from polymer_sims_cuda import polymer_sim, SimId
+except ModuleNotFoundError:
+  print("This package's polymer_sims_cuda extension is not installed, skipping.")
+else:
+  class CUDASim:
+    def __init__(self, sim_id, drag, T, l, delta_t, t_res, metadata=None):
+      self.sim_id = sim_id
+      self.drag = drag.to("cuda")
+      self.T = T
+      self.l = l
+      self.delta_t = delta_t
+      self.t_res = t_res
+      self.dt = delta_t/t_res
+      self.shape = (l, 3)
+      if metadata is not None:
+        for key in metadata:
+          setattr(self, key, metadata[key])
+    def _integrate(self, x, v, drag, T, steps):
+      polymer_sim(self.sim_id, x, v, drag, T, self.dt, steps)
+    def generate_trajectory(self, x, v, time, ret=True):
+      """ generate trajectory from initial conditions x, v
+          WARNING: initial condition tensors *will* be overwritten
+          we construct and return the trajectory if ret is True.
+          x: (batch, self.dim)
+          v: (batch, self.dim)
+          ans: (batch, time, self.dim) """
+      batch,          must_be[self.l], must_be[3] = x.shape
+      must_be[batch], must_be[self.l], must_be[3] = v.shape
+      if ret:
+        ans = torch.zeros((batch, time, *self.shape), device="cuda")
+      for i in range(time):
+        self._integrate(x, v, self.drag, self.T, self.t_res)
+        if ret: ans[:, i] = x
+      if ret:
+        return ans
+    def sample_equilibrium(self, batch, iterations, t_noise=None, t_ballistic=None,
+              drag_const=20.): # TODO: come up with a better way to pick the drag constant?
+      """ Do our best to sample from the equilibrium distribution by alternately setting drag to be high/zero. """
+      if t_noise is None:
+        t_noise = self.delta_t
+      if t_ballistic is None:
+        t_ballistic = self.delta_t
+      high_drag = self.drag + drag_const
+      zero_drag = torch.zeros_like(self.drag)
+      # start from 0:
+      x = torch.randn(batch, *self.shape, device="cuda") # spread out the particles initially for numerical stability
+      v = torch.zeros(batch, *self.shape, device="cuda")
+      # do several iterations:
+      for i in range(iterations):
+        self._integrate(x, v, high_drag, self.T, int(t_noise/self.dt))
+        self._integrate(x, v, zero_drag, self.T, int(t_ballistic/self.dt))
+      # then cooldown with the regular amount of drag for a bit:
+      self._integrate(x, v, self.drag, self.T, self.t_res)
+      return x, v
+  sims.add_constructor("repel5_l%d_t%d", lambda l, t: CUDASim(SimId.REPEL5,
     torch.tensor([1.]*l), 1.0, l, float(t), 100*t,
     metadata={"poly_len": l, "space_dim": 3}
-  )),
-  ("repel5a_l%d_t%d", lambda l, t: CUDASim(SimId.REPEL5,
+  ))
+  sims.add_constructor("repel5a_l%d_t%d", lambda l, t: CUDASim(SimId.REPEL5,
     torch.tensor([1.]*l), 1.0, l, float(t), 200*t,
     metadata={"poly_len": l, "space_dim": 3}
-  )),
-)
+  ))
+
+
+
 
 
 # DATASET GENERATION
