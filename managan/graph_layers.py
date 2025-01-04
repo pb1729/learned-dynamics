@@ -3,7 +3,7 @@ from torch_scatter import segment_coo
 
 import neighbour_grid_cuda as neighbour_grid
 
-from utils import must_be
+from .utils import must_be
 
 
 class Graph:

@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-from utils import must_be, batched_xy_moment, batched_xy_moment_dot_3d
+from .utils import must_be, batched_xy_moment, batched_xy_moment_dot_3d
 
 
 # DECORRELATION:
@@ -144,5 +144,3 @@ if __name__ == "__main__":
     c1 = torch.cov(x)
     c2 = batched_cov(x.T, x.T, 10)
     print(abs(c1 - c2).max())
-
-

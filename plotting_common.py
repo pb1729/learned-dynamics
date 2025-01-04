@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colormaps
 
-from polymer_util import rouse
+from managan.polymer_util import rouse
 
 
 # BASIS TRANSFORMS FOR PLOTTING:
@@ -28,7 +28,7 @@ def basis_transform_neighbours2(x):
   _, poly_len, _ = x.shape
   n = np.arange(poly_len)
   return x[:, n] - x[:, (n+2)%poly_len]
-  
+
 def basis_transform_neighbours4(x):
   """ x: (batch, poly_len, space_dim) """
   _, poly_len, _ = x.shape
@@ -141,7 +141,3 @@ class Plotter:
     self.fig = None
     self.axes = None
     self.col_idx = 0
-
-
-
-

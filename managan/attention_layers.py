@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 
-from utils import must_be
-from triton_kernels.proxattn import proxattn
-from triton_kernels.proxattn_periodic import proxattn_periodic
-from layers_common import VecRootS
+from .utils import must_be
+from .triton_kernels.proxattn import proxattn
+from .triton_kernels.proxattn_periodic import proxattn_periodic
+from .layers_common import VecRootS
 
 
 class ProbePoints(nn.Module):

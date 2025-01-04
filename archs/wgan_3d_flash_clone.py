@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from polymer_util import poly_len, space_dim
-from utils import must_be, prod
-from layers_common import *
-from attention_layers import *
-from config import Config
+from managan.polymer_util import poly_len, space_dim
+from managan.utils import must_be, prod
+from managan.layers_common import *
+from managan.attention_layers import *
+from managan.config import Config
 
 
 # Flash attention model that is as similar as possible to wgan_3d_interval_cheap

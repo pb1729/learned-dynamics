@@ -3,9 +3,7 @@ import triton
 import triton.language as tl
 from typing import Any
 
-import sys
-sys.path.append("/home/phillip/projects/torchenv/src/koopman") # TODO: should probably make this project into a package at some point...
-from utils import must_be, avg_relative_diff
+from ..utils import must_be, avg_relative_diff
 
 
 # Q: THIS FILE IS UNUSED, WHY IS IT IN THE REPO?

@@ -4,15 +4,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from polymer_util import poly_len, space_dim
-from utils import must_be, prod
-from layers_common import *
-from config import Config
-from tensor_products import *
-from graph_layers import Graph, edges_read, edges_read_dst, edges_reduce_src, boxwrap
-from grouping import DEFAULT, get_params_for_optim
-from flavour_layers import ResiduesEncode, ResiduesDecode
-from predictor import ModelState
+from managan.polymer_util import poly_len, space_dim
+from managan.utils import must_be, prod
+from managan.layers_common import *
+from managan.config import Config
+from managan.tensor_products import *
+from managan.graph_layers import Graph, edges_read, edges_read_dst, edges_reduce_src, boxwrap
+from managan.grouping import DEFAULT, get_params_for_optim
+from managan.flavour_layers import ResiduesEncode, ResiduesDecode
+from managan.predictor import ModelState
 
 
 def radial_encode_edge(r, n, rmax):

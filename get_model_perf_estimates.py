@@ -3,8 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from test_model import model_list_to_predictor_list, get_contin_states
-from config import load
-from utils import must_be, prod
+from managan.config import load
+from managan.utils import must_be, prod
 
 
 def gaussian_kl_div(x_actual, x_predicted):

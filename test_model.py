@@ -3,9 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from typing_extensions import List
 
-from predictor import Predictor, ModelPredictor
-from utils import must_be
-from config import get_predictor
+from managan.predictor import Predictor, ModelPredictor
+from managan.utils import must_be
+from managan.config import get_predictor
 from plotting_common import Plotter, basis_transform_coords, basis_transform_rouse, basis_transform_neighbours, basis_transform_neighbours2, basis_transform_neighbours4
 
 

@@ -1,7 +1,7 @@
 import torch
 
-from utils import must_be
-from sim_utils import RegexDict
+from .utils import must_be
+from .sim_utils import RegexDict
 
 
 

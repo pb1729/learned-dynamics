@@ -6,9 +6,9 @@ import os
 import torch
 from openmm import OpenMMException
 
-from run_visualization import TensorBoard
-from config import Config, load, save, makenew
-from predictor import ModelState
+from .run_visualization import TensorBoard
+from .config import Config, load, save, makenew
+from .predictor import ModelState
 
 
 def dataset_gen(config):

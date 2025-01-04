@@ -2,9 +2,9 @@ import torch
 import numpy as np
 from typing_extensions import Self, List
 
-from utils import prod, batched_model_eval
-from sim_utils import OpenMMMetadata
-from sims import sims
+from .utils import prod, batched_model_eval
+from .sim_utils import OpenMMMetadata
+from .sims import sims
 
 
 EVAL_BATCHSZ = 1024
@@ -182,7 +182,7 @@ class ModelPredictor(Predictor):
 
 
 try:
-  from hoomd_sims import HoomdSim, hoomd_sims
+  from .hoomd_sims import HoomdSim, hoomd_sims
 except ModuleNotFoundError:
   print("Warning: import of hoomd failed, skipping.")
   def get_hoomd_predictor(key):
@@ -232,7 +232,7 @@ else:
 
 
 try:
-  from openmm_sims import OpenMMConfig, OpenMMMetadata, XReporter, openmm_sims
+  from .openmm_sims import OpenMMConfig, OpenMMMetadata, XReporter, openmm_sims
 except ModuleNotFoundError:
   print("Warning: import of openmm failed, skipping.")
   def get_openmm_predictor(key):

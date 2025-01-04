@@ -11,15 +11,9 @@ from openmm.vec3 import Vec3
 from openmm.app import PDBFile, Modeller, ForceField, Simulation, PME
 from openmm.unit import Quantity, angstrom, kelvin, pico, second
 
-# setup imports so we can use stuff from the seq2pdbchain submodule:
-import sys
-from os import path
-sys.path.append(path.join(path.dirname(path.abspath(__file__)), "seq2pdbchain"))
-# seq2pdbchain imports
-from amino_data import letter_code, structures
-from seq2pdbchain import pdb_chain
-
-from sim_utils import RegexDict, OpenMMMetadata
+from .seq2pdbchain.amino_data import letter_code, structures
+from .seq2pdbchain.seq2pdbchain import pdb_chain
+from .sim_utils import RegexDict, OpenMMMetadata
 
 
 # constants

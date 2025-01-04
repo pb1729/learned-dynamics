@@ -3,8 +3,9 @@ import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
 
-from utils import grad_record, must_be
 from atoms_display import launch_atom_display
+
+from .utils import grad_record, must_be
 
 
 def magdata(x):

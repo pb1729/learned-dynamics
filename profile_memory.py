@@ -3,8 +3,8 @@ from collections import defaultdict
 import traceback
 import matplotlib.pyplot as plt
 
-from config import get_predictor
-from predictor import ModelPredictor
+from managan.config import get_predictor
+from managan.predictor import ModelPredictor
 
 
 class MemoryProfiler:

@@ -1,4 +1,4 @@
-from config import load_config, load, save
+from managan.config import load_config, load, save
 
 
 def main(modelpath, command=None, *args):
@@ -20,5 +20,3 @@ def main(modelpath, command=None, *args):
 if __name__ == "__main__":
   from sys import argv
   main(*argv[1:])
-
-

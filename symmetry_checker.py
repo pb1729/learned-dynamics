@@ -1,8 +1,8 @@
 import torch
 
-from config import get_predictor
-from utils import must_be, avg_relative_diff
-from predictor import ModelState
+from managan.config import get_predictor
+from managan.utils import must_be, avg_relative_diff
+from managan.predictor import ModelState
 
 
 class Symmetry:
@@ -99,8 +99,8 @@ def main(args):
       y_s_pred = model.predict(state_s)
       print(symm.__class__.__name__, avg_relative_diff(y_s - x, y_s_pred - x))
   elif args.test == "proxattn":
-    from attention_layers import ProximityFlashAttentionPeriodic
-    from layers_common import VectorSigmoid
+    from managan.attention_layers import ProximityFlashAttentionPeriodic
+    from managan.layers_common import VectorSigmoid
     print("Testing periodic version of proximity attention.")
     box_tuple = (16., 16., 16.)
     box = torch.tensor(box_tuple, device="cuda")
@@ -122,29 +122,8 @@ def main(args):
       print(symm.__class__.__name__)
       print(avg_relative_diff(ay_s, ay_s_pred))
       print(avg_relative_diff(vy_s, vy_s_pred))
-  elif args.test == "graph_embed":
-    from archs.wgan_3d_particles import GraphEmbedLayer
-    from graph_layers import Graph
-    print("Testing graph embed layer...")
-    box_tuple = (16., 16., 16.)
-    box = torch.tensor(box_tuple, device="cuda")
-    symms = [AxisRotSymm(box), TransSymm(), BoxSymm(box)]
-    batch = 1
-    nodes = 40
-    r_cut = 3.
-    embed = GraphEmbedLayer(r_cut)
-    pos = box*torch.rand(batch, nodes, 3, device="cuda")
-    graph = Graph.radius_graph(r_cut, box_tuple, pos)
-    y_a, y_v = embed.forward(graph, pos)
-    for symm in symms:
-      pos_s, y_a_s, y_v_s = symm.apply([pos, y_a, y_v], ["p", 0, 1])
-      graph_s = Graph.radius_graph(r_cut, box_tuple, pos_s)
-      y_a_s_pred, y_v_s_pred = embed.forward(graph_s, pos_s)
-      print(symm.__class__.__name__)
-      print(avg_relative_diff(y_a_s, y_a_s_pred))
-      print(avg_relative_diff(y_v_s, y_v_s_pred))
   elif args.test == "tensor_linear":
-    from tensor_products import TensLinear
+    from managan.tensor_products import TensLinear
     batch = 4
     nodes = 20
     dim = 32
@@ -161,7 +140,7 @@ def main(args):
         y_s_pred = tens_lin(x_s)
         print(avg_relative_diff(y_s, y_s_pred))
   elif args.test == "tensor_products":
-    from tensor_products import TensorProds
+    from managan.tensor_products import TensorProds
     batch = 4
     nodes = 40
     dim = 32
@@ -190,5 +169,5 @@ def main(args):
 if __name__ == "__main__":
   from argparse import ArgumentParser
   parser = ArgumentParser(prog="symmetry_checker")
-  parser.add_argument("test", choices=["modelfile", "proxattn", "graph_embed", "tensor_linear", "tensor_products"])
+  parser.add_argument("test", choices=["modelfile", "proxattn", "tensor_linear", "tensor_products"])
   main(parser.parse_args())

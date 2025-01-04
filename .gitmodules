@@ -1,5 +1,5 @@
 [submodule "seq2pdbchain"]
-	path = seq2pdbchain
+	path = managan/seq2pdbchain
 	url = https://github.com/pb1729/seq2pdbchain
 [submodule "atoms-display"]
 	path = atoms-display

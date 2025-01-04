@@ -2,9 +2,9 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-from utils import must_be
-from config import load
-from sims import get_dataset
+from managan.utils import must_be
+from managan.config import load
+from managan.sims import get_dataset
 from wass_utils import *
 
 
@@ -88,9 +88,3 @@ def main(fpath):
 if __name__ == "__main__":
   from sys import argv
   main(*argv[1:])
-
-
-
-
-
-

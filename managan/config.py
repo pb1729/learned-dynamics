@@ -1,8 +1,8 @@
 import torch
 import importlib
 
-from statefiles import DatasetPredictor
-from predictor import Predictor, ModelPredictor, get_sim_predictor, get_hoomd_predictor, get_openmm_predictor
+from .statefiles import DatasetPredictor
+from .predictor import Predictor, ModelPredictor, get_sim_predictor, get_hoomd_predictor, get_openmm_predictor
 
 
 ARCH_PREFIX = "archs."

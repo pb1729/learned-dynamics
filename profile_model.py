@@ -1,7 +1,7 @@
 import torch
 from torch.profiler import profile, record_function, ProfilerActivity
 
-from config import get_predictor
+from managan.config import get_predictor
 
 
 def profile_torch(args, model, inp):

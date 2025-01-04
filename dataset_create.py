@@ -1,8 +1,8 @@
 import argparse
 from os import path
 
-from config import get_predictor
-from statefiles import save_state_to_file, save_predictor_params_to_file
+from managan.config import get_predictor
+from managan.statefiles import save_state_to_file, save_predictor_params_to_file
 
 
 def main(args):

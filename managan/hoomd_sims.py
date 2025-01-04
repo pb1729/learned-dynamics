@@ -4,8 +4,8 @@ import hoomd
 import numpy as np
 import time
 
-from sim_utils import RegexDict
-from utils import must_be
+from .sim_utils import RegexDict
+from .utils import must_be
 
 
 class HoomdSim:

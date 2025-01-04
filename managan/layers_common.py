@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from utils import must_be
+from .utils import must_be
 
 
 # constants:

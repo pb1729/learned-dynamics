@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import random
 
-from predictor import State, Predictor, ModelState
+from .predictor import State, Predictor, ModelState
 
 
 def save_state_to_file(file:BufferedWriter, state:ModelState):

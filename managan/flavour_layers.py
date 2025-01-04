@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 
-from utils import must_be
-from openmm_sims import structures, letter_code, OpenMMMetadata
-from layers_common import VecLinear
+from .utils import must_be
+from .openmm_sims import structures, letter_code, OpenMMMetadata
+from .layers_common import VecLinear
 
 
 def get_residue_len(letter:str) -> int:

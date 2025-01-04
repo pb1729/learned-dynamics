@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torchview import draw_graph
 
-from config import get_predictor
+from managan.config import get_predictor
 
 
 def hunt_modules(model):

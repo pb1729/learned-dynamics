@@ -5,8 +5,8 @@ import torch.nn as nn
 
 from tensor_ops_cuda import tensor_linear, tensor_linear_backward
 
-from utils import must_be, prod
-from layers_common import VecLinear
+from .utils import must_be, prod
+from .layers_common import VecLinear
 
 
 class _TensLinearCuda(torch.autograd.Function):

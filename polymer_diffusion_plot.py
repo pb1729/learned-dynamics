@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 
 
 from test_model import model_list_to_predictor_list
-from config import load, Config
-from utils import PrintTiming
+from managan.config import load, Config
+from managan.utils import PrintTiming
 
 
 def get_traj(args, predictor):

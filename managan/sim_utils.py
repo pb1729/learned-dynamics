@@ -13,7 +13,7 @@ class RegexDict:
   def __init__(self, *constructors):
     """ constructors is a list of (regex, constructor_fn) tuples """
     self.cache = {}
-    self.constructors = constructors
+    self.constructors = list(constructors)
   def add_constructor(self, pattern, constructor):
     self.constructors.append((pattern, constructor))
   def _decode(self, match_group):

@@ -3,8 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from test_model import model_list_to_predictor_list
-from config import load, Config
-from utils import PrintTiming, avg_relative_diff
+from managan.config import load, Config
+from managan.utils import PrintTiming, avg_relative_diff
 
 
 def get_x(args, predictor):

@@ -3,9 +3,9 @@ import torch
 import matplotlib
 import matplotlib.pyplot as plt
 
-from config import load
-from sims import equilibrium_sample, get_dataset
-from polymer_util import rouse, tica_theory, get_n_quanta_theory
+from managan.config import load
+from managan.sims import equilibrium_sample, get_dataset
+from managan.polymer_util import rouse, tica_theory, get_n_quanta_theory
 
 
 def tica_comparison_plot(eigenfn, idx, tica_1, tica_2, dataset):
@@ -64,7 +64,3 @@ def main(path, abs_scale=False):
 if __name__ == "__main__":
   from sys import argv
   main(*argv[1:])
-
-
-
-

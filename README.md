@@ -1,39 +1,36 @@
 # Koopman Operator and Large Δt Learned Approximations of the Transfer Operator
 
 
+
+## MANAGAN (MArkov Nextstate Approximation GAN)
+
+Given a stochastic system that has dynamical trajectories `x(t)`, we choose a fixed lag time `Δt`. Can we sample from the probability distribution `P(x(Δt) | x(0))`? Let's try and train a GAN for this task. If we picked a large enough `Δt`, this might be computationally much cheaper than simulating the system in the usual way. In this repo, the focus is mainly on molecular systems, in particular polymers, especially proteins in solution.
+
+We need to consider symmetry:
+* Rotational symmetry implies activations in the network must correspond to representations of SO(3).
+* Translational symmetry implies that all vector activations in the network must be *differences* of positions.
+* If there is a periodic box, we must additionally be able to translate different atom positions by different integer sums of the lattice basis vectors without affecting neural network output.
+
+
 ## Vampnets
 
-VampNets learn a reduced dimension approximation of the Koopman operator. These can make useful building blocks/features for various applications. One such application is described in the next section.
+Vampnets are a good way to approximate a given system's Koopman operator. They're not the main focus of this repo anymore. However, we do know how to differentiably compute VAMPScore for equivariant VAMPNets. (In general, each of many features produced by the net must be some irrep of SO(3). Get in touch if you need to do this and would like us to tell you how.)
 
 
-## Learned Approximations of the Transfer Operator
+## Environment Setup
 
-Instead of running a simulation for a certain number of time steps, what if we replace it with a neural network forward pass? There is typically some randomness in the dynamics of the system, so we should have a neural network that samples from some probability distribution. I.e. a diffuser architecture or GAN architecture would be a good choice.
+Here we show how to create a virutalenv that has the needed packages. Work in progress, this will hopefully be more automatic in the future, sorry. Get in touch at `pbement "at symbol" phas "dot" ubc "dot" ca` if you run into trouble.
 
-Currently all architectures are some variant of WGANs. To train, run something like:
+* Initialize your environment. Python version should be at least 3.9.
+* cd into the env and `source bin/activate` to activate it
+* `pip install numpy matplotlib`
+* Install torch according to instructions [here](https://pytorch.org/get-started/locally/). (torchvision and torchaudio not needed)
+  * Quite likely just `pip install torch`
+* Enter a python repl and print `torch.__version__`. You'll get some version, eg. `2.5.1+cu124`.
+* `pip install torch-scatter -f https://data.pyg.org/whl/torch-2.5.1+cu124.html` where the `2.5.1+cu124` is replaced by your `torch.__version__`
+* Clone this repo into your environment and cd there. Now we install the extensions and atoms-display.
+* TODO: write these down
 
-```
-python train_wgan.py models/my_model.wgan.pt
-```
-
-Configure the training run by editing these lines:
-
-```
-config = Config("1D Polymer, Ornstein Uhlenbeck", "wgan_dn",
-      cond=Condition.ROUSE, x_only=True, subtract_mean=1,
-      batch=8, simlen=16,
-      n_rouse_modes=3)
-```
-
-
-## The 65536 Challenge
-
-This challenge is one of being efficient with training data (and to a lesser extent, training time). The parameters of the challenge are as follows:
-* Batch size is 8
-* The length of each trajectory in the batch is 16
-* The number of training steps is 65536
-
-The goal is to get good results (good approximation of the simulation's transfer operator) within these constraints.
 
 
 

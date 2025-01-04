@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from test_model import get_sample_step, continuation
-from config import load
+from managan.config import load
 
 
 def do_plotting(args, x0, x1, x1_hat):
@@ -44,5 +44,3 @@ if __name__ == "__main__":
   parser.add_argument("--range", dest="range", type=float, default=3.)
   parser.add_argument("--res", dest="res", type=int, default=24)
   main(parser.parse_args())
-
-

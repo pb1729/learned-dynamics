@@ -2,9 +2,9 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-from predictor import ModelPredictor
-from utils import must_be
-from config import get_predictor
+from managan.predictor import ModelPredictor
+from managan.utils import must_be
+from managan.config import get_predictor
 from test_model import BASES, model_list_to_predictor_list
 from plotting_common import squarish_factorize, basis_transform_coords, basis_transform_rouse, basis_transform_neighbours, basis_transform_neighbours2, basis_transform_neighbours4
 
