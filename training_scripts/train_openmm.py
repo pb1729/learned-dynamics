@@ -1,15 +1,14 @@
-import importlib
-
 import sys
-sys.path.append("/home/phillip/projects/torchenv/src/koopman")
+from os import path
+sys.path.append(path.join(path.split(__file__)[0], path.pardir))
 
-from config import Config
-from train import training_run
+from managan.config import Config
+from managan.train import training_run
 
 
 SIMTYPE = "A_t2000_L40_m20_M45"
 ARCH = "wgan_3d_newblock10_res"
-RUN_ID = "T3"
+RUN_ID = "T4"
 
 NSTEPS_LIST = [512*i for i in range(1, 33)]
 

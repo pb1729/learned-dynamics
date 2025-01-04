@@ -1,10 +1,9 @@
-import importlib
-
 import sys
-sys.path.append("/home/phillip/projects/torchenv/src/koopman")
+from os import path
+sys.path.append(path.join(path.split(__file__)[0], path.pardir))
 
-from config import Config
-from train import training_run
+from managan.config import Config
+from managan.train import training_run
 
 
 SIMTYPE = "particles_2"
