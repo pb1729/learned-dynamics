@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from typing import Optional
 from typing_extensions import Self, List
 
 from .utils import prod, batched_model_eval
@@ -58,7 +59,7 @@ class State:
     assert prod(newsize) == prod(self.size), f"can't reshape {self.size} to {newsize}"
     return tens.reshape(*(newsize + self.size))
   @property
-  def metadata(self) -> OpenMMMetadata|None:
+  def metadata(self) -> Optional[OpenMMMetadata]:
     return None
 class Predictor:
   """ Base class for all Predictors. Predictors have 1 basic function: they simulate
@@ -74,12 +75,12 @@ class Predictor:
     """ Some predictors may provide a way to sample States from some distribution q. (not necessarily
         the equilibrium distribution.) If so, you can sample a State of size batch by calling this function. """
     assert False, "q sampling not implemented for this class"
-  def predict(self, L:int, state:State, ret:bool=True) -> State | None:
+  def predict(self, L:int, state:State, ret:bool=True) -> Optional[State]:
     """ predict L steps based on initial state.
         MUTATES state
         ret: return the trajectory as a ModelState """
     assert False, "this class not concretely implemented!"
-  def get_box(self) -> torch.Tensor|None:
+  def get_box(self) -> Optional[torch.Tensor]:
     return None
 
 

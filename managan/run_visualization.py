@@ -17,6 +17,8 @@ except ModuleNotFoundError:
   print("Could not import tensorboard or torchvision. Falling back to dummy class definition.")
   class TensorBoard:
     """ dummy tensorboard that implements the same methods as a real one """
+    def __init__(self, name):
+      self.name = name
     def img_grid(self, label, images):
       pass
     def scalar(self, label, i, val):

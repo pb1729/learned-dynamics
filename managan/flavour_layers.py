@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 
 from .utils import must_be
-from .openmm_sims import structures, letter_code, OpenMMMetadata
+from .seq2pdbchain.amino_data import letter_code, structures
+from .sim_utils import OpenMMMetadata
 from .layers_common import VecLinear
 
 
