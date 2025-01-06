@@ -8,7 +8,7 @@ from .predictor import Predictor, ModelPredictor, get_sim_predictor, get_hoomd_p
 ARCH_PREFIX = "archs."
 
 
-def get_predictor(predictor_spec):
+def get_predictor(predictor_spec, override_base=None):
   """ given a specification for a predictor, construct the actual predictor.
       for backwards compatability, if no predictor type is specified, we return a SimPredictor """
   if ":" in predictor_spec:
@@ -24,7 +24,7 @@ def get_predictor(predictor_spec):
   elif "dataset" == pred_type:
     ans = DatasetPredictor(rest)
   elif "model" == pred_type: # treat "rest" as a path
-    ans = ModelPredictor(load(rest))
+    ans = ModelPredictor(load(rest, override_base))
   else: assert False, "unknown predictor type"
   ans.name = ":".join([pred_type, rest]) # tag predictor with a name for convenience
   return ans
@@ -96,9 +96,10 @@ def load_config(path):
   data = torch.load(path, weights_only=False)
   return Config(*data["args"], **data["kwargs"])
 
-def load(path):
+def load(path, override_base=None):
   data = torch.load(path, weights_only=False)
-  config = Config(*data["args"], **data["kwargs"])
+  pred_spec = data["args"][0] if override_base is None else override_base
+  config = Config(pred_spec, *data["args"][1:], **data["kwargs"])
   return config.modelclass.load_from_dict(data["states"], config)
 
 def save(model, path):

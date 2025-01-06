@@ -48,7 +48,7 @@ def make_linear(state):
 
 def main(args):
   # get comparison data
-  predictor = get_predictor(args.predictor_spec)
+  predictor = get_predictor(args.predictor_spec, override_base=args.override)
   assert space_dim(predictor) == 3
   box = None
   if args.wrap:
@@ -58,13 +58,7 @@ def main(args):
     if box is not None:
       x = (x + 0.5*box) % box - 0.5*box
     return x[0]
-  if args.override is not None:
-    override_predictor = get_predictor(args.override)
-    override_state = override_predictor.sample_q(1)
-    # actual state will be a ModelState (overrides only supported if main predictor is a ModelPredictor)
-    state = override_predictor.predict(1, override_state)[0]
-  else:
-    state = predictor.sample_q(1)
+  state = predictor.sample_q(1)
   if args.startlinear:
     make_linear(state)
   atomic_nums = state.metadata.atomic_nums if state.metadata is not None else 5*np.ones(poly_len(predictor), dtype=int)
