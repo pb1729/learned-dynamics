@@ -34,7 +34,7 @@ class Config:
   """ configuration class for training runs """
   def __init__(self, pred_spec, arch_name,
                device="cuda", batch=1, simlen=16, nsteps=65536, save_every=512,
-               arch_specific=None, **kwargs_rest):
+               arch_specific=None):
     self.pred_spec = pred_spec
     self.arch_name = arch_name
     self.predictor:Predictor = get_predictor(pred_spec)
@@ -50,6 +50,8 @@ class Config:
     self.modelclass, self.trainerclass = self.get_model_and_trainer_classes()
     if arch_specific is None: arch_specific={}
     self.arch_specific = arch_specific # should be a dictionary of strings and ints
+    self.mutations = []
+    self.trained_for = 0
   def get_model_and_trainer_classes(self):
     arch_module = importlib.import_module(ARCH_PREFIX + self.arch_name)
     return arch_module.modelclass, arch_module.trainerclass
@@ -65,6 +67,10 @@ class Config:
         "arch_specific": self.arch_specific,
       }
     return args, kwargs
+  def add_mutation(self, mut_desc):
+    self.mutations.append(f"TRAIN FOR: {self.trained_for} steps")
+    self.mutations.append(f"MUTATION: {mut_desc}")
+    self.trained_for = 0
   def __str__(self):
     args, kwargs = self.get_args_and_kwargs()
     ans = ["Config( \"%s\" ; \"%s\" ) {" % tuple(args)]
@@ -76,6 +82,9 @@ class Config:
       ans.append("    %s: %s" % (key, str(kwargs["arch_specific"][key])))
     ans.append("  }")
     ans.append("}")
+    for mutation in self.mutations:
+      ans.append(mutation)
+    ans.append(f"TRAIN FOR: {self.trained_for} steps")
     return "\n".join(ans)
   def __getitem__(self, key):
     """ allows architectures to access arch_specific configuration using the indexing operator """

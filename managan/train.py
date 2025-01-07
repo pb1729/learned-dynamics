@@ -74,6 +74,7 @@ def train(model, save_path):
     trainer.step(i, trajs)
     # save a checkpoint
     if (i + 1) % config.save_every == 0:
+      config.trained_for = i + 1
       print("\nsaving...")
       save(model, save_path)
       if i + 1 in checkpoints:
