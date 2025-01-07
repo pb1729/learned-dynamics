@@ -467,7 +467,10 @@ class WGAN3D:
     x = traj_state.x
     L, batch, atoms, must_be[3] = x.shape
     loss_d = self.discs_step(x, traj_state.metadata)
-    loss_g = self.gen_step(x, traj_state.metadata)
+    if "gen_train" in self.config and not self.config["gen_train"]:
+      loss_g = 0.
+    else:
+      loss_g = self.gen_step(x, traj_state.metadata)
     self.step_count += 1
     if self.step_count % 1024 == 0:
       self.lr_schedule_update()

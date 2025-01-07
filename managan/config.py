@@ -93,6 +93,8 @@ class Config:
     return self.arch_specific[key]
   def __setitem__(self, key, value):
     self.arch_specific[key] = value
+  def __contains__(self, key):
+    return key in self.arch_specific
 
 
 
