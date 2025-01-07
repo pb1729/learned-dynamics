@@ -430,12 +430,14 @@ class WGAN3D:
     for _ in range(config["ndiscs"]):
       self.add_new_disc()
     self.gen  = Generator(config, self.randgen).to(config.device)
+    self.gen.apply(weights_init)
     assert space_dim(config) == 3
     self.tensbox = config.predictor.get_box()
     self.box = (self.tensbox[0].item(), self.tensbox[1].item(), self.tensbox[2].item())
     self.init_optim()
   def add_new_disc(self):
     self.discs.append(Discriminator(self.config, self.randgen).to(self.config.device))
+    self.discs[-1].apply(weights_init)
   def init_optim(self):
     betas = (self.config["beta_1"], self.config["beta_2"])
     self.optim_d = torch.optim.AdamW(get_params_for_optim(*self.discs, slow={"lr": 0.001*self.config["lr_d"]}),
@@ -452,11 +454,7 @@ class WGAN3D:
     return ans
   @staticmethod
   def makenew(config):
-    ans = WGAN3D(config)
-    for disc in ans.discs:
-      disc.apply(weights_init)
-    ans.gen.apply(weights_init)
-    return ans
+    return WGAN3D(config)
   def save_to_dict(self):
     return {
         "discs": [disc.state_dict() for disc in self.discs],

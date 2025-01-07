@@ -70,7 +70,8 @@ class Config:
       }
     return args, kwargs
   def add_mutation(self, mut_desc):
-    self.mutations.append(f"TRAIN FOR: {self.trained_for} steps")
+    if self.trained_for > 0:
+      self.mutations.append(f"TRAIN FOR: {self.trained_for} steps")
     self.mutations.append(f"MUTATION: {mut_desc}")
     self.trained_for = 0
   def __str__(self):
