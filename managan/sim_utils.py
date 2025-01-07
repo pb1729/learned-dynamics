@@ -37,3 +37,9 @@ class RegexDict:
     if sim_nm not in self.cache:
       self.cache[sim_nm] = self._construct(sim_nm)
     return self.cache[sim_nm]
+
+
+class OpenMMSimError(Exception):
+  def __init__(self, message):
+    self.message = message
+

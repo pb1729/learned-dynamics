@@ -4,7 +4,7 @@ from typing import Optional
 from typing_extensions import Self, List
 
 from .utils import prod, batched_model_eval
-from .sim_utils import OpenMMMetadata
+from .sim_utils import OpenMMMetadata, OpenMMSimError
 from .sims import sims
 
 
@@ -234,6 +234,7 @@ else:
 
 try:
   from .openmm_sims import OpenMMConfig, OpenMMMetadata, XReporter, openmm_sims
+  from openmm import OpenMMException
 except ModuleNotFoundError:
   print("Warning: import of openmm failed, skipping.")
   def get_openmm_predictor(key):
@@ -262,7 +263,7 @@ else:
     def to_model_predictor_state(self):
       return ModelState(self.shape, self.x, metadata=self._metadata)
     @property
-    def metadata(self) -> OpenMMMetadata | None:
+    def metadata(self) -> Optional[OpenMMMetadata]:
       return self._metadata
   class OpenMMPredictor(Predictor):
     def __init__(self, openmm_config:OpenMMConfig):
@@ -276,11 +277,14 @@ else:
       """ MUTATES state """
       if ret:
         trajectory = torch.zeros(L, *state.size, *state.shape, dtype=torch.float32, device="cuda")
-      for i, sim in enumerate(state.sims):
-        for j in range(L):
-          sim.step(self.openmm_config.dt)
-          if ret:
-            trajectory[j, i] = torch.tensor(state.reporter_x(state.reporters[i]), dtype=torch.float32, device="cuda")
+      try:
+        for i, sim in enumerate(state.sims):
+          for j in range(L):
+            sim.step(self.openmm_config.dt)
+            if ret:
+              trajectory[j, i] = torch.tensor(state.reporter_x(state.reporters[i]), dtype=torch.float32, device="cuda")
+      except OpenMMException as e:
+        raise OpenMMSimError(e)
       if ret:
         return ModelState(state.shape, trajectory, metadata=state.metadata)
     def get_box(self):
