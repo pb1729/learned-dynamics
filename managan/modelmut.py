@@ -11,3 +11,14 @@ def add_discs(model, n):
   for i in range(n):
     model.add_new_disc()
   record_mutation(model, f"add {n} discriminators")
+
+def update_arch_params(model, newvalues):
+  updates = []
+  for key in newvalues:
+    oldvalue = None
+    if key in model.config:
+      oldvalue = model.config[key]
+    newvalue = newvalues[key]
+    updates.append(f"{key}: {oldvalue} -> {newvalue}")
+    model.config[key] = newvalue
+  record_mutation(model, "update arch params {\n\t" + "\n\t".join(updates) + "\n}")
