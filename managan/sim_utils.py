@@ -40,6 +40,5 @@ class RegexDict:
 
 
 class OpenMMSimError(Exception):
-  def __init__(self, message):
-    self.message = message
-
+  def __init__(self, child):
+    self.child = child
