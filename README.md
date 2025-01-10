@@ -25,12 +25,26 @@ Here we show how to create a virutalenv that has the needed packages. Work in pr
 * cd into the env and `source bin/activate` to activate it
 * `pip install numpy matplotlib`
 * Install torch according to instructions [here](https://pytorch.org/get-started/locally/). (torchvision and torchaudio not needed)
-  * Quite likely just `pip install torch`
+    * Quite likely just `pip install torch`
 * Enter a python repl and print `torch.__version__`. You'll get some version, eg. `2.5.1+cu124`.
 * `pip install torch-scatter -f https://data.pyg.org/whl/torch-2.5.1+cu124.html` where the `2.5.1+cu124` is replaced by your `torch.__version__`
 * Clone this repo into your environment and cd there. Now we install the extensions and atoms-display.
-* TODO: write these down
-
-
-
-
+* Extensions:
+    * Go into each extension's directory.
+    * `pip install .`
+* atoms-display:
+    * You only need this if your want to visualize trajectories. It depends on [pyopengl](https://pypi.org/project/PyOpenGL/).
+    * Try this first: `pip install PyOpenGL PyOpenGL_accelerate`
+    * If this results in an error like: "numpy.dtype size changed, may indicate binary incompatibility", it means that
+      the version of pyopengl on pypi is out of date for the current numpy version. Fix is to just install the latest
+      pyopengl from github: Clone [this](https://github.com/mcfletch/pyopengl) and follow README instructions (they are easy).
+    * Having obtained pyopengl, now go the the atoms-display directory and run `pip install -e .`
+* If you want to train your own model, you'll probably need a source of simulation data. Some simulations use
+  [hoomd](https://hoomd-blue.readthedocs.io/en/v5.0.0/) or [openmm](https://openmm.org/). Installation of these packages is
+  optional, you only need a given one if you want it to generate training data.
+* OpenMM:
+    * Installation is probably just `pip install openmm[cuda12]`.
+    * If you want more customization, check the docs:
+      http://docs.openmm.org/latest/userguide/application/01_getting_started.html#installing-openmm
+* HOOMD:
+    * Good luck: https://hoomd-blue.readthedocs.io/en/v5.0.0/getting-started.html
