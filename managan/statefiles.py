@@ -67,8 +67,9 @@ class DatasetState(State):
     return self.traj.metadata
 
 class DatasetPredictor(Predictor):
-  def __init__(self, dataset_dir):
+  def __init__(self, dataset_dir, stride=1):
     self.dataset_dir = dataset_dir
+    self.stride = stride
     with open(path.join(dataset_dir, "predictor_params.pickle"), "rb") as f:
       params = read_predictor_params_from_file(f)
     self._box = params["box"]
@@ -89,8 +90,16 @@ class DatasetPredictor(Predictor):
     return ans
   def predict(self, L, state, ret=True):
     assert isinstance(state, DatasetState), "DatasetPredictor can only handle DatasetState's"
-    assert L < state.L - state.t, f"DatasetPredictor tried to predict {L} steps, but only {state.L - state.t - 1} data remains"
+    assert L*self.stride < state.L - state.t, f"DatasetPredictor tried to predict {self.stride}*{L} steps, but only {state.L - state.t - 1} data remains"
     t_old = state.t
-    state.t += L
+    state.t += L*self.stride
     if ret:
-      return state.traj[t_old + 1:state.t + 1]
+      return state.traj[t_old + self.stride : state.t + 1 : self.stride]
+
+def get_dataset_predictor(spec):
+  return DatasetPredictor(spec)
+
+def get_strided_dataset_predictor(spec):
+  stride, dataset_dir = spec.split("?")
+  stride = int(stride)
+  return DatasetPredictor(dataset_dir, stride=stride)
