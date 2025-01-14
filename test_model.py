@@ -3,10 +3,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from typing_extensions import List
 
-from managan.predictor import Predictor, ModelPredictor
+from managan.predictor import ModelPredictor
 from managan.utils import must_be
-from managan.config import get_predictor
 from plotting_common import Plotter, basis_transform_coords, basis_transform_rouse, basis_transform_neighbours, basis_transform_neighbours2, basis_transform_neighbours4
+from predictor_argparse_util import args_to_predictor_list, add_model_list_arg
 
 
 BASES = {
@@ -67,20 +67,10 @@ def eval_predictors(args, predictors):
     comparison_plot(x_init, x_preds, state[i].shape, args)
 
 
-def model_list_to_predictor_list(models) -> List[Predictor]:
-  ans = []
-  for model in models:
-    predictor:Predictor = get_predictor(model)
-    if isinstance(predictor, ModelPredictor): # add the base predictor for a model first.
-      ans.append(predictor.get_base_predictor())
-    ans.append(predictor)
-  return ans
-
-
 def main(args):
   print(args)
   print("basis = %s    iterations = %d" % (args.basis, args.iter))
-  predictors = model_list_to_predictor_list(args.models)
+  predictors = args_to_predictor_list(args)
   eval_predictors(args, predictors)
 
 
@@ -89,7 +79,7 @@ def main(args):
 if __name__ == "__main__":
   from argparse import ArgumentParser
   parser = ArgumentParser(prog="test_model")
-  parser.add_argument("-M", dest="models", action="extend", nargs="+", type=str)
+  add_model_list_arg(parser) # -M and -O
   parser.add_argument("--basis", dest="basis", choices=[key for key in BASES], default="rouse")
   parser.add_argument("--radial", dest="radial", action="store_true")
   parser.add_argument("--iter", dest="iter", type=int, default=1)

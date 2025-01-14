@@ -2,7 +2,8 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-from test_model import model_list_to_predictor_list, get_contin_states
+from test_model import get_contin_states
+from predictor_argparse_util import model_list_to_predictor_list
 from managan.config import load
 from managan.utils import must_be, prod
 

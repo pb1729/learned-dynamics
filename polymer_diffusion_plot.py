@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-from test_model import model_list_to_predictor_list
+from test_model import add_model_list_arg, args_to_predictor_list
 from managan.config import load, Config
 from managan.utils import PrintTiming
 
@@ -30,7 +30,7 @@ MSD_FNS = {
 }
 
 def main(args):
-  predictors = model_list_to_predictor_list(args.models)
+  predictors = args_to_predictor_list(args)
   x_list = []
   for predictor in predictors:
     x_list.append(get_traj(args, predictor))
@@ -55,7 +55,7 @@ def main(args):
 if __name__ == "__main__":
   from argparse import ArgumentParser
   parser = ArgumentParser(prog="diffusion_plot")
-  parser.add_argument("-M", dest="models", action="extend", nargs="+", type=str)
+  add_model_list_arg(parser)
   parser.add_argument("--tmax", dest="tmax", type=int, default=2000)
   parser.add_argument("--batch", dest="batch", type=int, default=256)
   parser.add_argument("--slopegrid", dest="slopegrid", action="store_true")

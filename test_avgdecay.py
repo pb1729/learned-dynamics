@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 from managan.predictor import ModelPredictor
 from managan.utils import must_be
 from managan.config import get_predictor
-from test_model import BASES, model_list_to_predictor_list
+from test_model import BASES
+from predictor_argparse_util import args_to_predictor_list, add_model_list_arg
 from plotting_common import squarish_factorize, basis_transform_coords, basis_transform_rouse, basis_transform_neighbours, basis_transform_neighbours2, basis_transform_neighbours4
 
 
@@ -57,7 +58,7 @@ def eval_predictors(args, predictors):
 
 def main(args):
   print(args)
-  predictors = model_list_to_predictor_list(args.models)
+  predictors = args_to_predictor_list(args)
   eval_predictors(args, predictors)
 
 
@@ -66,7 +67,7 @@ def main(args):
 if __name__ == "__main__":
   from argparse import ArgumentParser
   parser = ArgumentParser(prog="test_avgdecay")
-  parser.add_argument("-M", dest="models", action="extend", nargs="+", type=str)
+  add_model_list_arg(parser)
   parser.add_argument("--basis", dest="basis", choices=[key for key in BASES], default="rouse")
   parser.add_argument("--contins", dest="contins", type=int, default=1000)
   parser.add_argument("--tmax", dest="tmax", type=int, default=32)

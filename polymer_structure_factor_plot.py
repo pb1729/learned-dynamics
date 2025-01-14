@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-from test_model import model_list_to_predictor_list
+from test_model import add_model_list_arg, args_to_predictor_list
 from managan.config import load, Config
 from managan.utils import PrintTiming, avg_relative_diff
 
@@ -73,7 +73,7 @@ def rdf_plot(args, predictors, x_list, labels):
 
 
 def main(args):
-  predictors = model_list_to_predictor_list(args.models)
+  predictors = args_to_predictor_list(args)
   x_list = []
   labels = []
   for predictor in predictors:
@@ -89,7 +89,7 @@ if __name__ == "__main__":
   from argparse import ArgumentParser
   parser = ArgumentParser(prog="structure_factor_plot")
   parser.add_argument("tmax", type=int) # positional: we make the user think about how many equililbration steps they want
-  parser.add_argument("-M", dest="models", action="extend", nargs="+", type=str)
+  add_model_list_arg(parser)
   parser.add_argument("--batch", dest="batch", type=int, default=256)
   parser.add_argument("--rdf", dest="rdf", action="store_true")
   parser.add_argument("--res", dest="res", type=int, default=100)
