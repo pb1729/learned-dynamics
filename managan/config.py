@@ -27,6 +27,8 @@ def get_predictor(predictor_spec, override_base=None):
     ans = get_strided_dataset_predictor(rest)
   elif "model" == pred_type: # treat "rest" as a path
     ans = ModelPredictor(load(rest, override_base))
+  elif "dummy" == pred_type:
+    ans = Predictor()
   else: assert False, "unknown predictor type"
   ans.name = ":".join([pred_type, rest]) # tag predictor with a name for convenience
   return ans
@@ -108,14 +110,17 @@ class Config:
 # * .save_to_dict()                 records the model states into a dictionary
 # * @staticmethod .makenew()        creates a new instance of the model
 
-def load_config(path):
+def data_to_config(data, override_base=None):
+  pred_spec = data["args"][0] if override_base is None else override_base
+  return Config(pred_spec, *data["args"][1:], **data["kwargs"])
+
+def load_config(path, override_base=None):
   data = torch.load(path, weights_only=False)
-  return Config(*data["args"], **data["kwargs"])
+  return data_to_config(data, override_base)
 
 def load(path, override_base=None):
   data = torch.load(path, weights_only=False)
-  pred_spec = data["args"][0] if override_base is None else override_base
-  config = Config(pred_spec, *data["args"][1:], **data["kwargs"])
+  config = data_to_config(data, override_base)
   return config.modelclass.load_from_dict(data["states"], config)
 
 def save(model, path):

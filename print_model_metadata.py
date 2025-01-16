@@ -1,22 +1,17 @@
 from managan.config import load_config, load, save
+from managan.predictor import Predictor
 
 
-def main(modelpath, command=None, *args):
-  if command == "--setstr":
-    key, val = args
-    model = load(modelpath)
-    model.config[key] = val
-    save(model, modelpath)
-  if command == "--setint":
-    key, val = args
-    val = int(val)
-    model = load(modelpath)
-    model.config[key] = val
-    save(model, modelpath)
-  config = load_config(modelpath)
+def main(args):
+  try:
+    config = load_config(args.modelpath)
+  except FileNotFoundError:
+    config = load_config(args.modelpath, override_base="dummy:original predictor could not be loaded")
   print(config)
 
 
 if __name__ == "__main__":
-  from sys import argv
-  main(*argv[1:])
+  from argparse import ArgumentParser
+  parser = ArgumentParser(prog="print_model_metadata")
+  parser.add_argument("modelpath")
+  main(parser.parse_args())
