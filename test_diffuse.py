@@ -13,6 +13,11 @@ def comparison_plot(args, trajs, names):
   for traj, name in zip(trajs, names):
     plt.plot(get_rms_diffusion(traj), label=name)
   plt.legend()
+  plt.xlabel("t [steps]")
+  plt.ylabel("sqrt(<(x_0 - x_t)^2>)")
+  if args.logscale:
+    plt.xscale("log")
+    plt.yscale("log")
   plt.show()
 
 
@@ -21,9 +26,13 @@ def eval_predictors(args, predictors):
   trajs = []
   names = []
   for predictor in predictors:
-    state = predictor.sample_q(args.batch)
-    traj = predictor.predict(args.tmax, state)
-    trajs.append(traj.x_npy)
+    traj = []
+    for i in range(args.batch):
+      print(i)
+      state = predictor.sample_q(1)
+      traj_i = predictor.predict(args.tmax, state)
+      traj.append(traj_i.x_npy)
+    trajs.append(np.concatenate(traj, axis=1))
     names.append(predictor.name)
   comparison_plot(args, trajs, names)
 
@@ -39,4 +48,5 @@ if __name__ == "__main__":
   add_model_list_arg(parser)
   parser.add_argument("--batch", dest="batch", type=int, default=1)
   parser.add_argument("--tmax", dest="tmax", type=int, default=10)
+  parser.add_argument("--logscale", action="store_true")
   main(parser.parse_args())
