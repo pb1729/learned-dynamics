@@ -9,13 +9,7 @@
 
 LOG_DIR = "runs"
 
-
-try:
-  from torch.utils.tensorboard import SummaryWriter
-  import torchvision
-except ModuleNotFoundError:
-  print("Could not import tensorboard or torchvision. Falling back to dummy class definition.")
-  class TensorBoard:
+class DummyTensorBoard:
     """ dummy tensorboard that implements the same methods as a real one """
     def __init__(self, name):
       self.name = name
@@ -23,6 +17,13 @@ except ModuleNotFoundError:
       pass
     def scalar(self, label, i, val):
       pass
+
+try:
+  from torch.utils.tensorboard import SummaryWriter
+  import torchvision
+except ModuleNotFoundError:
+  print("Could not import tensorboard or torchvision. Falling back to dummy class definition.")
+  TensorBoard = DummyTensorBoard
 else:
   class TensorBoard:
     """ logs various kinds of data to a tensor board """
