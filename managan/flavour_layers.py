@@ -13,22 +13,27 @@ def get_residue_len(letter:str) -> int:
 
 
 class SingleResidueEncode(nn.Module):
-  def __init__(self, natom:int, vdim:int):
+  def __init__(self, natom:int, vdim:int, nlin:int=1):
     super().__init__()
     self.natom = natom
-    self.lin = VecLinear(natom, vdim)
+    self.layers = nn.Sequential(*(
+      [VecLinear(natom, vdim)] +
+      [
+        VecLinear(vdim, vdim)
+        for i in range(nlin - 1)
+      ]))
   def forward(self, x:torch.Tensor):
     """ x:(batch, natom, 3)
         ans: (batch, vdim, 3) """
     root = x[:, 1] # Root is taken to be position of alpha carbon, which is always at index 1
     delta_x = x - root[:, None]
-    return self.lin(delta_x)
+    return self.layers(delta_x)
 
 class ResiduesEncode(nn.Module):
-  def __init__(self, vdim:int):
+  def __init__(self, vdim:int, nlin:int=1):
     super().__init__()
     self.res_enc = nn.ModuleDict({
-      letter: SingleResidueEncode(get_residue_len(letter), vdim)
+      letter: SingleResidueEncode(get_residue_len(letter), vdim, nlin=nlin)
       for letter in letter_code
     })
   def forward(self, x:torch.Tensor, metadata:OpenMMMetadata):
@@ -46,24 +51,29 @@ class ResiduesEncode(nn.Module):
 
 
 class SingleResidueDecode(nn.Module):
-  def __init__(self, natom:int, vdim:int):
+  def __init__(self, natom:int, vdim:int, nlin:int=1):
     super().__init__()
     self.natom = natom
-    self.lin = VecLinear(vdim, natom)
+    self.layers = nn.Sequential(*(
+      [
+        VecLinear(vdim, vdim)
+        for i in range(nlin - 1)
+      ] +
+      [VecLinear(vdim, natom)]))
   def init_to_zeros(self):
     with torch.no_grad():
-      self.lin.W.zero_()
+      self.layers[-1].W.zero_()
   def forward(self, pos_ca:torch.Tensor, x_v:torch.Tensor):
     """ pos_ca: (batch, 3)
         x_v: (batch, vdim, 3)
         ans: (batch, natom, 3) """
-    return pos_ca[:, None] + self.lin(x_v)
+    return pos_ca[:, None] + self.layers(x_v)
 
 class ResiduesDecode(nn.Module):
-  def __init__(self, vdim:int):
+  def __init__(self, vdim:int, nlin:int=1):
     super().__init__()
     self.res_dec = nn.ModuleDict({
-      letter: SingleResidueDecode(get_residue_len(letter), vdim)
+      letter: SingleResidueDecode(get_residue_len(letter), vdim, nlin=nlin)
       for letter in letter_code
     })
   def init_to_zeros(self):
@@ -77,3 +87,29 @@ class ResiduesDecode(nn.Module):
       self.res_dec[letter](pos_ca[:, i], x_v[:, i])
       for i, letter in enumerate(metadata.seq)
     ], dim=1) # dim=1 because batch
+
+class AddVec(nn.Module):
+  def __init__(self, adim):
+    super().__init__()
+    self.vec = nn.Parameter(torch.empty(adim))
+  def self_init(self):
+    with torch.no_grad():
+      self.vec.zero_()
+  def forward(self, x_a, metadata):
+    batch, nodes, adim = x_a.shape
+
+
+class ResidueEmbed(nn.Module):
+  def __init__(self, adim):
+    super().__init__()
+    self.embeddings = nn.ParameterDict({
+      letter: nn.Parameter(torch.empty(adim))
+      for letter in letter_code
+    })
+  def self_init(self):
+    with torch.no_grad():
+      for letter in self.embeddings:
+        self.embeddings[letter].zero_()
+  def forward(self, metadata:OpenMMMetadata):
+    """ ans: (1, nodes, adim) """
+    return torch.stack([self.embeddings[res] for res in metadata.seq], dim=0)[None]

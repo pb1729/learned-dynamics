@@ -6,9 +6,9 @@ from managan.config import Config
 from managan.train import training_run
 
 
-SIMTYPE = "A_t20_L40_m20_M25"#"A_t2000_L40_m20_M45"
-ARCH = "wgan_3d_newblock11_res"
-RUN_ID = "T5"
+SIMTYPE = "A_t220_L20_m3_M10"#"A_t2000_L40_m20_M45"
+ARCH = "wgan_3d_newblock12_res"
+RUN_ID = "T6"
 
 NSTEPS_LIST = [512*i for i in range(1, 33)]
 
