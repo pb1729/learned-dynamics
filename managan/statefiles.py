@@ -43,7 +43,8 @@ def save_predictor_params_to_file(file:BufferedWriter, predictor):
     box = tuple(box.cpu().numpy())
   pickle.dump({
     "box": box,
-    "shape": predictor.shape()
+    "shape": predictor.shape(),
+    "name": predictor.name,
   }, file)
 
 def read_predictor_params_from_file(file:BufferedReader):
