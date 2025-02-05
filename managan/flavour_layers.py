@@ -88,16 +88,6 @@ class ResiduesDecode(nn.Module):
       for i, letter in enumerate(metadata.seq)
     ], dim=1) # dim=1 because batch
 
-class AddVec(nn.Module):
-  def __init__(self, adim):
-    super().__init__()
-    self.vec = nn.Parameter(torch.empty(adim))
-  def self_init(self):
-    with torch.no_grad():
-      self.vec.zero_()
-  def forward(self, x_a, metadata):
-    batch, nodes, adim = x_a.shape
-
 
 class ResidueEmbed(nn.Module):
   def __init__(self, adim):
@@ -113,3 +103,24 @@ class ResidueEmbed(nn.Module):
   def forward(self, metadata:OpenMMMetadata):
     """ ans: (1, nodes, adim) """
     return torch.stack([self.embeddings[res] for res in metadata.seq], dim=0)[None]
+
+
+class ResiduesDecodeVec(nn.Module):
+  """ decode to a translation-invariant vector for each non-hydrogen atom in the residue """
+  def __init__(self, vdim:int, nlin:int=1):
+    super().__init__()
+    self.res_dec = nn.ModuleDict({
+      letter: nn.Sequential(
+        *[VecLinear(vdim, vdim) for i in range(nlin - 1)],
+        VecLinear(vdim, get_residue_len(letter)))
+      for letter in letter_code
+    })
+  def init_to_zeros(self):
+    with torch.no_grad():
+      for res in self.res_dec:
+        self.res_dec[res][-1].W.zero_()
+  def forward(self, x_v, metadata:OpenMMMetadata):
+    return torch.cat([
+      self.res_dec[letter](x_v[:, i])
+      for i, letter in enumerate(metadata.seq)
+    ], dim=1) # dim=1 because batch
