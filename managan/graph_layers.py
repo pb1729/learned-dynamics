@@ -19,7 +19,6 @@ class Graph:
     self.edge_indices = edge_indices
     self.batch = batch
     self.nodes = nodes
-    assert self.src.shape[0] > 0, "Tried to create a graph with 0 edges."
   @staticmethod
   def radius_graph(r0, box, pos, celllist_max=32, neighbours_max=64):
     """ Return an instance of graph where nodes are connected if they are within r0 of each other.

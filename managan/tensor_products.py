@@ -19,11 +19,15 @@ class _TensLinearCuda(torch.autograd.Function):
     dim_out, dim_in = W.shape
     *rest, must_be[dim_in] = x.shape[:len(x.shape) - inds]
     ctx.tens_linear_shapedata = (inds, rest, dim_in, dim_out)
+    if prod(rest) == 0: # special handling for zero-size tensors
+      return torch.zeros(*rest, dim_out, *[3]*inds, device=x.device)
     return tensor_linear(inds, W, x.reshape(prod(rest), dim_in, 3**inds)).reshape(*rest, dim_out, *[3]*inds)
   @staticmethod
   def backward(ctx, grad_output):
     inds, rest, dim_in, dim_out = ctx.tens_linear_shapedata
     W, x = ctx.saved_tensors
+    if prod(rest) == 0: # special handling for zero-size tensors
+      return None, torch.zeros_like(W), torch.zeros_like(x)
     WT = W.detach().transpose(0, 1).contiguous()
     dout = grad_output.reshape(prod(rest), dim_out, 3**inds)
     dx = tensor_linear(inds, WT, dout).reshape(*rest, dim_in, *[3]*inds)
