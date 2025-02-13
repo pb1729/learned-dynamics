@@ -8,7 +8,7 @@ import torch
 
 import openmm
 from openmm.vec3 import Vec3
-from openmm.app import PDBFile, Modeller, ForceField, Simulation, PME
+from openmm.app import PDBFile, Modeller, ForceField, Simulation, PME, NoCutoff
 from openmm.unit import Quantity, angstrom, kelvin, pico, second
 
 from .seq2pdbchain.amino_data import letter_code, structures
@@ -21,9 +21,6 @@ ANGSTROM = Quantity(1., unit=angstrom)
 PICOSEC  = Quantity(1., unit=pico*second)
 LETTERS = [letter for letter in letter_code]
 RES_CODE = {letter_code[letter]: letter for letter in letter_code}
-
-# force field
-FF = ForceField('amber14-all.xml', 'amber14/tip3pfb.xml')
 
 
 class XReporter:
@@ -52,10 +49,14 @@ def pdb_check_box(pdb:PDBFile, boxsz:float):
 
 def hydrogenate_and_solvate(pdb:PDBFile, ff:ForceField, boxsz:float):
   # http://docs.openmm.org/latest/userguide/application/03_model_building_editing.html
-  pdb.positions
   modeller = Modeller(pdb.topology, pdb.positions)
   modeller.addHydrogens(ff)
   modeller.addSolvent(ff, boxSize=Vec3(boxsz, boxsz, boxsz)*angstrom)
+  return modeller
+
+def hydrogenate(pdb:PDBFile, ff:ForceField):
+  modeller = Modeller(pdb.topology, pdb.positions)
+  modeller.addHydrogens(ff)
   return modeller
 
 
@@ -67,12 +68,14 @@ def get_get_random_seq(lmin:int, lmax:int):
 
 
 class OpenMMConfig:
-  ff = FF
-  def __init__(self, dt:int, boxsz:float, temp:float, sample_seq:Callable[[], str]):
+  def __init__(self, dt:int, boxsz:float, temp:float, sample_seq:Callable[[], str], ff:ForceField,
+      implicit_water=False):
     self.dt = dt # number of simulation steps, in units of [0.002ps]
     self.boxsz = boxsz
     self.temp = temp
     self.sample_seq = sample_seq
+    self.ff = ff
+    self.implicit_water = implicit_water
   def _sample_pdb(self, seq):
     for _ in range(10):
       pdb = init_pdb(seq)
@@ -99,10 +102,13 @@ class OpenMMConfig:
         atomic_nums.append(atom.element.atomic_number)
     return OpenMMMetadata("".join(seq), np.array(atomic_nums), np.array(atom_indices), np.array(residue_indices))
   def _pdb_to_sim(self, pdb):
-    modeller = hydrogenate_and_solvate(pdb, self.ff, self.boxsz)
+    if self.implicit_water:
+      modeller = hydrogenate(pdb, self.ff)
+    else:
+      modeller = hydrogenate_and_solvate(pdb, self.ff, self.boxsz)
     metadata = self._get_sys_metadata(modeller)
     integrator = openmm.LangevinMiddleIntegrator(self.temp*kelvin, 1/PICOSEC, 0.002*PICOSEC)
-    system = self.ff.createSystem(modeller.topology, nonbondedMethod=PME)
+    system = self.ff.createSystem(modeller.topology, nonbondedMethod=(NoCutoff if self.implicit_water else PME))
     simulation = Simulation(modeller.topology, system, integrator)
     simulation.context.setPositions(modeller.positions)
     return metadata, simulation
@@ -136,8 +142,14 @@ class OpenMMConfig:
     return metadata, sims, reporters
 
 
+# force fields
+FF_DEFAULT = ForceField('amber14-all.xml', 'amber14/tip3pfb.xml')
+FF_DRY     = ForceField('amber14-all.xml', 'implicit/gbn2.xml')
+
+# define sims
 openmm_sims = RegexDict(
   # A_ sims have T at 300K. example: A_t6000_L40_m20_M60
-  ("A_t%d_L%d_m%d_M%d", lambda t, L, m, M: OpenMMConfig(t, float(L), 300., get_get_random_seq(m, M))),
-  ("SEQ_t%d_L%d_seq%Q", lambda t, L, seq: OpenMMConfig(t, float(L), 300., lambda: seq))
+  ("A_t%d_L%d_m%d_M%d", lambda t, L, m, M: OpenMMConfig(t, float(L), 300., get_get_random_seq(m, M), FF_DEFAULT)),
+  ("SEQ_t%d_L%d_seq%Q", lambda t, L, seq: OpenMMConfig(t, float(L), 300., lambda: seq, FF_DEFAULT)),
+  ("SEQ_DRY_t%d_seq%Q", lambda t, seq: OpenMMConfig(t, float("inf"), 300., lambda: seq, FF_DRY, implicit_water=True))
 )
