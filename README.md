@@ -26,11 +26,12 @@ Here we show how to create a virutalenv that has the needed packages. Work in pr
 * `pip install numpy matplotlib`
 * Install torch according to instructions [here](https://pytorch.org/get-started/locally/). (torchvision and torchaudio not needed)
     * Quite likely just `pip install torch`
+    * Make sure you get CUDA support.
 * Enter a python repl and print `torch.__version__`. You'll get some version, eg. `2.5.1+cu124`.
 * `pip install torch-scatter -f https://data.pyg.org/whl/torch-2.5.1+cu124.html` where the `2.5.1+cu124` is replaced by your `torch.__version__`
 * Clone this repo into your environment and cd there. Now we install the extensions and atoms-display.
 * Extensions:
-    * Go into each extension's directory.
+    * Go into each extension's directory under `extensions/`
     * `pip install .`
 * atoms-display:
     * You only need this if your want to visualize trajectories. It depends on [pyopengl](https://pypi.org/project/PyOpenGL/).
