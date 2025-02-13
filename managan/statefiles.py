@@ -39,8 +39,6 @@ def read_state_from_file(file:BufferedReader):
 
 def save_predictor_params_to_file(file:BufferedWriter, predictor):
   box = predictor.get_box()
-  if box is not None:
-    box = tuple(box.cpu().numpy())
   pickle.dump({
     "box": box,
     "shape": predictor.shape(),
@@ -49,7 +47,6 @@ def save_predictor_params_to_file(file:BufferedWriter, predictor):
 
 def read_predictor_params_from_file(file:BufferedReader):
   metadata = pickle.load(file)
-  metadata["box"] = torch.tensor(metadata["box"], device="cuda")
   return metadata
 
 

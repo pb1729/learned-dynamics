@@ -62,6 +62,7 @@ def rdf_plot(args, predictors, x_list, labels):
     delta_x = x[:, :, None] - x[:, None, :] # (batch, nodes, nodes, 3)
     box = predictor.get_box()
     if box is not None:
+      box = np.array(box)
       rmax = (box.min()/2).item()
       delta_x =(delta_x + box/2)%box - box/2
     else:

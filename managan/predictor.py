@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from typing import Optional
-from typing_extensions import Self, List
+from typing_extensions import Self, List, Tuple
 
 from .utils import prod, batched_model_eval
 from .sim_utils import OpenMMMetadata, OpenMMSimError
@@ -80,7 +80,7 @@ class Predictor:
         MUTATES state
         ret: return the trajectory as a ModelState """
     assert False, "this class not concretely implemented!"
-  def get_box(self) -> Optional[torch.Tensor]:
+  def get_box(self) -> Optional[Tuple[float, float, float]]:
     return None
 
 
@@ -227,7 +227,7 @@ else:
       if ret:
         return ModelState(state.shape, trajectory)
     def get_box(self):
-      return torch.tensor(self.hoomd_sim.box, dtype=torch.float32, device="cuda")
+      return self.hoomd_sim.box
   def get_hoomd_predictor(key):
     return HoomdPredictor(hoomd_sims[key])
 
@@ -289,6 +289,6 @@ else:
         return ModelState(state.shape, trajectory, metadata=state.metadata)
     def get_box(self):
       boxsz = self.openmm_config.boxsz
-      return torch.tensor((boxsz, boxsz, boxsz), device="cuda")
+      return (boxsz, boxsz, boxsz)
   def get_openmm_predictor(key):
     return OpenMMPredictor(openmm_sims[key])

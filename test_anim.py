@@ -53,7 +53,7 @@ def main(args):
   box = None
   if args.wrap:
     box = predictor.get_box()
-  if box is not None: box = box.cpu().numpy()
+  if box is not None: box = np.array(box)
   def clean_for_display(x):
     if box is not None:
       x = (x + 0.5*box) % box - 0.5*box

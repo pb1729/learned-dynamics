@@ -352,8 +352,8 @@ class DiffusionDenoiser:
     self.dn = Denoiser(config).to(config.device)
     self.dn.apply(weights_init)
     assert space_dim(config) == 3
-    self.tensbox = config.predictor.get_box()
-    self.box = (self.tensbox[0].item(), self.tensbox[1].item(), self.tensbox[2].item())
+    self.box = config.predictor.get_box()
+    self.tensbox = torch.tensor(self.box, dtype=torch.float32, device="cuda")
     self.sigma_max = config["sigma_max"]
     self.init_optim()
   def init_optim(self):

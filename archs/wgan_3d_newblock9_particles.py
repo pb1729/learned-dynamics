@@ -404,8 +404,8 @@ class WGAN3D:
     self.config = config
     assert space_dim(config) == 3
     self.n_nodes = poly_len(config)
-    self.tensbox = config.predictor.get_box()
-    self.box = (self.tensbox[0].item(), self.tensbox[1].item(), self.tensbox[2].item())
+    self.box = config.predictor.get_box()
+    self.tensbox = torch.tensor(self.box, dtype=torch.float32, device="cuda")
     self.init_optim()
   def init_optim(self):
     betas = (self.config["beta_1"], self.config["beta_2"])

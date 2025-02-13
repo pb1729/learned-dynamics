@@ -83,6 +83,7 @@ def main(args):
     if box is None:
       symms = [RotSymm(), TransSymm()]
     else:
+      torch.tensor(box, dtype=torch.float32, device="cuda")
       symms = [AxisRotSymm(box), TransSymm(), BoxSymm(box)]
     model = predictor.model
     state = predictor.sample_q(1)
