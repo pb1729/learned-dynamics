@@ -57,7 +57,7 @@ class State:
     assert False, "reshape not implemented for this State subclass"
   def _reshape_tens(self, tens, newsize):
     assert prod(newsize) == prod(self.size), f"can't reshape {self.size} to {newsize}"
-    return tens.reshape(*(newsize + self.size))
+    return tens.reshape(*(newsize + self.shape))
   @property
   def metadata(self) -> Optional[OpenMMMetadata]:
     return None
