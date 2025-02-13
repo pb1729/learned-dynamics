@@ -63,7 +63,11 @@ def main(args):
     make_linear(state)
   atomic_nums = state.metadata.atomic_nums if state.metadata is not None else 5*np.ones(poly_len(predictor), dtype=int)
   display = launch_atom_display(atomic_nums, clean_for_display(state.x_npy))
+  i = 0
   while True:
+    if args.printevery is not None and i % args.printevery == 0:
+      print(i)
+    i += 1
     predictor.predict(1, state, ret=False)
     if args.slideshow:
       input("...")
@@ -84,4 +88,5 @@ if __name__ == "__main__":
   parser.add_argument("--wrap", dest="wrap", action="store_true")
   parser.add_argument("--startlinear", dest="startlinear", action="store_true")
   parser.add_argument("--override", dest="override", type=str, default=None)
+  parser.add_argument("--printevery", dest="printevery", type=int, default=None)
   main(parser.parse_args())
