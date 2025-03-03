@@ -6,6 +6,7 @@ from predictor_argparse_util import args_to_predictor_list, add_model_list_arg
 
 
 def get_rms_diffusion(traj):
+  """ traj: (L, batch, atoms, 3) """
   return np.sqrt(((traj - traj[0, None])**2).sum(-1).mean(-1).mean(-1))
 
 
