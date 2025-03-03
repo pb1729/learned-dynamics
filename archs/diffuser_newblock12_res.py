@@ -386,6 +386,8 @@ class DiffusionDenoiser:
     lr_fac = self.config["lr_fac"]
     for group in self.optim.param_groups: # learning rate schedule
       group["lr"] *= lr_fac
+  def sigma_t(self, t):
+    return nodecay_cosine_schedule(t, self.sigma_max)
   def _diffuser_step(self, x, metadata):
     """ x: (L, batch, poly_len, 3) """
     L, batch, atoms, must_be[3] = x.shape
@@ -394,9 +396,8 @@ class DiffusionDenoiser:
     x_1 = x[1:].reshape((L - 1)*batch, atoms, 3)
     t = torch.rand((L - 1)*batch, device=x.device)
     epsilon = torch.randn_like(x_0)
-    x_1_noised = x_1 + nodecay_cosine_schedule(t, self.sigma_max)[:, None, None]*epsilon
+    x_1_noised = x_1 + self.sigma_t(t)[:, None, None]*epsilon
     x_1_pred = self.dn(t, x_0, x_1_noised, self.box, metadata)
-    epsilon_pred = self.dn(t, x_0, x_1_noised, self.box, metadata)
     loss = ((x_1_pred - x_1)**2).mean()
     self.optim.zero_grad()
     loss.backward()
@@ -407,7 +408,7 @@ class DiffusionDenoiser:
     batch = prod(leading_dims)
     x_0 = x_0.reshape(batch, atoms, 3)
     ans = x_0.clone()
-    for t_item in np.linspace(1., 0.1, 8):
+    for t_item in np.linspace(1., 0.07, 4):
       t = torch.tensor([t_item], device=x_0.device, dtype=torch.float32)
       sigma_t = nodecay_cosine_schedule(t, self.sigma_max)[:, None, None]
       epsilon = torch.randn_like(ans)
