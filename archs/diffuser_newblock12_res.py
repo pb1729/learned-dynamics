@@ -396,9 +396,10 @@ class DiffusionDenoiser:
     x_1 = x[1:].reshape((L - 1)*batch, atoms, 3)
     t = torch.rand((L - 1)*batch, device=x.device)
     epsilon = torch.randn_like(x_0)
-    x_1_noised = x_1 + self.sigma_t(t)[:, None, None]*epsilon
+    sigma = self.sigma_t(t)[:, None, None]
+    x_1_noised = x_1 + sigma*epsilon
     x_1_pred = self.dn(t, x_0, x_1_noised, self.box, metadata)
-    loss = ((x_1_pred - x_1)**2).mean()
+    loss = (((x_1_pred - x_1)/(0.4 + sigma))**2).mean()
     self.optim.zero_grad()
     loss.backward()
     self.optim.step()
