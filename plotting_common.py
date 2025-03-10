@@ -49,6 +49,16 @@ def squarish_factorize(n):
   return n//best_y, best_y
 
 
+def approx_squarish_factorize(n):
+  """ plotting utility function, gives a nearly square factorization of n or a number a little larger than n
+      returns integers x, y with x >= y """
+  best_y, best_m = 1, n
+  for m in range(n, n + int(n**0.5) + 1):
+    for y in range(2, int(n**0.5) + 1):
+      if m % y == 0 and y > best_y:
+        best_y, best_m = y, m
+  return best_m//best_y, best_y
+
 class Plotter:
   def __init__(self, hist_transform=basis_transform_coords, flash_plot=False, samples_subset_size=20, title=None):
     self.hist_transform = hist_transform

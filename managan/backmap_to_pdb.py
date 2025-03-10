@@ -36,9 +36,21 @@ def pdb_to_mdtraj(pdb:str):
 
 
 def model_state_to_mdtraj(state):
-  size = state.size
-  state = state.reshape(prod(size))
+  """ state: ModelState (L,) """
+  L, = state.size
   mdtrajecs = [
     pdb_to_mdtraj(model_state_to_pdb(state[i]))
-    for i in range(prod(size))]
+    for i in range(L)]
   return mdtraj.join(mdtrajecs)
+
+def model_states_to_mdtrajs(state):
+  """ state: ModelState (L, batch) """
+  L, batch = state.size
+  state = state.reshape(L, batch)
+  return [
+    mdtraj.join([
+      pdb_to_mdtraj(model_state_to_pdb(state[j, i]))
+      for j in range(L)
+    ])
+    for i in range(batch)
+  ]
