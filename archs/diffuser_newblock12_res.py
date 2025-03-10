@@ -391,7 +391,6 @@ class DiffusionDenoiser:
   def _diffuser_step(self, x, metadata):
     """ x: (L, batch, poly_len, 3) """
     L, batch, atoms, must_be[3] = x.shape
-    # TODO: remember that we could train multiple diffusers for each of several lag times
     x_0 = x[:-1].reshape((L - 1)*batch, atoms, 3)
     x_1 = x[1:].reshape((L - 1)*batch, atoms, 3)
     t = torch.rand((L - 1)*batch, device=x.device)
@@ -404,17 +403,22 @@ class DiffusionDenoiser:
     loss.backward()
     self.optim.step()
     return loss.item()
-  def generate(self, x_0, metadata):
+  def generate(self, x_0, metadata, steps=12):
     *leading_dims, atoms, must_be[3] = x_0.shape
     batch = prod(leading_dims)
     x_0 = x_0.reshape(batch, atoms, 3)
-    ans = x_0.clone()
-    for t_item in np.linspace(1., 0.07, 4):
-      t = torch.tensor([t_item], device=x_0.device, dtype=torch.float32)
-      sigma_t = nodecay_cosine_schedule(t, self.sigma_max)[:, None, None]
+    ans = x_0 + self.sigma_t(torch.zeros(1, device=x_0.device))[:, None, None]*self.randgen.randn(1, x_0.shape[:-1])
+    t_list = np.linspace(0., 1., steps + 1)
+    for i in range(steps):
+      t = torch.tensor([t_list[i]], device=x_0.device, dtype=torch.float32)
+      tdec= torch.tensor([t_list[i + 1]], device=x_0.device, dtype=torch.float32)
+      sigma_t = self.sigma_t(t)[:, None, None]
+      sigma_tdec = self.sigma_t(tdec)[:, None, None]
+      dsigma = torch.sqrt(sigma_t**2 - sigma_tdec**2)
+      pred_noise = ans - self.dn(t, x_0, ans, self.box, metadata)
+      ans -= ((dsigma/sigma_t)**2)*pred_noise
       epsilon = torch.randn_like(ans)
-      ans += sigma_t*epsilon
-      ans = self.dn(t, x_0, ans, self.box, metadata)
+      ans += (dsigma*sigma_tdec/sigma_t)*epsilon
     return ans.reshape(*leading_dims, atoms, 3)
   def set_eval(self, bool_eval):
     if bool_eval:
