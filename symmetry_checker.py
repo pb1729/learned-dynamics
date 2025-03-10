@@ -71,7 +71,8 @@ class BoxSymm(Symmetry):
   def pos(self, p_v):
     generator = torch.Generator(device=p_v.device)
     generator.manual_seed(self.seed) # ensure displacements will be consistent
-    displacements = self.box*torch.randint(-4, 5, p_v.shape, device=p_v.device, generator=generator)
+    box = torch.tensor(self.box, device=p_v.device)
+    displacements = box*torch.randint(-4, 5, p_v.shape, device=p_v.device, generator=generator)
     return p_v + displacements
 
 
