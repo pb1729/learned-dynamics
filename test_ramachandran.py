@@ -63,8 +63,8 @@ def tcorr_plot(angles):
   for i in range(npep):
     ax_phi = axs_flat[2*i]
     ax_psi = axs_flat[2*i + 1]
-    ax_phi.set_ylabel(f"bond {i}: φ [rad]")
-    ax_psi.set_ylabel(f"bond {i}: ψ [rad]")
+    ax_phi.set_ylabel(f"bond {i}: <cos(φ(0) - φ(t))>")
+    ax_psi.set_ylabel(f"bond {i}: <cos(ψ(0) - ψ(t))>")
     for ax in [ax_phi, ax_psi]:
       ax.set_xlabel("time [steps]")
       ax.legend()
