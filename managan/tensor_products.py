@@ -29,7 +29,7 @@ class _TensLinearCuda(torch.autograd.Function):
     if prod(rest) == 0: # special handling for zero-size tensors
       return None, torch.zeros_like(W), torch.zeros_like(x)
     WT = W.detach().transpose(0, 1).contiguous()
-    dout = grad_output.reshape(prod(rest), dim_out, 3**inds)
+    dout = grad_output.reshape(prod(rest), dim_out, 3**inds).contiguous()
     dx = tensor_linear(inds, WT, dout).reshape(*rest, dim_in, *[3]*inds)
     dW = tensor_linear_backward(inds, x.reshape(prod(rest), dim_in, 3**inds), dout)
     return None, dW, dx

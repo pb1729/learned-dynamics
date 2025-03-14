@@ -3,7 +3,7 @@ import numpy as np
 from typing import Optional
 from typing_extensions import Self, List, Tuple
 
-from .utils import prod, batched_model_eval
+from .utils import must_be, prod, batched_model_eval
 from .sim_utils import OpenMMMetadata, OpenMMSimError
 from .sims import sims
 
@@ -180,6 +180,59 @@ class ModelPredictor(Predictor):
   def get_box(self):
     return self.get_base_predictor().get_box()
 
+
+class LongModelPredictor(Predictor):
+  """ Like a ModelPredictor, except states consist of several states in a row.
+      We expect states to have a size,shape of (framelen, *size)(*shape)."""
+  def __init__(self, model):
+    model.set_eval(True)
+    self.model = model
+    self.framelen = model.config["framelen"]
+  def shape(self):
+    return self.get_base_predictor().shape()
+  '''def _long_state_to_state(self, long_state:ModelState):
+    """ long_state: (*size)(framelen, *base_shape)
+        ans: (framelen, *size)(*base_shape) """
+    size = long_state.size
+    must_be[self.framelen], *base_shape = long_state.shape
+    return ModelState(base_shape,
+      long_state.x.permute(len(size), *range(len(size)), *range(len(size) + 1, len(size) + 1 + len(base_shape))),
+      **long_state.kwargs)
+  def _state_to_long_state(self, state:ModelState):
+    """ state: (framelen, *size)(*base_shape)
+        ans: (*size)(framelen, *base_shape) """
+    must_be[self.framelen], *size = state.size
+    base_shape = state.shape
+    return ModelState((self.framelen,) + base_shape,
+      state.x.permute(*range(1, 1 + len(size)), 0, *range(len(size) + 1, len(size) + 1 + len(base_shape))),
+      **state.kwargs)'''
+  def predict(self, L, state, ret=True):
+    """ MUTATES state.
+        state: (*size)(framelen, *base_shape)
+        NOTE: creates a normal-looking trajectory with shape (L, *base_shape) not (L, framelen, *base_shape) """
+    must_be[self.framelen], *size = state.size
+    trajectory = torch.zeros(self.framelen + L, *size, *state.shape,
+      dtype=state._x.dtype, device=state._x.device)
+    trajectory[:self.framelen] = state.x
+    with torch.no_grad():
+      for i in range(L):
+        state._x[:] = trajectory[i:(self.framelen + i)]
+        new_x = self.model.predict(state)
+        trajectory[self.framelen + i] = new_x
+      state._x[:] = trajectory[-self.framelen:]
+    if ret:
+      return ModelState(state.shape, trajectory[self.framelen:], **state.kwargs)
+  def sample_q(self, batch):
+    base_pred = self.get_base_predictor()
+    state = base_pred.sample_q(batch)
+    size, shape = state.size, state.shape
+    return base_pred.predict(self.framelen, state)
+    '''    (must_be[batch],), shape = state.size, state.shape
+    traj = base_pred.predict(self.framelen, state)'''
+  def get_base_predictor(self) -> Predictor:
+    return self.model.config.predictor
+  def get_box(self):
+    return self.get_base_predictor().get_box()
 
 
 try:

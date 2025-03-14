@@ -1,7 +1,7 @@
 from typing_extensions import List
 
 from managan.config import get_predictor
-from managan.predictor import Predictor, ModelPredictor
+from managan.predictor import Predictor, ModelPredictor, LongModelPredictor
 
 
 def args_to_predictor_list(args):
@@ -15,7 +15,7 @@ def model_list_to_predictor_list(models, overrides=None) -> List[Predictor]:
   ans = []
   for model, override in zip(models, overrides):
     predictor:Predictor = get_predictor(model, override_base=override)
-    if isinstance(predictor, ModelPredictor): # add the base predictor for a model first.
+    if isinstance(predictor, ModelPredictor) or isinstance(predictor, LongModelPredictor): # add the base predictor for a model first.
       ans.append(predictor.get_base_predictor())
     ans.append(predictor)
   return ans

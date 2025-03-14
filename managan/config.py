@@ -2,7 +2,7 @@ import torch
 import importlib
 
 from .statefiles import get_dataset_predictor, get_strided_dataset_predictor
-from .predictor import Predictor, ModelPredictor, get_sim_predictor, get_hoomd_predictor, get_openmm_predictor
+from .predictor import Predictor, ModelPredictor, LongModelPredictor, get_sim_predictor, get_hoomd_predictor, get_openmm_predictor
 
 
 ARCH_PREFIX = "archs."
@@ -27,6 +27,8 @@ def get_predictor(predictor_spec, override_base=None):
     ans = get_strided_dataset_predictor(rest)
   elif "model" == pred_type: # treat "rest" as a path
     ans = ModelPredictor(load(rest, override_base))
+  elif "lmodel" == pred_type: # treat "rest" as a path
+    ans = LongModelPredictor(load(rest, override_base))
   elif "dummy" == pred_type:
     ans = Predictor()
   else: assert False, "unknown predictor type"

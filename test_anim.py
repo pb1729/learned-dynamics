@@ -10,35 +10,6 @@ from managan.config import get_predictor
 from managan.utils import must_be
 
 
-SHOW_REALSPACE_SAMPLES = 10
-RADIAL = True
-
-
-def compare_predictions_x(x_init, x_actual, predictor, basis, show_histogram=True):
-  x_init   = x_init  .cpu().numpy().reshape(-1, poly_len(predictor), space_dim(predictor))
-  x_actual = x_actual.cpu().numpy().reshape(-1, poly_len(predictor), space_dim(predictor))
-  plotter = Plotter(BASES[basis], samples_subset_size=SHOW_REALSPACE_SAMPLES, title=("basis type = " + basis))
-  plotter.plot_samples(x_actual)
-  plotter.plot_samples_ic(x_init)
-  plotter.show()
-  if show_histogram:
-    if RADIAL:
-      plotter.plot_hist_radial(x_actual)
-    else:
-      plotter.plot_hist(x_actual)
-      plotter.plot_hist_ic(x_init)
-    plotter.show()
-
-
-def eval_sample_step(init_states, fin_statess, predictor, basis):
-  batch, contins, _ = fin_statess.shape
-  for i in range(batch):
-    print("\nnext i.c: i=%d\n" % i)
-    init_state = init_states[i, None]
-    fin_states = fin_statess[i, :]
-    compare_predictions_x(init_state, fin_states, predictor, basis)
-
-
 def make_linear(state):
   """ MUTATES state """
   _, nodes, must_be[3] = state.x.shape
@@ -49,12 +20,15 @@ def make_linear(state):
 def main(args):
   # get comparison data
   predictor = get_predictor(args.predictor_spec, override_base=args.override)
-  assert space_dim(predictor) == 3
+  #assert space_dim(predictor) == 3 # TODO: salvage this somehow?
   box = None
   if args.wrap:
     box = predictor.get_box()
   if box is not None: box = np.array(box)
-  def clean_for_display(x):
+  def clean_for_display(state):
+    if len(state.size) == 2: # handle the case where state consists of multiple time-lagged configurations
+      state = state[-1] # use most recent configuration
+    x = state.x_npy
     if box is not None:
       x = (x + 0.5*box) % box - 0.5*box
     return x[0]
@@ -62,7 +36,7 @@ def main(args):
   if args.startlinear:
     make_linear(state)
   atomic_nums = state.metadata.atomic_nums if state.metadata is not None else 5*np.ones(poly_len(predictor), dtype=int)
-  display = launch_atom_display(atomic_nums, clean_for_display(state.x_npy))
+  display = launch_atom_display(atomic_nums, clean_for_display(state))
   i = 0
   while True:
     if args.printevery is not None and i % args.printevery == 0:
@@ -71,7 +45,7 @@ def main(args):
     predictor.predict(1, state, ret=False)
     if args.slideshow:
       input("...")
-    display.update_pos(clean_for_display(state.x_npy))
+    display.update_pos(clean_for_display(state))
     if args.center:
       display.center_pos()
     if args.framedelay > 0:
