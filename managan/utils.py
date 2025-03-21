@@ -41,6 +41,8 @@ def avg_relative_diff(a, b, show_as_plot=False):
     plt.show()
   return y.mean()
 
+def typsz(x:torch.Tensor):
+  return ((x**2).mean()**0.5).item()
 
 # OTHER STUFF...
 
