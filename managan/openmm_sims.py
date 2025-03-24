@@ -1,4 +1,5 @@
 import io
+import os
 import random
 from typing_extensions import List, Tuple, Callable
 import warnings
@@ -14,6 +15,7 @@ from openmm.unit import Quantity, angstrom, kelvin, pico, second
 from .seq2pdbchain.amino_data import letter_code, structures
 from .seq2pdbchain.seq2pdbchain import pdb_chain
 from .sim_utils import RegexDict, OpenMMMetadata
+from .amino_seq_markov import generate_seq
 
 
 # constants
@@ -65,6 +67,42 @@ def get_get_random_seq(lmin:int, lmax:int):
     length = random.randint(lmin, lmax)
     return "".join([random.choice(LETTERS) for _ in range(length)])
   return get_random_seq
+
+def get_get_mutated_seq(lmin:int, lmax:int, seqs_envvar_nm:str, cutsz:int=10):
+  def mutated_seq_generator():
+    seqsfnm = os.environ.get(seqs_envvar_nm)
+    if seqsfnm is None:
+      raise ValueError(f"Environment variable {seqs_envvar_nm} not set")
+    with open(seqsfnm, "r") as f:
+      seqs = [line.strip() for line in f.readlines()]
+    random.shuffle(seqs)
+    for seq in seqs:
+      if len(seq) < lmin:
+        l_desired = random.randint(lmin, lmax)
+        mutation = generate_seq(l_desired - len(seq), init=seq)
+        yield seq + mutation
+      elif len(seq) > lmax:
+        ncuts = len(seq)//cutsz
+        cuts = [0, len(seq)] + [random.randint(1, len(seq) - 1) for i in range(ncuts)]
+        cuts.sort()
+        segments = [seq[cuts[i]:cuts[i + 1]] for i in range(ncuts + 1)]
+        long_seq = ""
+        for seg in segments[:-1]:
+          long_seq += seg
+          long_seq += generate_seq(random.randint(1, cutsz), init=long_seq)
+        long_seq += segments[-1]
+        while len(long_seq) > lmax:
+          end_idx = random.randint(lmin, lmax)
+          yield long_seq[:end_idx]
+          long_seq = long_seq[end_idx:]
+        if len(long_seq) >= lmin:
+          yield long_seq
+      else:
+        yield seq
+  seqgen = mutated_seq_generator()
+  def get_mutated_seq():
+    return next(seqgen)
+  return get_mutated_seq
 
 
 class OpenMMConfig:
@@ -150,6 +188,9 @@ FF_DRY     = ForceField('amber14-all.xml', 'implicit/gbn2.xml')
 openmm_sims = RegexDict(
   # A_ sims have T at 300K. example: A_t6000_L40_m20_M60
   ("A_t%d_L%d_m%d_M%d", lambda t, L, m, M: OpenMMConfig(t, float(L), 300., get_get_random_seq(m, M), FF_DEFAULT)),
+  ("B_t%d_L%d_m%d_M%d", lambda t, L, m, M: OpenMMConfig(t, float(L), 300., get_get_mutated_seq(m, M, "MANAGAN_SEQS_LOC"), FF_DEFAULT)),
   ("SEQ_t%d_L%d_seq%Q", lambda t, L, seq: OpenMMConfig(t, float(L), 300., lambda: seq, FF_DEFAULT)),
   ("SEQ_DRY_t%d_seq%Q", lambda t, seq: OpenMMConfig(t, float("inf"), 300., lambda: seq, FF_DRY, implicit_water=True))
 )
+
+
