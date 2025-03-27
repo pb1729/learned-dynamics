@@ -540,9 +540,10 @@ class WGAN3D:
         model = self.distill_models[nsteps]
         t = torch.rand((L - nsteps)*batch, device=x.device)
         epsilon = torch.randn_like(x_1_g)
-        x_1_g_noised = x_1_g + model.sigma_t(t)[:, None, None]*epsilon
+        sigma = model.sigma_t(t)[:, None, None]
+        x_1_g_noised = x_1_g + sigma*epsilon
         x_1_g_pred = model.dn(t, x_0, x_1_g_noised, self.box, metadata)
-        loss = loss + self.config["distill_lambdas"][nsteps]*((x_1_g_pred - x_1_g)**2).mean()
+        loss = loss + self.config["distill_lambdas"][nsteps]*(((x_1_g_pred - x_1_g.detach())/(0.4 + sigma))**2).mean()
     # backprop, update
     self.optim_g.zero_grad()
     loss.backward()

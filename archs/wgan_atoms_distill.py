@@ -634,7 +634,7 @@ class WGAN3D:
         sigma = model.sigma_t(t)[:, None, None]
         x_1_g_noised = x_1_g + sigma*epsilon
         x_1_g_pred = model.dn(t, x_0, x_1_g_noised, self.box, metadata)
-        loss = loss + self.config["distill_lambdas"][nsteps]*(((x_1_g_pred - x_1_g)/(0.4 + sigma))**2).mean()
+        loss = loss + self.config["distill_lambdas"][nsteps]*(((x_1_g_pred - x_1_g.detach())/(0.4 + sigma))**2).mean()
     # backprop, update
     self.optim_g.zero_grad()
     loss.backward()
@@ -675,4 +675,3 @@ class GANTrainer:
 # export model class and trainer class:
 modelclass   = WGAN3D
 trainerclass = GANTrainer
-
