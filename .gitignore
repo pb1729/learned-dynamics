@@ -13,3 +13,4 @@ images/
 extensions/*/build/
 extensions/*/dist/
 extensions/*/*.egg-info/
+traces/
