@@ -59,7 +59,7 @@ void writeSrcDst(
 std::tuple<torch::Tensor, torch::Tensor> get_neighbours(
         int listmax, int neighboursmax, float cutoff,
         float box_x, float box_y, float box_z,
-        torch::Tensor x) {
+        const torch::Tensor& x) {
     // listmax gives the maximum number of particles per cell
     // the corresponding estimated max neighbours is 4pi/3 * listmax
     // 8 * listmax is a decent choice for redundancy
@@ -68,7 +68,7 @@ std::tuple<torch::Tensor, torch::Tensor> get_neighbours(
     // run kernel on same device as input tensors
     at::Device device = x.device();
     cudaSetDevice(device.index());
-    
+
     // dimension checks:
     TORCH_CHECK(x.dim() == 3 && x.size(2) == 3, "x must have shape (batch, nodes, 3)");
     int batch = x.size(0);
@@ -102,7 +102,7 @@ std::tuple<torch::Tensor, torch::Tensor> get_neighbours(
     return std::make_tuple(neighbourLists, neighbourCounts);
 }
 
-torch::Tensor edges_read(torch::Tensor neighbourCounts, torch::Tensor neighbours, torch::Tensor x) {
+torch::Tensor edges_read(const torch::Tensor& neighbourCounts, const torch::Tensor& neighbours, const torch::Tensor& x) {
     CHECK_INPUT(neighbourCounts);
     CHECK_INPUT(neighbours);
     CHECK_INPUT(x);
@@ -134,7 +134,7 @@ torch::Tensor edges_read(torch::Tensor neighbourCounts, torch::Tensor neighbours
     return edgeData;
 }
 
-torch::Tensor edges_reduce(torch::Tensor neighbourCounts, torch::Tensor neighbours, torch::Tensor x) {
+torch::Tensor edges_reduce(const torch::Tensor& neighbourCounts, const torch::Tensor& neighbours, const torch::Tensor& x) {
     CHECK_INPUT(neighbourCounts);
     CHECK_INPUT(neighbours);
     CHECK_INPUT(x);
@@ -170,7 +170,7 @@ torch::Tensor edges_reduce(torch::Tensor neighbourCounts, torch::Tensor neighbou
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> get_edges(
         int listmax, int neighboursmax, float cutoff,
         float box_x, float box_y, float box_z,
-        torch::Tensor x) {
+        const torch::Tensor& x) {
     std::tuple<torch::Tensor, torch::Tensor> neighbourData = get_neighbours(
         listmax, neighboursmax, cutoff, box_x, box_y, box_z, x);
     torch::Tensor neighbours = std::get<0>(neighbourData);

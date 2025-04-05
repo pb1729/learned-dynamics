@@ -27,7 +27,7 @@ void tensorLinearBackward(
 
 
 // C++ interface
-torch::Tensor tensor_linear(int inds, torch::Tensor W, torch::Tensor x) {
+torch::Tensor tensor_linear(int inds, const torch::Tensor& W, const torch::Tensor& x) {
     CHECK_INPUT(W);
     CHECK_INPUT(x);
     // run kernel on same device as input tensors
@@ -75,7 +75,7 @@ torch::Tensor tensor_linear(int inds, torch::Tensor W, torch::Tensor x) {
 }
 
 
-torch::Tensor tensor_linear_backward(int inds, torch::Tensor x, torch::Tensor dout) {
+torch::Tensor tensor_linear_backward(int inds, const torch::Tensor& x, const torch::Tensor& dout) {
     CHECK_INPUT(x);
     CHECK_INPUT(dout);
     // run kernel on same device as input tensors
@@ -129,4 +129,3 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("tensor_linear", &tensor_linear, "Apply linear operation to a tensor with inds indices in 3 dimensions.");
     m.def("tensor_linear_backward", &tensor_linear_backward, "Backwards part of tensor_linear to compute dW.");
 }
-

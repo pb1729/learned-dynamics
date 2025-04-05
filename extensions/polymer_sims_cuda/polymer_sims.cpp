@@ -14,11 +14,11 @@ enum SimId {
 void repel5_sim(float3* x, float3* v, float* drag, float T, float dt, int nsteps, int batch_size, int n, unsigned long seed);
 
 // C++ interface
-void polymer_sim(SimId sim_id, torch::Tensor x, torch::Tensor v, torch::Tensor drag, float T, float dt, int nsteps) {
+void polymer_sim(SimId sim_id, torch::Tensor& x, torch::Tensor& v, torch::Tensor& drag, float T, float dt, int nsteps) {
     CHECK_INPUT(x);
     CHECK_INPUT(v);
     CHECK_INPUT(drag);
-    
+
     // run kernel on same device as input tensors
     at::Device device = x.device();
     cudaSetDevice(device.index());
