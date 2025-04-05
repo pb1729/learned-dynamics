@@ -248,9 +248,7 @@ void fused_tensor_prods_example_kern(
       float l_110_1 = left_110[(threadIdx.y)*3 + 1];
       float l_110_2 = left_110[(threadIdx.y)*3 + 2];
       for (int idx_chan_in_110 = threadIdx.x; idx_chan_in_110 < dim_1; idx_chan_in_110 += blockDim.x) {
-        product_110[((threadIdx.y)*dim_1 + idx_chan_in_110)*1 + 0] = (l_110_0*x_1[((idx_batch)*dim_1 + idx_chan_in_110)*3 + 0]
-            + l_110_1*x_1[((idx_batch)*dim_1 + idx_chan_in_110)*3 + 1]
-            + l_110_2*x_1[((idx_batch)*dim_1 + idx_chan_in_110)*3 + 2]);
+        product_110[((threadIdx.y)*dim_1 + idx_chan_in_110)*1 + 0] = (l_110_0*x_1[((idx_batch)*dim_1 + idx_chan_in_110)*3 + 0] + l_110_1*x_1[((idx_batch)*dim_1 + idx_chan_in_110)*3 + 1] + l_110_2*x_1[((idx_batch)*dim_1 + idx_chan_in_110)*3 + 2]);
       }
       float l_220_0 = left_220[(threadIdx.y)*9 + 0];
       float l_220_1 = left_220[(threadIdx.y)*9 + 1];
@@ -262,15 +260,7 @@ void fused_tensor_prods_example_kern(
       float l_220_7 = left_220[(threadIdx.y)*9 + 7];
       float l_220_8 = left_220[(threadIdx.y)*9 + 8];
       for (int idx_chan_in_220 = threadIdx.x; idx_chan_in_220 < dim_2; idx_chan_in_220 += blockDim.x) {
-        product_220[((threadIdx.y)*dim_2 + idx_chan_in_220)*1 + 0] = (l_220_0*x_2[((idx_batch)*dim_2 + idx_chan_in_220)*9 + 0]
-            + l_220_1*x_2[((idx_batch)*dim_2 + idx_chan_in_220)*9 + 1]
-            + l_220_2*x_2[((idx_batch)*dim_2 + idx_chan_in_220)*9 + 2]
-            + l_220_3*x_2[((idx_batch)*dim_2 + idx_chan_in_220)*9 + 3]
-            + l_220_4*x_2[((idx_batch)*dim_2 + idx_chan_in_220)*9 + 4]
-            + l_220_5*x_2[((idx_batch)*dim_2 + idx_chan_in_220)*9 + 5]
-            + l_220_6*x_2[((idx_batch)*dim_2 + idx_chan_in_220)*9 + 6]
-            + l_220_7*x_2[((idx_batch)*dim_2 + idx_chan_in_220)*9 + 7]
-            + l_220_8*x_2[((idx_batch)*dim_2 + idx_chan_in_220)*9 + 8]);
+        product_220[((threadIdx.y)*dim_2 + idx_chan_in_220)*1 + 0] = (l_220_0*x_2[((idx_batch)*dim_2 + idx_chan_in_220)*9 + 0] + l_220_1*x_2[((idx_batch)*dim_2 + idx_chan_in_220)*9 + 1] + l_220_2*x_2[((idx_batch)*dim_2 + idx_chan_in_220)*9 + 2] + l_220_3*x_2[((idx_batch)*dim_2 + idx_chan_in_220)*9 + 3] + l_220_4*x_2[((idx_batch)*dim_2 + idx_chan_in_220)*9 + 4] + l_220_5*x_2[((idx_batch)*dim_2 + idx_chan_in_220)*9 + 5] + l_220_6*x_2[((idx_batch)*dim_2 + idx_chan_in_220)*9 + 6] + l_220_7*x_2[((idx_batch)*dim_2 + idx_chan_in_220)*9 + 7] + l_220_8*x_2[((idx_batch)*dim_2 + idx_chan_in_220)*9 + 8]);
       }
       float l_222_0 = left_222[(threadIdx.y)*9 + 0];
       float l_222_1 = left_222[(threadIdx.y)*9 + 1];
@@ -282,33 +272,15 @@ void fused_tensor_prods_example_kern(
       float l_222_7 = left_222[(threadIdx.y)*9 + 7];
       float l_222_8 = left_222[(threadIdx.y)*9 + 8];
       for (int idx_chan_in_222 = threadIdx.x; idx_chan_in_222 < dim_2; idx_chan_in_222 += blockDim.x) {
-        product_222[((threadIdx.y)*dim_2 + idx_chan_in_222)*9 + 0] = (l_222_0*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 0]
-            + l_222_1*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 1]
-            + l_222_2*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 2]);
-        product_222[((threadIdx.y)*dim_2 + idx_chan_in_222)*9 + 1] = (l_222_0*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 3]
-            + l_222_1*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 4]
-            + l_222_2*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 5]);
-        product_222[((threadIdx.y)*dim_2 + idx_chan_in_222)*9 + 2] = (l_222_0*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 6]
-            + l_222_1*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 7]
-            + l_222_2*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 8]);
-        product_222[((threadIdx.y)*dim_2 + idx_chan_in_222)*9 + 3] = (l_222_3*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 0]
-            + l_222_4*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 1]
-            + l_222_5*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 2]);
-        product_222[((threadIdx.y)*dim_2 + idx_chan_in_222)*9 + 4] = (l_222_3*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 3]
-            + l_222_4*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 4]
-            + l_222_5*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 5]);
-        product_222[((threadIdx.y)*dim_2 + idx_chan_in_222)*9 + 5] = (l_222_3*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 6]
-            + l_222_4*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 7]
-            + l_222_5*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 8]);
-        product_222[((threadIdx.y)*dim_2 + idx_chan_in_222)*9 + 6] = (l_222_6*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 0]
-            + l_222_7*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 1]
-            + l_222_8*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 2]);
-        product_222[((threadIdx.y)*dim_2 + idx_chan_in_222)*9 + 7] = (l_222_6*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 3]
-            + l_222_7*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 4]
-            + l_222_8*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 5]);
-        product_222[((threadIdx.y)*dim_2 + idx_chan_in_222)*9 + 8] = (l_222_6*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 6]
-            + l_222_7*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 7]
-            + l_222_8*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 8]);
+        product_222[((threadIdx.y)*dim_2 + idx_chan_in_222)*9 + 0] = (l_222_0*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 0] + l_222_1*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 1] + l_222_2*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 2]);
+        product_222[((threadIdx.y)*dim_2 + idx_chan_in_222)*9 + 1] = (l_222_0*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 3] + l_222_1*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 4] + l_222_2*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 5]);
+        product_222[((threadIdx.y)*dim_2 + idx_chan_in_222)*9 + 2] = (l_222_0*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 6] + l_222_1*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 7] + l_222_2*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 8]);
+        product_222[((threadIdx.y)*dim_2 + idx_chan_in_222)*9 + 3] = (l_222_3*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 0] + l_222_4*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 1] + l_222_5*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 2]);
+        product_222[((threadIdx.y)*dim_2 + idx_chan_in_222)*9 + 4] = (l_222_3*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 3] + l_222_4*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 4] + l_222_5*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 5]);
+        product_222[((threadIdx.y)*dim_2 + idx_chan_in_222)*9 + 5] = (l_222_3*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 6] + l_222_4*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 7] + l_222_5*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 8]);
+        product_222[((threadIdx.y)*dim_2 + idx_chan_in_222)*9 + 6] = (l_222_6*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 0] + l_222_7*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 1] + l_222_8*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 2]);
+        product_222[((threadIdx.y)*dim_2 + idx_chan_in_222)*9 + 7] = (l_222_6*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 3] + l_222_7*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 4] + l_222_8*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 5]);
+        product_222[((threadIdx.y)*dim_2 + idx_chan_in_222)*9 + 8] = (l_222_6*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 6] + l_222_7*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 7] + l_222_8*x_2[((idx_batch)*dim_2 + idx_chan_in_222)*9 + 8]);
       }
       float l_211_0 = left_211[(threadIdx.y)*9 + 0];
       float l_211_1 = left_211[(threadIdx.y)*9 + 1];
@@ -320,15 +292,9 @@ void fused_tensor_prods_example_kern(
       float l_211_7 = left_211[(threadIdx.y)*9 + 7];
       float l_211_8 = left_211[(threadIdx.y)*9 + 8];
       for (int idx_chan_in_211 = threadIdx.x; idx_chan_in_211 < dim_1; idx_chan_in_211 += blockDim.x) {
-        product_211[((threadIdx.y)*dim_1 + idx_chan_in_211)*3 + 0] = (l_211_0*x_1[((idx_batch)*dim_1 + idx_chan_in_211)*3 + 0]
-            + l_211_1*x_1[((idx_batch)*dim_1 + idx_chan_in_211)*3 + 1]
-            + l_211_2*x_1[((idx_batch)*dim_1 + idx_chan_in_211)*3 + 2]);
-        product_211[((threadIdx.y)*dim_1 + idx_chan_in_211)*3 + 1] = (l_211_3*x_1[((idx_batch)*dim_1 + idx_chan_in_211)*3 + 0]
-            + l_211_4*x_1[((idx_batch)*dim_1 + idx_chan_in_211)*3 + 1]
-            + l_211_5*x_1[((idx_batch)*dim_1 + idx_chan_in_211)*3 + 2]);
-        product_211[((threadIdx.y)*dim_1 + idx_chan_in_211)*3 + 2] = (l_211_6*x_1[((idx_batch)*dim_1 + idx_chan_in_211)*3 + 0]
-            + l_211_7*x_1[((idx_batch)*dim_1 + idx_chan_in_211)*3 + 1]
-            + l_211_8*x_1[((idx_batch)*dim_1 + idx_chan_in_211)*3 + 2]);
+        product_211[((threadIdx.y)*dim_1 + idx_chan_in_211)*3 + 0] = (l_211_0*x_1[((idx_batch)*dim_1 + idx_chan_in_211)*3 + 0] + l_211_1*x_1[((idx_batch)*dim_1 + idx_chan_in_211)*3 + 1] + l_211_2*x_1[((idx_batch)*dim_1 + idx_chan_in_211)*3 + 2]);
+        product_211[((threadIdx.y)*dim_1 + idx_chan_in_211)*3 + 1] = (l_211_3*x_1[((idx_batch)*dim_1 + idx_chan_in_211)*3 + 0] + l_211_4*x_1[((idx_batch)*dim_1 + idx_chan_in_211)*3 + 1] + l_211_5*x_1[((idx_batch)*dim_1 + idx_chan_in_211)*3 + 2]);
+        product_211[((threadIdx.y)*dim_1 + idx_chan_in_211)*3 + 2] = (l_211_6*x_1[((idx_batch)*dim_1 + idx_chan_in_211)*3 + 0] + l_211_7*x_1[((idx_batch)*dim_1 + idx_chan_in_211)*3 + 1] + l_211_8*x_1[((idx_batch)*dim_1 + idx_chan_in_211)*3 + 2]);
       }
     }
     __syncthreads();

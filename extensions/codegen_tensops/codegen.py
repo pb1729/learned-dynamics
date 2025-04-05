@@ -3,7 +3,6 @@
 PRELUDE_CPP = """
 #include <torch/extension.h>
 #include <cuda_runtime.h>
-#include <stdio.h>
 #include <vector>
 
 #define CHECK_CUDA(x) TORCH_CHECK(x.device().is_cuda(), #x " must be a CUDA tensor")
@@ -40,6 +39,23 @@ def at(indices, shape):
     return f"[{index_last}]"
   *shape_rest, dim_last = shape
   return f"[({at(indices_rest, shape_rest)[1:-1]})*{dim_last} + {index_last}]"
+
+def ilabel(*inds):
+  return "_" + "".join([str(i) for i in inds])
+
+class LocalRef:
+  def __init__(self, varnm):
+    self.varnm = varnm
+  def tensidx(self, i, tsz):
+    return f"{self.varnm}{ilabel(i)}"
+
+class IndexRef:
+  def __init__(self, ptrnm, base_indices, base_shape):
+    self.ptrnm = ptrnm
+    self.base_indices = base_indices
+    self.base_shape = base_shape
+  def tensidx(self, i, tsz):
+    return f"{self.ptrnm}{at(list(self.base_indices) + [i,], list(self.base_shape) + [tsz,])}"
 
 
 class SharedVars:
@@ -122,6 +138,7 @@ class Function:
     self.shared_vars = shared_vars
     self.chunksz_exprs = chunksz_exprs
     self.cu_body = cu_body
+    self.do_checks = True
   def _get_kern_int_params(self):
     # int params are slightly different for the kernel itself...
     return [
@@ -132,7 +149,7 @@ class Function:
   def _stub_cpp(self):
     return "".join([
       f"std::vector<at::Tensor> {self.fnname}_cuda(\n",
-      FNARG_TAB, ", ".join([f"at::Tensor {tens_param}" for tens_param in self.tens_params]), ")"
+      FNARG_TAB, ", ".join([f"const at::Tensor& {tens_param}" for tens_param in self.tens_params]), ")"
     ])
   def _stub(self):
     return "".join([
@@ -169,17 +186,20 @@ class Function:
   def _checks(self):
     ans = []
     initialized_dims = set()
-    for tens_param in self.tens_params:
-      ans.append(f"CHECK_INPUT({tens_param});")
+    if self.do_checks:
+      for tens_param in self.tens_params:
+        ans.append(f"CHECK_INPUT({tens_param});")
     for tens_param in self.tens_params:
       ans.append(f"at::Device device = {tens_param}.device();")
       ans.append("cudaSetDevice(device.index()); // run kernel on same device as input tensors")
       break
     for tens_param in self.tens_params:
-      ans.append(f"TORCH_CHECK({tens_param}.dim() == {len(self.shapes[tens_param])}, \"{tens_param} has wrong number of axes\");")
+      if self.do_checks:
+        ans.append(f"TORCH_CHECK({tens_param}.dim() == {len(self.shapes[tens_param])}, \"{tens_param} has wrong number of axes\");")
       for i, dim in enumerate(self.shapes[tens_param]):
         if isinstance(dim, int) or dim in initialized_dims:
-          ans.append(f"TORCH_CHECK({tens_param}.size({i}) == {dim}, \"{tens_param}: expected axis {i} to have size {dim}\");")
+          if self.do_checks:
+            ans.append(f"TORCH_CHECK({tens_param}.size({i}) == {dim}, \"{tens_param}: expected axis {i} to have size {dim}\");")
         else:
           ans.append(f"int {dim} = {tens_param}.size({i});")
           initialized_dims.add(dim)
@@ -232,12 +252,56 @@ def warp_sum(variables):
   ]
 
 
+def prodlabel(prod):
+  return f"_{prod[0]}{prod[1]}{prod[2]}"
+
+
+
+def compute_left(tens_sizes, prod):
+  inds_l, inds_r, inds_o = prod
+  label = prodlabel(prod)
+  ans = []
+  for i in range(tens_sizes[inds_l]):
+    ans.append(f"float accum{label}{ilabel(i)} = 0.0;")
+  ans.append(f"for (int idx_chan_in{label} = threadIdx.x; idx_chan_in{label} < dim_{inds_l}; idx_chan_in{label} += blockDim.x) {{")
+  W_index = at(["threadIdx.y", f"idx_chan_in{label}"], ["dim_l", f"dim_{inds_l}"])
+  ans.append(f"  float W_oi{label} = W{label}{W_index};")
+  for i in range(tens_sizes[inds_l]):
+    x_index = at(["idx_batch", f"idx_chan_in{label}", str(i)], ["batch", f"dim_{inds_l}", str(tens_sizes[inds_l])])
+    ans.append(f"  accum{label}{ilabel(i)} += W_oi{label}*x_{inds_l}{x_index};")
+  ans.append("}")
+  ans.extend(warp_sum([f"accum{label}{ilabel(i)}" for i in range(tens_sizes[inds_l])]))
+  ans.append("if (threadIdx.x == 0) {")
+  for i in range(tens_sizes[inds_l]):
+    ans.append(f"  left{label}{at(['threadIdx.y', str(i)], ['dim_l', str(tens_sizes[inds_l])])} = accum{label}{ilabel(i)};")
+  ans.append("}")
+  return ans
+
+def tensprod(tens_sizes, prod, leftref, rightref, outref):
+  inds_l, inds_r, inds_o = prod
+  label = prodlabel(prod)
+  double_n_reduces = (inds_l + inds_r - inds_o)
+  assert double_n_reduces % 2 == 0, f"tensor product {inds_l}, {inds_r} -> {inds_o} has incorrect parity"
+  n_reduces = double_n_reduces//2
+  assert 0 <= n_reduces <= min(inds_l, inds_r), f"tensor product {inds_l}, {inds_r} -> {inds_o} is impossible"
+  ans = []
+  for i in range(tens_sizes[inds_o]):
+    tensprod = []
+    tsz_reduce = tens_sizes[n_reduces]
+    for j in range(tsz_reduce):
+      free_tsz_right = tens_sizes[inds_r]//tsz_reduce
+      i_left = i//free_tsz_right
+      i_right = i % free_tsz_right
+      tensprod.append(
+        leftref.tensidx(i_left*tsz_reduce + j, tens_sizes[inds_l])
+        + "*" +
+        rightref.tensidx(i_right*tsz_reduce + j, tens_sizes[inds_r]))
+    tensprod = " + ".join(tensprod)
+    ans.append(f"{outref.tensidx(i, tens_sizes[inds_o])} = ({tensprod});")
+  return ans
+
 def tensor_prods(name, max_inds, prods, dim_l):
   """ codegen a fused kernel that does many kinds of tensor products at once """
-  def prodlabel(prod):
-    return f"_{prod[0]}{prod[1]}{prod[2]}"
-  def ilabel(*inds):
-    return "_" + "".join([str(i) for i in inds])
   V = SharedVars()
   tens_sizes = [3**p for p in range(max_inds + 1)]
   def indsgen():
@@ -276,20 +340,7 @@ def tensor_prods(name, max_inds, prods, dim_l):
     tens_params.append(f"W{label}")
     V.add_variable(f"left{label}", "dim_l", tens_sizes[inds_l])
     # matmul:
-    for i in range(tens_sizes[inds_l]):
-      cu_body.append(f"  float accum{label}{ilabel(i)} = 0.0;")
-    cu_body.append(f"  for (int idx_chan_in{label} = threadIdx.x; idx_chan_in{label} < dim_{inds_l}; idx_chan_in{label} += blockDim.x) {{")
-    W_index = at(["threadIdx.y", f"idx_chan_in{label}"], ["dim_l", f"dim_{inds_l}"])
-    cu_body.append(f"    float W_oi{label} = W{label}{W_index};")
-    for i in range(tens_sizes[inds_l]):
-      x_index = at(["idx_batch", f"idx_chan_in{label}", str(i)], ["batch", f"dim_{inds_l}", str(tens_sizes[inds_l])])
-      cu_body.append(f"    accum{label}{ilabel(i)} += W_oi{label}*x_{inds_l}{x_index};")
-    cu_body.append("  }")
-    cu_body.extend(tab(warp_sum([f"accum{label}{ilabel(i)}" for i in range(tens_sizes[inds_l])])))
-    cu_body.append("  if (threadIdx.x == 0) {")
-    for i in range(tens_sizes[inds_l]):
-      cu_body.append(f"    left{label}{at(['threadIdx.y', str(i)], ['dim_l', str(tens_sizes[inds_l])])} = accum{label}{ilabel(i)};")
-    cu_body.append("  }")
+    cu_body.extend(tab(compute_left(tens_sizes, prod)))
   cu_body.append("}")
   cu_body.append("__syncthreads();")
   # TENSOR PRODUCTS:
@@ -297,28 +348,17 @@ def tensor_prods(name, max_inds, prods, dim_l):
   for prod in prods:
     inds_l, inds_r, inds_o = prod
     label = prodlabel(prod)
-    double_n_reduces = (inds_l + inds_r - inds_o)
-    assert double_n_reduces % 2 == 0, f"tensor product {inds_l}, {inds_r} -> {inds_o} has incorrect parity"
-    n_reduces = double_n_reduces//2
-    assert 0 <= n_reduces <= min(inds_l, inds_r), f"tensor product {inds_l}, {inds_r} -> {inds_o} is impossible"
     V.add_variable(f"product{label}", f"p_{inds_r}", tens_sizes[inds_o])
     for i in range(tens_sizes[inds_l]):
       left_index = at(["threadIdx.y", str(i)], ["dim_l", str(tens_sizes[inds_l])])
       cu_body.append(f"  float l{label}{ilabel(i)} = left{label}{left_index};")
     cu_body.append(f"  for (int idx_chan_in{label} = threadIdx.x; idx_chan_in{label} < dim_{inds_r}; idx_chan_in{label} += blockDim.x) {{")
-    for i in range(tens_sizes[inds_o]):
-      product_index = at([f"threadIdx.y", f"idx_chan_in{label}", str(i)], ["dim_l", f"dim_{inds_r}", str(tens_sizes[inds_o])])
-      tensprod = []
-      tsz_reduce = tens_sizes[n_reduces]
-      for j in range(tsz_reduce):
-        free_tsz_left = tens_sizes[inds_l]//tsz_reduce
-        free_tsz_right = tens_sizes[inds_r]//tsz_reduce
-        i_left = i//free_tsz_right
-        i_right = i % free_tsz_right
-        x_index = at(["idx_batch", f"idx_chan_in{label}", str(i_right*tsz_reduce + j)], ["batch", f"dim_{inds_r}", str(tens_sizes[inds_r])])
-        tensprod.append(f"l{label}{ilabel(i_left*tsz_reduce + j)}*x_{inds_r}{x_index}")
-      tensprod = "\n          + ".join(tensprod)
-      cu_body.append(f"    product{label}{product_index} = ({tensprod});")
+    cu_body.extend(tab(tab(
+      tensprod(tens_sizes, prod,
+        LocalRef(f"l{label}"),
+        IndexRef(f"x_{inds_r}", ["idx_batch", f"idx_chan_in{label}"], ["batch", f"dim_{inds_r}"]),
+        IndexRef(f"product{label}", [f"threadIdx.y", f"idx_chan_in{label}"], ["dim_l", f"dim_{inds_r}"]))
+    )))
     cu_body.append("  }")
   cu_body.append("}")
   cu_body.append("__syncthreads();")

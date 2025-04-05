@@ -1,7 +1,6 @@
 
 #include <torch/extension.h>
 #include <cuda_runtime.h>
-#include <stdio.h>
 #include <vector>
 
 #define CHECK_CUDA(x) TORCH_CHECK(x.device().is_cuda(), #x " must be a CUDA tensor")
@@ -15,7 +14,7 @@ void fused_tensor_prods_example(
     float* y_0, float* y_1, float* y_2);
 
 std::vector<at::Tensor> fused_tensor_prods_example_cuda(
-    at::Tensor x_0, at::Tensor x_1, at::Tensor x_2, at::Tensor W_000, at::Tensor W_011, at::Tensor W_101, at::Tensor W_110, at::Tensor W_220, at::Tensor W_222, at::Tensor W_211, at::Tensor P_000, at::Tensor P_110, at::Tensor P_220, at::Tensor P_011, at::Tensor P_101, at::Tensor P_211, at::Tensor P_222) {
+    const at::Tensor& x_0, const at::Tensor& x_1, const at::Tensor& x_2, const at::Tensor& W_000, const at::Tensor& W_011, const at::Tensor& W_101, const at::Tensor& W_110, const at::Tensor& W_220, const at::Tensor& W_222, const at::Tensor& W_211, const at::Tensor& P_000, const at::Tensor& P_110, const at::Tensor& P_220, const at::Tensor& P_011, const at::Tensor& P_101, const at::Tensor& P_211, const at::Tensor& P_222) {
   CHECK_INPUT(x_0);
   CHECK_INPUT(x_1);
   CHECK_INPUT(x_2);

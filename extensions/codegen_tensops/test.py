@@ -58,8 +58,36 @@ x_1 = torch.randn(batch, dim_1, 3, device="cuda")
 x_2 = torch.randn(batch, dim_2, 3, 3, device="cuda")
 
 
-y_0_refimpl, y_1_refimpl, y_2_refimpl = refimpl(x_0, x_1, x_2, W_000, W_011, W_101, W_110, W_220, W_222, W_211, P_000, P_110, P_220, P_011, P_101, P_211, P_222)
-y_0_ckernel, y_1_ckernel, y_2_ckernel = fused_tensor_prods_example_cuda(x_0, x_1, x_2, W_000, W_011, W_101, W_110, W_220, W_222, W_211, P_000, P_110, P_220, P_011, P_101, P_211, P_222)
+# burn-in:
+for i in range(10):
+  y_0_refimpl, y_1_refimpl, y_2_refimpl = refimpl(x_0, x_1, x_2, W_000, W_011, W_101, W_110, W_220, W_222, W_211, P_000, P_110, P_220, P_011, P_101, P_211, P_222)
+  y_0_ckernel, y_1_ckernel, y_2_ckernel = fused_tensor_prods_example_cuda(x_0, x_1, x_2, W_000, W_011, W_101, W_110, W_220, W_222, W_211, P_000, P_110, P_220, P_011, P_101, P_211, P_222)
+
+
+# Profile CUDA kernel implementation
+with torch.profiler.profile(
+    activities=[
+        torch.profiler.ProfilerActivity.CPU,
+        torch.profiler.ProfilerActivity.CUDA,
+    ],
+    with_stack=True
+) as prof_cuda:
+    dummy = torch.randn(1000, 1000, device="cuda")
+    y_0_ckernel, y_1_ckernel, y_2_ckernel = fused_tensor_prods_example_cuda(x_0, x_1, x_2, W_000, W_011, W_101, W_110, W_220, W_222, W_211, P_000, P_110, P_220, P_011, P_101, P_211, P_222)
+prof_cuda.export_chrome_trace("traces/ckernel_trace.json")
+
+# Profile reference implementation
+with torch.profiler.profile(
+    activities=[
+        torch.profiler.ProfilerActivity.CPU,
+        torch.profiler.ProfilerActivity.CUDA,
+    ],
+    with_stack=True
+) as prof_ref:
+    dummy = torch.randn(1000, 1000, device="cuda")
+    y_0_refimpl, y_1_refimpl, y_2_refimpl = refimpl(x_0, x_1, x_2, W_000, W_011, W_101, W_110, W_220, W_222, W_211, P_000, P_110, P_220, P_011, P_101, P_211, P_222)
+prof_ref.export_chrome_trace("traces/refimpl_trace.json")
+
 
 print(avg_relative_diff(y_0_refimpl, y_0_ckernel))
 print(avg_relative_diff(y_1_refimpl, y_1_ckernel))
