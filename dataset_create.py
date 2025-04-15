@@ -6,7 +6,7 @@ from managan.statefiles import save_state_to_file, save_predictor_params_to_file
 
 
 def main(args):
-  predictor = get_predictor(args.predictor)
+  predictor = get_predictor(args.predictor, override_base=args.override)
   if args.sequence_num == 0: # saving predictor metadata need only be done once
     with open(path.join(args.folder, "predictor_params.pickle"), "wb") as f:
       save_predictor_params_to_file(f, predictor)
@@ -25,6 +25,7 @@ if __name__ == "__main__":
   parser.add_argument("sequence_num", type=int)
   parser.add_argument("predictor", type=str)
   parser.add_argument("folder", type=str)
+  parser.add_argument("--override", type=str, default=None)
   parser.add_argument("--loop", type=int, default=128)
   parser.add_argument("--chunks", type=int, default=20)
   parser.add_argument("--chunklen", type=int, default=64)
