@@ -43,7 +43,7 @@ def main(args):
     predictor = ModelPredictor(model)
   else:
     # load model
-    predictor = get_predictor("model:" + args.fpath)
+    predictor = get_predictor("model:" + args.fpath, override_base=args.override)
     model = predictor.model
   model.set_eval(False)
   # fill in default save location if needed
@@ -74,6 +74,7 @@ if __name__ == "__main__":
   parser.add_argument("--length", dest="length", type=int, default=8)
   parser.add_argument("--burnin", dest="burnin", type=int, default=5)
   parser.add_argument("--saveto", dest="saveto", type=str, default=None)
+  parser.add_argument("--override", dest="override", type=str, default=None)
   parser.add_argument("--inference", dest="inference", action="store_true")
   parser.add_argument("--nsight", dest="nsight", action="store_true")
   parser.add_argument("--newmodel", dest="newmodel", action="store_true")
