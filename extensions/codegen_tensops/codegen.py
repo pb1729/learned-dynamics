@@ -1,3 +1,4 @@
+from typing_extensions import List, Tuple
 
 
 PRELUDE_CPP = """
@@ -12,6 +13,7 @@ PRELUDE_CPP = """
 
 PRELUDE_CU = """
 #define WARPSZ 32
+#define MODWARP(X) (X & 0x1f)
 
 """
 
@@ -90,16 +92,16 @@ class SharedVars:
     ans = []
     for i, chunksz in enumerate(self.coeffs):
       if i > 0: # first offset is a freebie: it's always 0
-        ans.append(f"int {chunksz}_base")
-      ans.append(f"int {chunksz}")
-    return ", ".join(ans)
+        ans.append(f"int {chunksz}_base, ")
+      ans.append(f"int {chunksz}, ")
+    return "".join(ans)
   def args(self):
     ans = []
     for i, chunksz in enumerate(self.coeffs):
       if i > 0: # first offset is a freebie: it's always 0
-        ans.append(f"{chunksz}_base")
-      ans.append(f"{chunksz}")
-    return ", ".join(ans)
+        ans.append(f"{chunksz}_base, ")
+      ans.append(f"{chunksz}, ")
+    return "".join(ans)
   def vars_readout(self):
     base_idxs = {
       chunksz: coeffs_to_base_idxs(self.coeffs[chunksz])
@@ -163,7 +165,7 @@ class Function:
       "__global__\n",
       f"void {self.fnname}_kern(\n",
       FNARG_TAB, f"// <<<({self.gridsz_expr}), ({self.blocksz_expr})>>>\n",
-      FNARG_TAB, self.shared_vars.params(), ",\n",
+      FNARG_TAB, self.shared_vars.params(), "\n",
       FNARG_TAB, ", ".join([f"int {int_param}" for int_param in self._get_kern_int_params()]), ",\n",
       FNARG_TAB, ", ".join([f"const float* {tens_param}" for tens_param in self.tens_params]), ",\n",
       FNARG_TAB, ", ".join([f"float* __restrict__ {tens_output}" for tens_output in self.tens_outputs]), ")"
@@ -171,7 +173,7 @@ class Function:
   def _call_kern(self, gridsz, blocksz, sharedsz):
     return "".join([
       f"{self.fnname}_kern<<<{gridsz}, {blocksz}, {sharedsz}>>>(\n",
-      FNARG_TAB, self.shared_vars.args(), ",\n",
+      FNARG_TAB, self.shared_vars.args(), "\n",
       FNARG_TAB, ", ".join([f"{int_param}" for int_param in self._get_kern_int_params()]), ",\n",
       FNARG_TAB, ", ".join([f"{tens_param}" for tens_param in self.tens_params]), ",\n",
       FNARG_TAB, ", ".join([f"{tens_output}" for tens_output in self.tens_outputs]), ")"
@@ -257,150 +259,320 @@ def prodlabel(prod):
 
 
 
-def compute_left(tens_sizes, prod):
-  inds_l, inds_r, inds_o = prod
-  label = prodlabel(prod)
-  ans = []
-  for i in range(tens_sizes[inds_l]):
-    ans.append(f"float accum{label}{ilabel(i)} = 0.0;")
-  ans.append(f"for (int idx_chan_in{label} = threadIdx.x; idx_chan_in{label} < dim_{inds_l}; idx_chan_in{label} += blockDim.x) {{")
-  W_index = at(["threadIdx.y", f"idx_chan_in{label}"], ["dim_l", f"dim_{inds_l}"])
-  ans.append(f"  float W_oi{label} = W{label}{W_index};")
-  for i in range(tens_sizes[inds_l]):
-    x_index = at(["idx_batch", f"idx_chan_in{label}", str(i)], ["batch", f"dim_{inds_l}", str(tens_sizes[inds_l])])
-    ans.append(f"  accum{label}{ilabel(i)} += W_oi{label}*x_{inds_l}{x_index};")
-  ans.append("}")
-  ans.extend(warp_sum([f"accum{label}{ilabel(i)}" for i in range(tens_sizes[inds_l])]))
-  ans.append("if (threadIdx.x == 0) {")
-  for i in range(tens_sizes[inds_l]):
-    ans.append(f"  left{label}{at(['threadIdx.y', str(i)], ['dim_l', str(tens_sizes[inds_l])])} = accum{label}{ilabel(i)};")
-  ans.append("}")
-  return ans
-
-def tensprod(tens_sizes, prod, leftref, rightref, outref):
+def gen_tensprod(tens_sizes, prod, leftref, rightref, outref, result=2):
+  """ codegen for an individual tensor product. result (0, 1, or 2) shows which thing is our output.
+      (indexes into [left, right, out].) if result is None, then we contract all 3 inputs into a scalar. """
   inds_l, inds_r, inds_o = prod
   label = prodlabel(prod)
   double_n_reduces = (inds_l + inds_r - inds_o)
   assert double_n_reduces % 2 == 0, f"tensor product {inds_l}, {inds_r} -> {inds_o} has incorrect parity"
   n_reduces = double_n_reduces//2
   assert 0 <= n_reduces <= min(inds_l, inds_r), f"tensor product {inds_l}, {inds_r} -> {inds_o} is impossible"
-  ans = []
-  for i in range(tens_sizes[inds_o]):
-    tensprod = []
+  ref_triplets = {}
+  for i_out in range(tens_sizes[inds_o]):
     tsz_reduce = tens_sizes[n_reduces]
+    free_tsz_right = tens_sizes[inds_r]//tsz_reduce
     for j in range(tsz_reduce):
-      free_tsz_right = tens_sizes[inds_r]//tsz_reduce
-      i_left = i//free_tsz_right
-      i_right = i % free_tsz_right
-      tensprod.append(
-        leftref.tensidx(i_left*tsz_reduce + j, tens_sizes[inds_l])
-        + "*" +
-        rightref.tensidx(i_right*tsz_reduce + j, tens_sizes[inds_r]))
-    tensprod = " + ".join(tensprod)
-    ans.append(f"{outref.tensidx(i, tens_sizes[inds_o])} = ({tensprod});")
+      i_left = (i_out//free_tsz_right)*tsz_reduce + j
+      i_right = (i_out % free_tsz_right)*tsz_reduce + j
+      ref_triplets[(i_left, i_right, i_out)] = [
+          leftref.tensidx(i_left, tens_sizes[inds_l]),
+          rightref.tensidx(i_right, tens_sizes[inds_r]),
+          outref.tensidx(i_out, tens_sizes[inds_o])
+        ]
+  if result is None:
+    ans = " + ".join([
+      "*".join(ref_triplets[tup])
+      for tup in ref_triplets
+    ])
+    return f"({ans})"
+  else:
+    ans = []
+    for i in range(tens_sizes[[inds_l, inds_r, inds_o][result]]):
+      assignment_var = None
+      assignment_val = []
+      for tup in ref_triplets:
+        if tup[result] == i:
+          ref_triplet = ref_triplets[tup]
+          prod = "*".join(ref_triplet[:result] + ref_triplet[result + 1:])
+          assignment_val.append(prod)
+          if assignment_var is None:
+            assignment_var = ref_triplet[result]
+          else:
+            assert ref_triplet[result] == assignment_var
+      assert assignment_var is not None
+      ans.append(assignment_var + " = " + " + ".join(assignment_val) + ";")
   return ans
 
-def tensor_prods(name, max_inds, prods, dim_l):
-  """ codegen a fused kernel that does many kinds of tensor products at once """
+
+def batchfor_wrap(code):
+  """ Wrap code in the proper for loop if kernel has blockIdx to indicate batch index. """
+  return "\n".join([
+    "for (int idx_batch = blockIdx.x; idx_batch < batch; idx_batch += gridDim.x) {",
+    *tab(code), "}"
+  ])
+
+def gen_fwd_tensor_prods(input_indsset: List[int], output_indsset: List[int], prods: List[Tuple[int, int, int]], tens_sizes):
+  code = []
   V = SharedVars()
-  tens_sizes = [3**p for p in range(max_inds + 1)]
-  def indsgen():
-    return range(len(tens_sizes))
-  int_params = ["batch", *[f"dim_{i}" for i in indsgen()]]
-  tens_params = [f"x_{i}" for i in indsgen()]
-  tens_outputs = [f"y_{i}" for i in indsgen()]
-  chunksz_exprs = {"dim_l": f"{dim_l}"}
-  chunksz_exprs.update({
-    f"dim_{i}": f"dim_{i}"
-    for i in indsgen()
-  })
-  chunksz_exprs.update({
-    f"p_{i}": f"dim_l*dim_{i}"
-    for i in indsgen()
-  })
-  gridsz_expr = f"batch"
-  blocksz_expr = f"WARPSZ, dim_l"
-  # shapes setup
-  shapes = {}
-  for i in indsgen():
-    shapes[f"x_{i}"] = ("batch", f"dim_{i}") + (3,)*i
-    shapes[f"y_{i}"] = ("batch", f"dim_{i}") + (3,)*i
-  for prod in prods:
-    inds_l, inds_r, inds_o = prod
-    label = prodlabel(prod)
-    shapes[f"W{label}"] = (dim_l, f"dim_{inds_l}")
-    shapes[f"P{label}"] = (f"dim_{inds_o}", dim_l, f"dim_{inds_r}")
-  # Now for the hard part: generating the main computational part of the kernel!
-  cu_body = []
-  # COMPUTE LEFT SIDE OF PRODUCT:
-  cu_body.append("{ // linear transform to compute the left sides of the products")
-  for prod in prods:
-    inds_l, inds_r, inds_o = prod
-    label = prodlabel(prod)
-    tens_params.append(f"W{label}")
-    V.add_variable(f"left{label}", "dim_l", tens_sizes[inds_l])
-    # matmul:
-    cu_body.extend(tab(compute_left(tens_sizes, prod)))
-  cu_body.append("}")
-  cu_body.append("__syncthreads();")
-  # TENSOR PRODUCTS:
-  cu_body.append("{ // compute tensor products")
   for prod in prods:
     inds_l, inds_r, inds_o = prod
     label = prodlabel(prod)
     V.add_variable(f"product{label}", f"p_{inds_r}", tens_sizes[inds_o])
+  # COMPUTE TENSOR PRODUCTS:
+  code.append("{ // compute tensor products")
+  for prod in prods:
+    inds_l, inds_r, inds_o = prod
+    label = prodlabel(prod)
     for i in range(tens_sizes[inds_l]):
-      left_index = at(["threadIdx.y", str(i)], ["dim_l", str(tens_sizes[inds_l])])
-      cu_body.append(f"  float l{label}{ilabel(i)} = left{label}{left_index};")
-    cu_body.append(f"  for (int idx_chan_in{label} = threadIdx.x; idx_chan_in{label} < dim_{inds_r}; idx_chan_in{label} += blockDim.x) {{")
-    cu_body.extend(tab(tab(
-      tensprod(tens_sizes, prod,
+      left_index = at(["idx_batch", "threadIdx.y", str(i)], ["batch", "dim_l", str(tens_sizes[inds_l])])
+      code.append(f"  float l{label}{ilabel(i)} = left{label}{left_index};")
+    code.append(f"  for (int idx_chan_in{label} = threadIdx.x; idx_chan_in{label} < dim_{inds_r}; idx_chan_in{label} += blockDim.x) {{")
+    code.extend(tab(tab(
+      gen_tensprod(tens_sizes, prod,
         LocalRef(f"l{label}"),
         IndexRef(f"x_{inds_r}", ["idx_batch", f"idx_chan_in{label}"], ["batch", f"dim_{inds_r}"]),
         IndexRef(f"product{label}", [f"threadIdx.y", f"idx_chan_in{label}"], ["dim_l", f"dim_{inds_r}"]))
     )))
-    cu_body.append("  }")
-  cu_body.append("}")
-  cu_body.append("__syncthreads();")
-  # FINAL LINEAR TRANSFORMS:
-  cu_body.append("{ // linear transforms to compute the outputs")
-  for inds_o in indsgen(): # by inds_o so that we can sum contributions from each prod
-    cu_body.append(f"  for (int idx_chan_out_{inds_o} = threadIdx.y; idx_chan_out_{inds_o} < dim_{inds_o}; idx_chan_out_{inds_o} += blockDim.y) {{")
+    code.append("  }")
+  code.append("}")
+  code.append("__syncthreads();")
+  # FINAL LINEAR TRANSFORMS (FORWARD):
+  code.append("{ // linear transforms to compute the outputs")
+  for inds_o in output_indsset: # by inds_o so that we can sum contributions from each prod
+    code.append(f"  for (int idx_chan_out_{inds_o} = threadIdx.y; idx_chan_out_{inds_o} < dim_{inds_o}; idx_chan_out_{inds_o} += blockDim.y) {{")
     for i in range(tens_sizes[inds_o]):
-      cu_body.append(f"    float y_o_{inds_o}{ilabel(i)} = 0.0;")
+      code.append(f"    float y_o_{inds_o}{ilabel(i)} = 0.0;")
     for prod in prods:
       inds_l, inds_r, actual_inds_o = prod
       if inds_o == actual_inds_o:
         label = prodlabel(prod)
-        tens_params.append(f"P{label}")
         # matmul
         for i in range(tens_sizes[inds_o]):
-          cu_body.append(f"    float accum{label}{ilabel(i)} = 0.0;")
-        cu_body.append(f"    for (int idx_chan_in{label} = threadIdx.x; idx_chan_in{label} < dim_l*dim_{inds_r}; idx_chan_in{label} += blockDim.x) {{")
+          code.append(f"    float accum{label}{ilabel(i)} = 0.0;")
+        code.append(f"    for (int idx_chan_in{label} = threadIdx.x; idx_chan_in{label} < dim_l*dim_{inds_r}; idx_chan_in{label} += blockDim.x) {{")
         P_index = at([f"idx_chan_out_{inds_o}", f"idx_chan_in{label}"], [f"dim_{inds_o}", f"dim_l*dim_{inds_r}"])
-        cu_body.append(f"      float P_oi{label} = P{label}{P_index};")
+        code.append(f"      float P_oi{label} = P{label}{P_index};")
         for i in range(tens_sizes[inds_o]):
-          product_index = at([f"idx_chan_in{label}", str(i)], [f"dim_{inds_o}", str(tens_sizes[inds_o])])
-          cu_body.append(f"      accum{label}{ilabel(i)} += P_oi{label}*product{label}{product_index};")
-        cu_body.append("    }")
-        cu_body.extend(tab(tab(warp_sum([f"accum{label}{ilabel(i)}" for i in range(tens_sizes[inds_o])]))))
-        cu_body.append("    if (threadIdx.x == 0) {")
+          product_index = at([f"idx_chan_in{label}", str(i)], [f"dim_l*dim_{inds_o}", str(tens_sizes[inds_o])])
+          code.append(f"      accum{label}{ilabel(i)} += P_oi{label}*product{label}{product_index};")
+        code.append("    }")
+        code.extend(tab(tab(warp_sum([f"accum{label}{ilabel(i)}" for i in range(tens_sizes[inds_o])]))))
+        code.append("    if (threadIdx.x == 0) {")
         for i in range(tens_sizes[inds_o]):
-          cu_body.append(f"      y_o_{inds_o}{ilabel(i)} += accum{label}{ilabel(i)};")
-        cu_body.append("    }")
-    cu_body.append("    if (threadIdx.x == 0) {")
+          code.append(f"      y_o_{inds_o}{ilabel(i)} += accum{label}{ilabel(i)};")
+        code.append("    }")
+    code.append("    if (threadIdx.x == 0) {")
     for i in range(tens_sizes[inds_o]):
       y_index = at([f"idx_batch", f"idx_chan_out_{inds_o}", i], ["batch", f"dim_{inds_o}", tens_sizes[inds_o]])
-      cu_body.append(f"      y_{inds_o}{y_index} = y_o_{inds_o}{ilabel(i)};")
-    cu_body.append("    }")
-    cu_body.append("  }")
-  cu_body.append("}")
-  # wrap the whole thing in a for loop to make this work with large batches
-  cu_body = "\n".join([
-    "for (int idx_batch = blockIdx.x; idx_batch < batch; idx_batch += gridDim.x) {",
-    *tab(cu_body), "}"
-  ])
-  return Function(name, int_params, tens_params, tens_outputs, shapes, gridsz_expr, blocksz_expr, V, chunksz_exprs, cu_body)
+      code.append(f"      y_{inds_o}{y_index} = y_o_{inds_o}{ilabel(i)};")
+    code.append("    }")
+    code.append("  }")
+  code.append("}")
+  return V, batchfor_wrap(code)
+
+
+def gen_bwd_tensor_prods(input_indsset: List[int], output_indsset: List[int], prods: List[Tuple[int, int, int]], tens_sizes):
+  code = []
+  V = SharedVars()
+  for prod in prods:
+    inds_l, inds_r, inds_o = prod
+    label = prodlabel(prod)
+    V.add_variable(f"dproduct{label}", f"p_{inds_o}", tens_sizes[inds_r])
+  # COMPUTE TENSOR PRODUCTS:
+  code.append("{ // compute tensor products")
+  for prod in prods:
+    inds_l, inds_r, inds_o = prod
+    label = prodlabel(prod)
+    for i in range(tens_sizes[inds_l]):
+      left_index = at(["idx_batch", "threadIdx.y", str(i)], ["batch", "dim_l", str(tens_sizes[inds_l])])
+      code.append(f"  float l{label}{ilabel(i)} = left{label}{left_index};")
+    code.append(f"  for (int idx_chan_out{label} = threadIdx.x; idx_chan_out{label} < dim_{inds_o}; idx_chan_out{label} += blockDim.x) {{")
+    code.extend(tab(tab(
+      gen_tensprod(tens_sizes, prod,
+        LocalRef(f"l{label}"),
+        IndexRef(f"dproduct{label}", [f"threadIdx.y", f"idx_chan_out{label}"], ["dim_l", f"dim_{inds_o}"]),
+        IndexRef(f"dy_{inds_o}", ["idx_batch", f"idx_chan_out{label}"], ["batch", f"dim_{inds_o}"]),
+        result=1)
+    )))
+    code.append("  }")
+  code.append("}")
+  code.append("__syncthreads();")
+  # FINAL LINEAR TRANSFORMS (BACKWARDS):
+  code.append("{ // linear transforms to compute dx")
+  for inds_r in input_indsset: # by inds_r so that we can sum contributions from each prod
+    code.append(f"  for (int idx_chan_in_{inds_r} = threadIdx.y; idx_chan_in_{inds_r} < dim_{inds_r}; idx_chan_in_{inds_r} += blockDim.y) {{")
+    for i in range(tens_sizes[inds_r]):
+      code.append(f"    float dx_o_{inds_r}{ilabel(i)} = 0.0;")
+    for prod in prods:
+      inds_l, actual_inds_r, inds_o = prod
+      if inds_r == actual_inds_r:
+        label = prodlabel(prod)
+        # matmul
+        for i in range(tens_sizes[inds_r]):
+          code.append(f"    float accum{label}{ilabel(i)} = 0.0;")
+        code.append(f"    for (int idx_l{label} = 0; idx_l{label} < dim_l; idx_l{label} += 1) {{")
+        code.append(f"      for (int idx_chan_out{label} = threadIdx.x; idx_chan_out{label} < dim_{inds_o}; idx_chan_out{label} += blockDim.x) {{")
+        P_index = at([f"idx_chan_out{label}", f"idx_l{label}", f"idx_chan_in_{inds_r}"], [f"dim_{inds_o}", "dim_l", f"dim_{inds_r}"])
+        code.append(f"        float P_oi{label} = P{label}{P_index};")
+        for i in range(tens_sizes[inds_r]):
+          dproduct_index = at([f"idx_l{label}", f"idx_chan_out{label}", str(i)], ["dim_l", f"dim_{inds_o}", str(tens_sizes[inds_r])])
+          code.append(f"        accum{label}{ilabel(i)} += P_oi{label}*dproduct{label}{dproduct_index};")
+        code.append("      }")
+        code.append("    }")
+        code.extend(tab(tab(warp_sum([f"accum{label}{ilabel(i)}" for i in range(tens_sizes[inds_r])]))))
+        code.append("    if (threadIdx.x == 0) {")
+        for i in range(tens_sizes[inds_r]):
+          code.append(f"      dx_o_{inds_r}{ilabel(i)} += accum{label}{ilabel(i)};")
+        code.append("    }")
+    code.append("    if (threadIdx.x == 0) {")
+    for i in range(tens_sizes[inds_r]):
+      dx_index = at([f"idx_batch", f"idx_chan_in_{inds_r}", i], ["batch", f"dim_{inds_r}", tens_sizes[inds_r]])
+      code.append(f"      dx_{inds_r}{dx_index} = dx_o_{inds_r}{ilabel(i)};")
+    code.append("    }")
+    code.append("  }")
+  code.append("}")
+  return V, batchfor_wrap(code)
+
+
+def gen_blf_tensor_prods(input_indsset: List[int], output_indsset: List[int], prods: List[Tuple[int, int, int]], tens_sizes):
+  code = []
+  V = SharedVars()
+  code.append("{ // compute left derivative tensor products")
+  for prod in prods:
+    inds_l, inds_r, inds_o = prod
+    label = prodlabel(prod)
+    for i in range(tens_sizes[inds_l]):
+      code.append(f"  float accum{label}{ilabel(i)} = 0.0;")
+    code.append(f"  for (int idx_chan_in{label} = threadIdx.x; idx_chan_in{label} < dim_{inds_r}; idx_chan_in{label} += blockDim.x) {{")
+    code.append(f"    for (int idx_chan_out{label} = 0; idx_chan_out{label} < dim_{inds_o}; idx_chan_out{label} += 1) {{")
+    code.extend(tab(tab(tab(
+      gen_tensprod(tens_sizes, prod,
+        LocalRef(f"float l{label}"),
+        IndexRef(f"x_{inds_r}", ["idx_batch", f"idx_chan_in{label}"], ["batch", f"dim_{inds_r}"]),
+        IndexRef(f"dy_{inds_o}", ["idx_batch", f"idx_chan_out{label}"], ["batch", f"dim_{inds_o}"]),
+        result=0)
+    ))))
+    P_index = at([f"idx_chan_out{label}", f"threadIdx.y", f"idx_chan_in{label}"], [f"dim_{inds_o}", "blockDim.y", f"dim_{inds_r}"])
+    code.append(f"      float P_oi{label} = P{label}{P_index};")
+    for i in range(tens_sizes[inds_l]):
+      code.append(f"      accum{label}{ilabel(i)} += P_oi{label}*l{label}{ilabel(i)};")
+    code.append("    }")
+    code.append("  }")
+    code.extend(tab(warp_sum([f"accum{label}{ilabel(i)}" for i in range(tens_sizes[inds_l])])))
+    code.append("  if (threadIdx.x == 0) {")
+    for i in range(tens_sizes[inds_l]):
+      dleft_index = at(["idx_batch", "threadIdx.y", i], ["batch", "dim_l", tens_sizes[inds_l]])
+      code.append(f"    dleft{label}{dleft_index} = accum{label}{ilabel(i)};")
+    code.append("  }")
+  code.append("}")
+  return V, batchfor_wrap(code)
+
+def gen_wtb_tensor_prods(input_indsset: List[int], output_indsset: List[int], prods: List[Tuple[int, int, int]], tens_sizes):
+  code = []
+  V = SharedVars()
+  for prod in prods:
+    inds_l, inds_r, inds_o = prod
+    label = prodlabel(prod)
+    code.append(f"for (int idx_chan_in{label} = blockIdx.x; idx_chan_in{label} < dim_{inds_r}; idx_chan_in{label} += gridDim.x) {{")
+    code.append(f"  for (int idx_chan_out{label} = blockIdx.y; idx_chan_out{label} < dim_{inds_o}; idx_chan_out{label} += gridDim.y) {{")
+    code.append(f"    float dP_oi = 0.0;")
+    code.append(f"    for (int idx_batch = threadIdx.x; idx_batch < batch; idx_batch += blockDim.x) {{")
+    tensprod = gen_tensprod(tens_sizes, prod,
+        IndexRef(f"left{label}", ["idx_batch", "threadIdx.y"], ["batch", "dim_l"]),
+        IndexRef(f"x_{inds_r}", ["idx_batch", f"idx_chan_in{label}"], ["batch", f"dim_{inds_r}"]),
+        IndexRef(f"dy_{inds_o}", ["idx_batch", f"idx_chan_out{label}"], ["batch", f"dim_{inds_o}"]),
+        result=None)
+    code.append(f"      dP_oi += {tensprod};")
+    code.append("    }")
+    code.extend(tab(tab(warp_sum(["dP_oi"]))))
+    code.append("    if (threadIdx.x == 0) {")
+    dP_index = at([f"idx_chan_out{label}", f"threadIdx.y", f"idx_chan_in{label}"], [f"dim_{inds_o}", "blockDim.y", f"dim_{inds_r}"])
+    code.append(f"      dP{label}{dP_index} = dP_oi;")
+    code.append("    }")
+    code.append("  }")
+    code.append("}")
+  # TODO: finish writing this...
+  return V, "\n".join(code)
+
+
+def tensor_prods(name: str, input_indsset: List[int], output_indsset: List[int], prods: List[Tuple[int, int, int]], dim_l: int):
+  """ Generate code for a fused kernel that does many kinds of tensor products at once.
+      We also generate a corresponding backwards kernel at the same time.
+      name: name to be assigned to the generated function
+      input_indsset, out_indsset: list of inds's that appear as inputs and outputs respectively
+      prods: list of tensor products to be computed in the form (inds_left, inds_right, inds_output)
+      dim_l: dimension that the left side of each product is transformed to before tensprods are taken """
+  for inds_o in output_indsset:
+    assert inds_o in input_indsset, "Unsupported to have output tensorkind that is not amongst input tensorkinds."
+  tens_sizes = [3**p for p in range(max(input_indsset) + 1)]
+  int_params = ["batch", "dim_l", *[f"dim_{i}" for i in input_indsset]]
+  # shapes setup
+  shapes_fwd = {}
+  shapes_bwd = {}
+  shapes_blf = {}
+  shapes_wtb = {}
+  # define x, y params and outputs
+  tens_params_fwd = [f"x_{i}" for i in input_indsset]
+  tens_params_bwd = [f"dy_{i}" for i in output_indsset]
+  tens_params_blf = [f"x_{i}" for i in input_indsset] + [f"dy_{i}" for i in output_indsset]
+  tens_params_wtb = [f"x_{i}" for i in input_indsset] + [f"dy_{i}" for i in output_indsset]
+  tens_outputs_fwd = [f"y_{i}" for i in output_indsset]
+  tens_outputs_bwd = [f"dx_{i}" for i in input_indsset]
+  tens_outputs_blf = []
+  tens_outputs_wtb = []
+  for i in input_indsset:
+    shapes_fwd[f"x_{i}"] = ("batch", f"dim_{i}") + (3,)*i
+    shapes_bwd[f"dx_{i}"] = ("batch", f"dim_{i}") + (3,)*i
+    shapes_blf[f"x_{i}"] = ("batch", f"dim_{i}") + (3,)*i
+    shapes_wtb[f"x_{i}"] = ("batch", f"dim_{i}") + (3,)*i
+  for i in output_indsset:
+    shapes_fwd[f"y_{i}"] = ("batch", f"dim_{i}") + (3,)*i
+    shapes_bwd[f"dy_{i}"] = ("batch", f"dim_{i}") + (3,)*i
+    shapes_blf[f"dy_{i}"] = ("batch", f"dim_{i}") + (3,)*i
+    shapes_wtb[f"dy_{i}"] = ("batch", f"dim_{i}") + (3,)*i
+  chunksz_exprs = {"dim_l": "dim_l"}
+  chunksz_exprs.update({
+    f"dim_{i}": f"dim_{i}"
+    for i in input_indsset
+  })
+  chunksz_exprs.update({
+    f"p_{i}": f"dim_l*dim_{i}"
+    for i in input_indsset
+  })
+  gridsz_expr = "batch"
+  blocksz_expr = "WARPSZ, dim_l"
+  gridsz_expr_wtb = "WARPSZ, WARPSZ" # dim_j will probably be divisible by WARPSZ
+  for prod in prods:
+    inds_l, inds_r, inds_o = prod
+    label = prodlabel(prod)
+    tens_params_fwd.append(f"P{label}")
+    tens_params_bwd.append(f"P{label}")
+    tens_params_blf.append(f"P{label}")
+    tens_outputs_wtb.append(f"dP{label}")
+    shapes_fwd[f"P{label}"] = (f"dim_{inds_o}", "dim_l", f"dim_{inds_r}")
+    shapes_bwd[f"P{label}"] = (f"dim_{inds_o}", "dim_l", f"dim_{inds_r}")
+    shapes_blf[f"P{label}"] = (f"dim_{inds_o}", "dim_l", f"dim_{inds_r}")
+    shapes_wtb[f"dP{label}"] = (f"dim_{inds_o}", "dim_l", f"dim_{inds_r}")
+    tens_params_fwd.append(f"left{label}")
+    tens_params_bwd.append(f"left{label}")
+    tens_outputs_blf.append(f"dleft{label}")
+    tens_params_wtb.append(f"left{label}")
+    shapes_fwd[f"left{label}"] = ("batch", "dim_l") + (3,)*inds_l
+    shapes_bwd[f"left{label}"] = ("batch", "dim_l") + (3,)*inds_l
+    shapes_blf[f"dleft{label}"] = ("batch", "dim_l") + (3,)*inds_l
+    shapes_wtb[f"left{label}"] = ("batch", "dim_l") + (3,)*inds_l
+  # Now for the hard part: generating the main computational part of the kernel!
+  V_fwd, cu_fwd = gen_fwd_tensor_prods(input_indsset, output_indsset, prods, tens_sizes)
+  V_bwd, cu_bwd = gen_bwd_tensor_prods(input_indsset, output_indsset, prods, tens_sizes)
+  V_blf, cu_blf = gen_blf_tensor_prods(input_indsset, output_indsset, prods, tens_sizes)
+  V_wtb, cu_wtb = gen_wtb_tensor_prods(input_indsset, output_indsset, prods, tens_sizes)
+  return (
+    Function(name, int_params, tens_params_fwd, tens_outputs_fwd, shapes_fwd, gridsz_expr, blocksz_expr, V_fwd, chunksz_exprs, cu_fwd),
+    Function(name + "_backward", int_params, tens_params_bwd, tens_outputs_bwd, shapes_bwd, gridsz_expr, blocksz_expr, V_bwd, chunksz_exprs, cu_bwd),
+    Function(name + "_backleft", int_params, tens_params_blf, tens_outputs_blf, shapes_blf, gridsz_expr, blocksz_expr, V_blf, chunksz_exprs, cu_blf),
+    Function(name + "_wtsback", int_params, tens_params_wtb, tens_outputs_wtb, shapes_wtb, gridsz_expr_wtb, blocksz_expr, V_wtb, chunksz_exprs, cu_wtb)
+  )
 
 
 def bindings(functions):
@@ -433,11 +605,13 @@ if __name__ == "__main__":
     print(V.sharedmemsz_calculations())
     print()
   if True:
-    F = tensor_prods("fused_tensor_prods_example", 1, [(0, 0, 0), (0, 1, 1), (1, 1, 0)], 8)
-    print(F.define_kern())
-    print()
-    print(F.define())
-    print()
-    print(F.define_cpp())
-    print()
-    print(bindings([F]))
+    Fs = tensor_prods("fused_tensor_prods_example", [0, 1], [0, 1], [(0, 0, 0), (0, 1, 1), (1, 1, 0)], 8)
+    for F in Fs:
+      print()
+      print(F.define_kern())
+      print()
+      print(F.define())
+      print()
+      print(F.define_cpp())
+      print()
+    print(bindings(Fs))

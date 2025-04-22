@@ -1,7 +1,11 @@
 from codegen import *
 
 
-functions = [tensor_prods("fused_tensor_prods_example", 2, [(0, 0, 0), (0, 1, 1), (1, 0, 1), (1, 1, 0), (2, 2, 0), (2, 2, 2), (2, 1, 1)], 8)]
+function_pairs = [tensor_prods("fused_tensor_prods_example", [0, 1, 2], [0, 1, 2], [(0, 0, 0), (0, 1, 1), (1, 0, 1), (1, 1, 0), (2, 2, 0), (2, 2, 2), (2, 1, 1)], 8)]
+functions = []
+for fns in function_pairs:
+  for fn in fns:
+    functions.append(fn)
 
 
 with open("codegen_tensops.cpp", "w") as f:

@@ -9,29 +9,44 @@
 
 
 void fused_tensor_prods_example(
-    int batch, int dim_0, int dim_1, int dim_2,
-    const float* x_0, const float* x_1, const float* x_2, const float* W_000, const float* W_011, const float* W_101, const float* W_110, const float* W_220, const float* W_222, const float* W_211, const float* P_000, const float* P_110, const float* P_220, const float* P_011, const float* P_101, const float* P_211, const float* P_222,
+    int batch, int dim_l, int dim_0, int dim_1, int dim_2,
+    const float* x_0, const float* x_1, const float* x_2, const float* P_000, const float* left_000, const float* P_011, const float* left_011, const float* P_101, const float* left_101, const float* P_110, const float* left_110, const float* P_220, const float* left_220, const float* P_222, const float* left_222, const float* P_211, const float* left_211,
     float* y_0, float* y_1, float* y_2);
 
+void fused_tensor_prods_example_backward(
+    int batch, int dim_l, int dim_0, int dim_1, int dim_2,
+    const float* dy_0, const float* dy_1, const float* dy_2, const float* P_000, const float* left_000, const float* P_011, const float* left_011, const float* P_101, const float* left_101, const float* P_110, const float* left_110, const float* P_220, const float* left_220, const float* P_222, const float* left_222, const float* P_211, const float* left_211,
+    float* dx_0, float* dx_1, float* dx_2);
+
+void fused_tensor_prods_example_backleft(
+    int batch, int dim_l, int dim_0, int dim_1, int dim_2,
+    const float* x_0, const float* x_1, const float* x_2, const float* dy_0, const float* dy_1, const float* dy_2, const float* P_000, const float* P_011, const float* P_101, const float* P_110, const float* P_220, const float* P_222, const float* P_211,
+    float* dleft_000, float* dleft_011, float* dleft_101, float* dleft_110, float* dleft_220, float* dleft_222, float* dleft_211);
+
+void fused_tensor_prods_example_wtsback(
+    int batch, int dim_l, int dim_0, int dim_1, int dim_2,
+    const float* x_0, const float* x_1, const float* x_2, const float* dy_0, const float* dy_1, const float* dy_2, const float* left_000, const float* left_011, const float* left_101, const float* left_110, const float* left_220, const float* left_222, const float* left_211,
+    float* dP_000, float* dP_011, float* dP_101, float* dP_110, float* dP_220, float* dP_222, float* dP_211);
+
 std::vector<at::Tensor> fused_tensor_prods_example_cuda(
-    const at::Tensor& x_0, const at::Tensor& x_1, const at::Tensor& x_2, const at::Tensor& W_000, const at::Tensor& W_011, const at::Tensor& W_101, const at::Tensor& W_110, const at::Tensor& W_220, const at::Tensor& W_222, const at::Tensor& W_211, const at::Tensor& P_000, const at::Tensor& P_110, const at::Tensor& P_220, const at::Tensor& P_011, const at::Tensor& P_101, const at::Tensor& P_211, const at::Tensor& P_222) {
+    const at::Tensor& x_0, const at::Tensor& x_1, const at::Tensor& x_2, const at::Tensor& P_000, const at::Tensor& left_000, const at::Tensor& P_011, const at::Tensor& left_011, const at::Tensor& P_101, const at::Tensor& left_101, const at::Tensor& P_110, const at::Tensor& left_110, const at::Tensor& P_220, const at::Tensor& left_220, const at::Tensor& P_222, const at::Tensor& left_222, const at::Tensor& P_211, const at::Tensor& left_211) {
   CHECK_INPUT(x_0);
   CHECK_INPUT(x_1);
   CHECK_INPUT(x_2);
-  CHECK_INPUT(W_000);
-  CHECK_INPUT(W_011);
-  CHECK_INPUT(W_101);
-  CHECK_INPUT(W_110);
-  CHECK_INPUT(W_220);
-  CHECK_INPUT(W_222);
-  CHECK_INPUT(W_211);
   CHECK_INPUT(P_000);
-  CHECK_INPUT(P_110);
-  CHECK_INPUT(P_220);
+  CHECK_INPUT(left_000);
   CHECK_INPUT(P_011);
+  CHECK_INPUT(left_011);
   CHECK_INPUT(P_101);
-  CHECK_INPUT(P_211);
+  CHECK_INPUT(left_101);
+  CHECK_INPUT(P_110);
+  CHECK_INPUT(left_110);
+  CHECK_INPUT(P_220);
+  CHECK_INPUT(left_220);
   CHECK_INPUT(P_222);
+  CHECK_INPUT(left_222);
+  CHECK_INPUT(P_211);
+  CHECK_INPUT(left_211);
   at::Device device = x_0.device();
   cudaSetDevice(device.index()); // run kernel on same device as input tensors
   TORCH_CHECK(x_0.dim() == 2, "x_0 has wrong number of axes");
@@ -46,66 +61,344 @@ std::vector<at::Tensor> fused_tensor_prods_example_cuda(
   int dim_2 = x_2.size(1);
   TORCH_CHECK(x_2.size(2) == 3, "x_2: expected axis 2 to have size 3");
   TORCH_CHECK(x_2.size(3) == 3, "x_2: expected axis 3 to have size 3");
-  TORCH_CHECK(W_000.dim() == 2, "W_000 has wrong number of axes");
-  TORCH_CHECK(W_000.size(0) == 8, "W_000: expected axis 0 to have size 8");
-  TORCH_CHECK(W_000.size(1) == dim_0, "W_000: expected axis 1 to have size dim_0");
-  TORCH_CHECK(W_011.dim() == 2, "W_011 has wrong number of axes");
-  TORCH_CHECK(W_011.size(0) == 8, "W_011: expected axis 0 to have size 8");
-  TORCH_CHECK(W_011.size(1) == dim_0, "W_011: expected axis 1 to have size dim_0");
-  TORCH_CHECK(W_101.dim() == 2, "W_101 has wrong number of axes");
-  TORCH_CHECK(W_101.size(0) == 8, "W_101: expected axis 0 to have size 8");
-  TORCH_CHECK(W_101.size(1) == dim_1, "W_101: expected axis 1 to have size dim_1");
-  TORCH_CHECK(W_110.dim() == 2, "W_110 has wrong number of axes");
-  TORCH_CHECK(W_110.size(0) == 8, "W_110: expected axis 0 to have size 8");
-  TORCH_CHECK(W_110.size(1) == dim_1, "W_110: expected axis 1 to have size dim_1");
-  TORCH_CHECK(W_220.dim() == 2, "W_220 has wrong number of axes");
-  TORCH_CHECK(W_220.size(0) == 8, "W_220: expected axis 0 to have size 8");
-  TORCH_CHECK(W_220.size(1) == dim_2, "W_220: expected axis 1 to have size dim_2");
-  TORCH_CHECK(W_222.dim() == 2, "W_222 has wrong number of axes");
-  TORCH_CHECK(W_222.size(0) == 8, "W_222: expected axis 0 to have size 8");
-  TORCH_CHECK(W_222.size(1) == dim_2, "W_222: expected axis 1 to have size dim_2");
-  TORCH_CHECK(W_211.dim() == 2, "W_211 has wrong number of axes");
-  TORCH_CHECK(W_211.size(0) == 8, "W_211: expected axis 0 to have size 8");
-  TORCH_CHECK(W_211.size(1) == dim_2, "W_211: expected axis 1 to have size dim_2");
   TORCH_CHECK(P_000.dim() == 3, "P_000 has wrong number of axes");
   TORCH_CHECK(P_000.size(0) == dim_0, "P_000: expected axis 0 to have size dim_0");
-  TORCH_CHECK(P_000.size(1) == 8, "P_000: expected axis 1 to have size 8");
+  int dim_l = P_000.size(1);
   TORCH_CHECK(P_000.size(2) == dim_0, "P_000: expected axis 2 to have size dim_0");
-  TORCH_CHECK(P_110.dim() == 3, "P_110 has wrong number of axes");
-  TORCH_CHECK(P_110.size(0) == dim_0, "P_110: expected axis 0 to have size dim_0");
-  TORCH_CHECK(P_110.size(1) == 8, "P_110: expected axis 1 to have size 8");
-  TORCH_CHECK(P_110.size(2) == dim_1, "P_110: expected axis 2 to have size dim_1");
-  TORCH_CHECK(P_220.dim() == 3, "P_220 has wrong number of axes");
-  TORCH_CHECK(P_220.size(0) == dim_0, "P_220: expected axis 0 to have size dim_0");
-  TORCH_CHECK(P_220.size(1) == 8, "P_220: expected axis 1 to have size 8");
-  TORCH_CHECK(P_220.size(2) == dim_2, "P_220: expected axis 2 to have size dim_2");
+  TORCH_CHECK(left_000.dim() == 2, "left_000 has wrong number of axes");
+  TORCH_CHECK(left_000.size(0) == batch, "left_000: expected axis 0 to have size batch");
+  TORCH_CHECK(left_000.size(1) == dim_l, "left_000: expected axis 1 to have size dim_l");
   TORCH_CHECK(P_011.dim() == 3, "P_011 has wrong number of axes");
   TORCH_CHECK(P_011.size(0) == dim_1, "P_011: expected axis 0 to have size dim_1");
-  TORCH_CHECK(P_011.size(1) == 8, "P_011: expected axis 1 to have size 8");
+  TORCH_CHECK(P_011.size(1) == dim_l, "P_011: expected axis 1 to have size dim_l");
   TORCH_CHECK(P_011.size(2) == dim_1, "P_011: expected axis 2 to have size dim_1");
+  TORCH_CHECK(left_011.dim() == 2, "left_011 has wrong number of axes");
+  TORCH_CHECK(left_011.size(0) == batch, "left_011: expected axis 0 to have size batch");
+  TORCH_CHECK(left_011.size(1) == dim_l, "left_011: expected axis 1 to have size dim_l");
   TORCH_CHECK(P_101.dim() == 3, "P_101 has wrong number of axes");
   TORCH_CHECK(P_101.size(0) == dim_1, "P_101: expected axis 0 to have size dim_1");
-  TORCH_CHECK(P_101.size(1) == 8, "P_101: expected axis 1 to have size 8");
+  TORCH_CHECK(P_101.size(1) == dim_l, "P_101: expected axis 1 to have size dim_l");
   TORCH_CHECK(P_101.size(2) == dim_0, "P_101: expected axis 2 to have size dim_0");
-  TORCH_CHECK(P_211.dim() == 3, "P_211 has wrong number of axes");
-  TORCH_CHECK(P_211.size(0) == dim_1, "P_211: expected axis 0 to have size dim_1");
-  TORCH_CHECK(P_211.size(1) == 8, "P_211: expected axis 1 to have size 8");
-  TORCH_CHECK(P_211.size(2) == dim_1, "P_211: expected axis 2 to have size dim_1");
+  TORCH_CHECK(left_101.dim() == 3, "left_101 has wrong number of axes");
+  TORCH_CHECK(left_101.size(0) == batch, "left_101: expected axis 0 to have size batch");
+  TORCH_CHECK(left_101.size(1) == dim_l, "left_101: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_101.size(2) == 3, "left_101: expected axis 2 to have size 3");
+  TORCH_CHECK(P_110.dim() == 3, "P_110 has wrong number of axes");
+  TORCH_CHECK(P_110.size(0) == dim_0, "P_110: expected axis 0 to have size dim_0");
+  TORCH_CHECK(P_110.size(1) == dim_l, "P_110: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_110.size(2) == dim_1, "P_110: expected axis 2 to have size dim_1");
+  TORCH_CHECK(left_110.dim() == 3, "left_110 has wrong number of axes");
+  TORCH_CHECK(left_110.size(0) == batch, "left_110: expected axis 0 to have size batch");
+  TORCH_CHECK(left_110.size(1) == dim_l, "left_110: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_110.size(2) == 3, "left_110: expected axis 2 to have size 3");
+  TORCH_CHECK(P_220.dim() == 3, "P_220 has wrong number of axes");
+  TORCH_CHECK(P_220.size(0) == dim_0, "P_220: expected axis 0 to have size dim_0");
+  TORCH_CHECK(P_220.size(1) == dim_l, "P_220: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_220.size(2) == dim_2, "P_220: expected axis 2 to have size dim_2");
+  TORCH_CHECK(left_220.dim() == 4, "left_220 has wrong number of axes");
+  TORCH_CHECK(left_220.size(0) == batch, "left_220: expected axis 0 to have size batch");
+  TORCH_CHECK(left_220.size(1) == dim_l, "left_220: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_220.size(2) == 3, "left_220: expected axis 2 to have size 3");
+  TORCH_CHECK(left_220.size(3) == 3, "left_220: expected axis 3 to have size 3");
   TORCH_CHECK(P_222.dim() == 3, "P_222 has wrong number of axes");
   TORCH_CHECK(P_222.size(0) == dim_2, "P_222: expected axis 0 to have size dim_2");
-  TORCH_CHECK(P_222.size(1) == 8, "P_222: expected axis 1 to have size 8");
+  TORCH_CHECK(P_222.size(1) == dim_l, "P_222: expected axis 1 to have size dim_l");
   TORCH_CHECK(P_222.size(2) == dim_2, "P_222: expected axis 2 to have size dim_2");
+  TORCH_CHECK(left_222.dim() == 4, "left_222 has wrong number of axes");
+  TORCH_CHECK(left_222.size(0) == batch, "left_222: expected axis 0 to have size batch");
+  TORCH_CHECK(left_222.size(1) == dim_l, "left_222: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_222.size(2) == 3, "left_222: expected axis 2 to have size 3");
+  TORCH_CHECK(left_222.size(3) == 3, "left_222: expected axis 3 to have size 3");
+  TORCH_CHECK(P_211.dim() == 3, "P_211 has wrong number of axes");
+  TORCH_CHECK(P_211.size(0) == dim_1, "P_211: expected axis 0 to have size dim_1");
+  TORCH_CHECK(P_211.size(1) == dim_l, "P_211: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_211.size(2) == dim_1, "P_211: expected axis 2 to have size dim_1");
+  TORCH_CHECK(left_211.dim() == 4, "left_211 has wrong number of axes");
+  TORCH_CHECK(left_211.size(0) == batch, "left_211: expected axis 0 to have size batch");
+  TORCH_CHECK(left_211.size(1) == dim_l, "left_211: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_211.size(2) == 3, "left_211: expected axis 2 to have size 3");
+  TORCH_CHECK(left_211.size(3) == 3, "left_211: expected axis 3 to have size 3");
   at::Tensor y_0 = torch::empty({batch, dim_0}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor y_1 = torch::empty({batch, dim_1, 3}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor y_2 = torch::empty({batch, dim_2, 3, 3}, torch::dtype(torch::kFloat32).device(device));
   fused_tensor_prods_example(
-      batch, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(W_000.data_ptr<float>()), reinterpret_cast<float*>(W_011.data_ptr<float>()), reinterpret_cast<float*>(W_101.data_ptr<float>()), reinterpret_cast<float*>(W_110.data_ptr<float>()), reinterpret_cast<float*>(W_220.data_ptr<float>()), reinterpret_cast<float*>(W_222.data_ptr<float>()), reinterpret_cast<float*>(W_211.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()),
+      batch, dim_l, dim_0, dim_1, dim_2,
+      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()),
       reinterpret_cast<float*>(y_0.data_ptr<float>()), reinterpret_cast<float*>(y_1.data_ptr<float>()), reinterpret_cast<float*>(y_2.data_ptr<float>()));
   return {y_0, y_1, y_2};
 }
 
+std::vector<at::Tensor> fused_tensor_prods_example_backward_cuda(
+    const at::Tensor& dy_0, const at::Tensor& dy_1, const at::Tensor& dy_2, const at::Tensor& P_000, const at::Tensor& left_000, const at::Tensor& P_011, const at::Tensor& left_011, const at::Tensor& P_101, const at::Tensor& left_101, const at::Tensor& P_110, const at::Tensor& left_110, const at::Tensor& P_220, const at::Tensor& left_220, const at::Tensor& P_222, const at::Tensor& left_222, const at::Tensor& P_211, const at::Tensor& left_211) {
+  CHECK_INPUT(dy_0);
+  CHECK_INPUT(dy_1);
+  CHECK_INPUT(dy_2);
+  CHECK_INPUT(P_000);
+  CHECK_INPUT(left_000);
+  CHECK_INPUT(P_011);
+  CHECK_INPUT(left_011);
+  CHECK_INPUT(P_101);
+  CHECK_INPUT(left_101);
+  CHECK_INPUT(P_110);
+  CHECK_INPUT(left_110);
+  CHECK_INPUT(P_220);
+  CHECK_INPUT(left_220);
+  CHECK_INPUT(P_222);
+  CHECK_INPUT(left_222);
+  CHECK_INPUT(P_211);
+  CHECK_INPUT(left_211);
+  at::Device device = dy_0.device();
+  cudaSetDevice(device.index()); // run kernel on same device as input tensors
+  TORCH_CHECK(dy_0.dim() == 2, "dy_0 has wrong number of axes");
+  int batch = dy_0.size(0);
+  int dim_0 = dy_0.size(1);
+  TORCH_CHECK(dy_1.dim() == 3, "dy_1 has wrong number of axes");
+  TORCH_CHECK(dy_1.size(0) == batch, "dy_1: expected axis 0 to have size batch");
+  int dim_1 = dy_1.size(1);
+  TORCH_CHECK(dy_1.size(2) == 3, "dy_1: expected axis 2 to have size 3");
+  TORCH_CHECK(dy_2.dim() == 4, "dy_2 has wrong number of axes");
+  TORCH_CHECK(dy_2.size(0) == batch, "dy_2: expected axis 0 to have size batch");
+  int dim_2 = dy_2.size(1);
+  TORCH_CHECK(dy_2.size(2) == 3, "dy_2: expected axis 2 to have size 3");
+  TORCH_CHECK(dy_2.size(3) == 3, "dy_2: expected axis 3 to have size 3");
+  TORCH_CHECK(P_000.dim() == 3, "P_000 has wrong number of axes");
+  TORCH_CHECK(P_000.size(0) == dim_0, "P_000: expected axis 0 to have size dim_0");
+  int dim_l = P_000.size(1);
+  TORCH_CHECK(P_000.size(2) == dim_0, "P_000: expected axis 2 to have size dim_0");
+  TORCH_CHECK(left_000.dim() == 2, "left_000 has wrong number of axes");
+  TORCH_CHECK(left_000.size(0) == batch, "left_000: expected axis 0 to have size batch");
+  TORCH_CHECK(left_000.size(1) == dim_l, "left_000: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_011.dim() == 3, "P_011 has wrong number of axes");
+  TORCH_CHECK(P_011.size(0) == dim_1, "P_011: expected axis 0 to have size dim_1");
+  TORCH_CHECK(P_011.size(1) == dim_l, "P_011: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_011.size(2) == dim_1, "P_011: expected axis 2 to have size dim_1");
+  TORCH_CHECK(left_011.dim() == 2, "left_011 has wrong number of axes");
+  TORCH_CHECK(left_011.size(0) == batch, "left_011: expected axis 0 to have size batch");
+  TORCH_CHECK(left_011.size(1) == dim_l, "left_011: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_101.dim() == 3, "P_101 has wrong number of axes");
+  TORCH_CHECK(P_101.size(0) == dim_1, "P_101: expected axis 0 to have size dim_1");
+  TORCH_CHECK(P_101.size(1) == dim_l, "P_101: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_101.size(2) == dim_0, "P_101: expected axis 2 to have size dim_0");
+  TORCH_CHECK(left_101.dim() == 3, "left_101 has wrong number of axes");
+  TORCH_CHECK(left_101.size(0) == batch, "left_101: expected axis 0 to have size batch");
+  TORCH_CHECK(left_101.size(1) == dim_l, "left_101: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_101.size(2) == 3, "left_101: expected axis 2 to have size 3");
+  TORCH_CHECK(P_110.dim() == 3, "P_110 has wrong number of axes");
+  TORCH_CHECK(P_110.size(0) == dim_0, "P_110: expected axis 0 to have size dim_0");
+  TORCH_CHECK(P_110.size(1) == dim_l, "P_110: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_110.size(2) == dim_1, "P_110: expected axis 2 to have size dim_1");
+  TORCH_CHECK(left_110.dim() == 3, "left_110 has wrong number of axes");
+  TORCH_CHECK(left_110.size(0) == batch, "left_110: expected axis 0 to have size batch");
+  TORCH_CHECK(left_110.size(1) == dim_l, "left_110: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_110.size(2) == 3, "left_110: expected axis 2 to have size 3");
+  TORCH_CHECK(P_220.dim() == 3, "P_220 has wrong number of axes");
+  TORCH_CHECK(P_220.size(0) == dim_0, "P_220: expected axis 0 to have size dim_0");
+  TORCH_CHECK(P_220.size(1) == dim_l, "P_220: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_220.size(2) == dim_2, "P_220: expected axis 2 to have size dim_2");
+  TORCH_CHECK(left_220.dim() == 4, "left_220 has wrong number of axes");
+  TORCH_CHECK(left_220.size(0) == batch, "left_220: expected axis 0 to have size batch");
+  TORCH_CHECK(left_220.size(1) == dim_l, "left_220: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_220.size(2) == 3, "left_220: expected axis 2 to have size 3");
+  TORCH_CHECK(left_220.size(3) == 3, "left_220: expected axis 3 to have size 3");
+  TORCH_CHECK(P_222.dim() == 3, "P_222 has wrong number of axes");
+  TORCH_CHECK(P_222.size(0) == dim_2, "P_222: expected axis 0 to have size dim_2");
+  TORCH_CHECK(P_222.size(1) == dim_l, "P_222: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_222.size(2) == dim_2, "P_222: expected axis 2 to have size dim_2");
+  TORCH_CHECK(left_222.dim() == 4, "left_222 has wrong number of axes");
+  TORCH_CHECK(left_222.size(0) == batch, "left_222: expected axis 0 to have size batch");
+  TORCH_CHECK(left_222.size(1) == dim_l, "left_222: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_222.size(2) == 3, "left_222: expected axis 2 to have size 3");
+  TORCH_CHECK(left_222.size(3) == 3, "left_222: expected axis 3 to have size 3");
+  TORCH_CHECK(P_211.dim() == 3, "P_211 has wrong number of axes");
+  TORCH_CHECK(P_211.size(0) == dim_1, "P_211: expected axis 0 to have size dim_1");
+  TORCH_CHECK(P_211.size(1) == dim_l, "P_211: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_211.size(2) == dim_1, "P_211: expected axis 2 to have size dim_1");
+  TORCH_CHECK(left_211.dim() == 4, "left_211 has wrong number of axes");
+  TORCH_CHECK(left_211.size(0) == batch, "left_211: expected axis 0 to have size batch");
+  TORCH_CHECK(left_211.size(1) == dim_l, "left_211: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_211.size(2) == 3, "left_211: expected axis 2 to have size 3");
+  TORCH_CHECK(left_211.size(3) == 3, "left_211: expected axis 3 to have size 3");
+  at::Tensor dx_0 = torch::empty({batch, dim_0}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dx_1 = torch::empty({batch, dim_1, 3}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dx_2 = torch::empty({batch, dim_2, 3, 3}, torch::dtype(torch::kFloat32).device(device));
+  fused_tensor_prods_example_backward(
+      batch, dim_l, dim_0, dim_1, dim_2,
+      reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()),
+      reinterpret_cast<float*>(dx_0.data_ptr<float>()), reinterpret_cast<float*>(dx_1.data_ptr<float>()), reinterpret_cast<float*>(dx_2.data_ptr<float>()));
+  return {dx_0, dx_1, dx_2};
+}
+
+std::vector<at::Tensor> fused_tensor_prods_example_backleft_cuda(
+    const at::Tensor& x_0, const at::Tensor& x_1, const at::Tensor& x_2, const at::Tensor& dy_0, const at::Tensor& dy_1, const at::Tensor& dy_2, const at::Tensor& P_000, const at::Tensor& P_011, const at::Tensor& P_101, const at::Tensor& P_110, const at::Tensor& P_220, const at::Tensor& P_222, const at::Tensor& P_211) {
+  CHECK_INPUT(x_0);
+  CHECK_INPUT(x_1);
+  CHECK_INPUT(x_2);
+  CHECK_INPUT(dy_0);
+  CHECK_INPUT(dy_1);
+  CHECK_INPUT(dy_2);
+  CHECK_INPUT(P_000);
+  CHECK_INPUT(P_011);
+  CHECK_INPUT(P_101);
+  CHECK_INPUT(P_110);
+  CHECK_INPUT(P_220);
+  CHECK_INPUT(P_222);
+  CHECK_INPUT(P_211);
+  at::Device device = x_0.device();
+  cudaSetDevice(device.index()); // run kernel on same device as input tensors
+  TORCH_CHECK(x_0.dim() == 2, "x_0 has wrong number of axes");
+  int batch = x_0.size(0);
+  int dim_0 = x_0.size(1);
+  TORCH_CHECK(x_1.dim() == 3, "x_1 has wrong number of axes");
+  TORCH_CHECK(x_1.size(0) == batch, "x_1: expected axis 0 to have size batch");
+  int dim_1 = x_1.size(1);
+  TORCH_CHECK(x_1.size(2) == 3, "x_1: expected axis 2 to have size 3");
+  TORCH_CHECK(x_2.dim() == 4, "x_2 has wrong number of axes");
+  TORCH_CHECK(x_2.size(0) == batch, "x_2: expected axis 0 to have size batch");
+  int dim_2 = x_2.size(1);
+  TORCH_CHECK(x_2.size(2) == 3, "x_2: expected axis 2 to have size 3");
+  TORCH_CHECK(x_2.size(3) == 3, "x_2: expected axis 3 to have size 3");
+  TORCH_CHECK(dy_0.dim() == 2, "dy_0 has wrong number of axes");
+  TORCH_CHECK(dy_0.size(0) == batch, "dy_0: expected axis 0 to have size batch");
+  TORCH_CHECK(dy_0.size(1) == dim_0, "dy_0: expected axis 1 to have size dim_0");
+  TORCH_CHECK(dy_1.dim() == 3, "dy_1 has wrong number of axes");
+  TORCH_CHECK(dy_1.size(0) == batch, "dy_1: expected axis 0 to have size batch");
+  TORCH_CHECK(dy_1.size(1) == dim_1, "dy_1: expected axis 1 to have size dim_1");
+  TORCH_CHECK(dy_1.size(2) == 3, "dy_1: expected axis 2 to have size 3");
+  TORCH_CHECK(dy_2.dim() == 4, "dy_2 has wrong number of axes");
+  TORCH_CHECK(dy_2.size(0) == batch, "dy_2: expected axis 0 to have size batch");
+  TORCH_CHECK(dy_2.size(1) == dim_2, "dy_2: expected axis 1 to have size dim_2");
+  TORCH_CHECK(dy_2.size(2) == 3, "dy_2: expected axis 2 to have size 3");
+  TORCH_CHECK(dy_2.size(3) == 3, "dy_2: expected axis 3 to have size 3");
+  TORCH_CHECK(P_000.dim() == 3, "P_000 has wrong number of axes");
+  TORCH_CHECK(P_000.size(0) == dim_0, "P_000: expected axis 0 to have size dim_0");
+  int dim_l = P_000.size(1);
+  TORCH_CHECK(P_000.size(2) == dim_0, "P_000: expected axis 2 to have size dim_0");
+  TORCH_CHECK(P_011.dim() == 3, "P_011 has wrong number of axes");
+  TORCH_CHECK(P_011.size(0) == dim_1, "P_011: expected axis 0 to have size dim_1");
+  TORCH_CHECK(P_011.size(1) == dim_l, "P_011: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_011.size(2) == dim_1, "P_011: expected axis 2 to have size dim_1");
+  TORCH_CHECK(P_101.dim() == 3, "P_101 has wrong number of axes");
+  TORCH_CHECK(P_101.size(0) == dim_1, "P_101: expected axis 0 to have size dim_1");
+  TORCH_CHECK(P_101.size(1) == dim_l, "P_101: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_101.size(2) == dim_0, "P_101: expected axis 2 to have size dim_0");
+  TORCH_CHECK(P_110.dim() == 3, "P_110 has wrong number of axes");
+  TORCH_CHECK(P_110.size(0) == dim_0, "P_110: expected axis 0 to have size dim_0");
+  TORCH_CHECK(P_110.size(1) == dim_l, "P_110: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_110.size(2) == dim_1, "P_110: expected axis 2 to have size dim_1");
+  TORCH_CHECK(P_220.dim() == 3, "P_220 has wrong number of axes");
+  TORCH_CHECK(P_220.size(0) == dim_0, "P_220: expected axis 0 to have size dim_0");
+  TORCH_CHECK(P_220.size(1) == dim_l, "P_220: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_220.size(2) == dim_2, "P_220: expected axis 2 to have size dim_2");
+  TORCH_CHECK(P_222.dim() == 3, "P_222 has wrong number of axes");
+  TORCH_CHECK(P_222.size(0) == dim_2, "P_222: expected axis 0 to have size dim_2");
+  TORCH_CHECK(P_222.size(1) == dim_l, "P_222: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_222.size(2) == dim_2, "P_222: expected axis 2 to have size dim_2");
+  TORCH_CHECK(P_211.dim() == 3, "P_211 has wrong number of axes");
+  TORCH_CHECK(P_211.size(0) == dim_1, "P_211: expected axis 0 to have size dim_1");
+  TORCH_CHECK(P_211.size(1) == dim_l, "P_211: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_211.size(2) == dim_1, "P_211: expected axis 2 to have size dim_1");
+  at::Tensor dleft_000 = torch::empty({batch, dim_l}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dleft_011 = torch::empty({batch, dim_l}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dleft_101 = torch::empty({batch, dim_l, 3}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dleft_110 = torch::empty({batch, dim_l, 3}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dleft_220 = torch::empty({batch, dim_l, 3, 3}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dleft_222 = torch::empty({batch, dim_l, 3, 3}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dleft_211 = torch::empty({batch, dim_l, 3, 3}, torch::dtype(torch::kFloat32).device(device));
+  fused_tensor_prods_example_backleft(
+      batch, dim_l, dim_0, dim_1, dim_2,
+      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()),
+      reinterpret_cast<float*>(dleft_000.data_ptr<float>()), reinterpret_cast<float*>(dleft_011.data_ptr<float>()), reinterpret_cast<float*>(dleft_101.data_ptr<float>()), reinterpret_cast<float*>(dleft_110.data_ptr<float>()), reinterpret_cast<float*>(dleft_220.data_ptr<float>()), reinterpret_cast<float*>(dleft_222.data_ptr<float>()), reinterpret_cast<float*>(dleft_211.data_ptr<float>()));
+  return {dleft_000, dleft_011, dleft_101, dleft_110, dleft_220, dleft_222, dleft_211};
+}
+
+std::vector<at::Tensor> fused_tensor_prods_example_wtsback_cuda(
+    const at::Tensor& x_0, const at::Tensor& x_1, const at::Tensor& x_2, const at::Tensor& dy_0, const at::Tensor& dy_1, const at::Tensor& dy_2, const at::Tensor& left_000, const at::Tensor& left_011, const at::Tensor& left_101, const at::Tensor& left_110, const at::Tensor& left_220, const at::Tensor& left_222, const at::Tensor& left_211) {
+  CHECK_INPUT(x_0);
+  CHECK_INPUT(x_1);
+  CHECK_INPUT(x_2);
+  CHECK_INPUT(dy_0);
+  CHECK_INPUT(dy_1);
+  CHECK_INPUT(dy_2);
+  CHECK_INPUT(left_000);
+  CHECK_INPUT(left_011);
+  CHECK_INPUT(left_101);
+  CHECK_INPUT(left_110);
+  CHECK_INPUT(left_220);
+  CHECK_INPUT(left_222);
+  CHECK_INPUT(left_211);
+  at::Device device = x_0.device();
+  cudaSetDevice(device.index()); // run kernel on same device as input tensors
+  TORCH_CHECK(x_0.dim() == 2, "x_0 has wrong number of axes");
+  int batch = x_0.size(0);
+  int dim_0 = x_0.size(1);
+  TORCH_CHECK(x_1.dim() == 3, "x_1 has wrong number of axes");
+  TORCH_CHECK(x_1.size(0) == batch, "x_1: expected axis 0 to have size batch");
+  int dim_1 = x_1.size(1);
+  TORCH_CHECK(x_1.size(2) == 3, "x_1: expected axis 2 to have size 3");
+  TORCH_CHECK(x_2.dim() == 4, "x_2 has wrong number of axes");
+  TORCH_CHECK(x_2.size(0) == batch, "x_2: expected axis 0 to have size batch");
+  int dim_2 = x_2.size(1);
+  TORCH_CHECK(x_2.size(2) == 3, "x_2: expected axis 2 to have size 3");
+  TORCH_CHECK(x_2.size(3) == 3, "x_2: expected axis 3 to have size 3");
+  TORCH_CHECK(dy_0.dim() == 2, "dy_0 has wrong number of axes");
+  TORCH_CHECK(dy_0.size(0) == batch, "dy_0: expected axis 0 to have size batch");
+  TORCH_CHECK(dy_0.size(1) == dim_0, "dy_0: expected axis 1 to have size dim_0");
+  TORCH_CHECK(dy_1.dim() == 3, "dy_1 has wrong number of axes");
+  TORCH_CHECK(dy_1.size(0) == batch, "dy_1: expected axis 0 to have size batch");
+  TORCH_CHECK(dy_1.size(1) == dim_1, "dy_1: expected axis 1 to have size dim_1");
+  TORCH_CHECK(dy_1.size(2) == 3, "dy_1: expected axis 2 to have size 3");
+  TORCH_CHECK(dy_2.dim() == 4, "dy_2 has wrong number of axes");
+  TORCH_CHECK(dy_2.size(0) == batch, "dy_2: expected axis 0 to have size batch");
+  TORCH_CHECK(dy_2.size(1) == dim_2, "dy_2: expected axis 1 to have size dim_2");
+  TORCH_CHECK(dy_2.size(2) == 3, "dy_2: expected axis 2 to have size 3");
+  TORCH_CHECK(dy_2.size(3) == 3, "dy_2: expected axis 3 to have size 3");
+  TORCH_CHECK(left_000.dim() == 2, "left_000 has wrong number of axes");
+  TORCH_CHECK(left_000.size(0) == batch, "left_000: expected axis 0 to have size batch");
+  int dim_l = left_000.size(1);
+  TORCH_CHECK(left_011.dim() == 2, "left_011 has wrong number of axes");
+  TORCH_CHECK(left_011.size(0) == batch, "left_011: expected axis 0 to have size batch");
+  TORCH_CHECK(left_011.size(1) == dim_l, "left_011: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_101.dim() == 3, "left_101 has wrong number of axes");
+  TORCH_CHECK(left_101.size(0) == batch, "left_101: expected axis 0 to have size batch");
+  TORCH_CHECK(left_101.size(1) == dim_l, "left_101: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_101.size(2) == 3, "left_101: expected axis 2 to have size 3");
+  TORCH_CHECK(left_110.dim() == 3, "left_110 has wrong number of axes");
+  TORCH_CHECK(left_110.size(0) == batch, "left_110: expected axis 0 to have size batch");
+  TORCH_CHECK(left_110.size(1) == dim_l, "left_110: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_110.size(2) == 3, "left_110: expected axis 2 to have size 3");
+  TORCH_CHECK(left_220.dim() == 4, "left_220 has wrong number of axes");
+  TORCH_CHECK(left_220.size(0) == batch, "left_220: expected axis 0 to have size batch");
+  TORCH_CHECK(left_220.size(1) == dim_l, "left_220: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_220.size(2) == 3, "left_220: expected axis 2 to have size 3");
+  TORCH_CHECK(left_220.size(3) == 3, "left_220: expected axis 3 to have size 3");
+  TORCH_CHECK(left_222.dim() == 4, "left_222 has wrong number of axes");
+  TORCH_CHECK(left_222.size(0) == batch, "left_222: expected axis 0 to have size batch");
+  TORCH_CHECK(left_222.size(1) == dim_l, "left_222: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_222.size(2) == 3, "left_222: expected axis 2 to have size 3");
+  TORCH_CHECK(left_222.size(3) == 3, "left_222: expected axis 3 to have size 3");
+  TORCH_CHECK(left_211.dim() == 4, "left_211 has wrong number of axes");
+  TORCH_CHECK(left_211.size(0) == batch, "left_211: expected axis 0 to have size batch");
+  TORCH_CHECK(left_211.size(1) == dim_l, "left_211: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_211.size(2) == 3, "left_211: expected axis 2 to have size 3");
+  TORCH_CHECK(left_211.size(3) == 3, "left_211: expected axis 3 to have size 3");
+  at::Tensor dP_000 = torch::empty({dim_0, dim_l, dim_0}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dP_011 = torch::empty({dim_1, dim_l, dim_1}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dP_101 = torch::empty({dim_1, dim_l, dim_0}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dP_110 = torch::empty({dim_0, dim_l, dim_1}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dP_220 = torch::empty({dim_0, dim_l, dim_2}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dP_222 = torch::empty({dim_2, dim_l, dim_2}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dP_211 = torch::empty({dim_1, dim_l, dim_1}, torch::dtype(torch::kFloat32).device(device));
+  fused_tensor_prods_example_wtsback(
+      batch, dim_l, dim_0, dim_1, dim_2,
+      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()),
+      reinterpret_cast<float*>(dP_000.data_ptr<float>()), reinterpret_cast<float*>(dP_011.data_ptr<float>()), reinterpret_cast<float*>(dP_101.data_ptr<float>()), reinterpret_cast<float*>(dP_110.data_ptr<float>()), reinterpret_cast<float*>(dP_220.data_ptr<float>()), reinterpret_cast<float*>(dP_222.data_ptr<float>()), reinterpret_cast<float*>(dP_211.data_ptr<float>()));
+  return {dP_000, dP_011, dP_101, dP_110, dP_220, dP_222, dP_211};
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-  m.def("fused_tensor_prods_example_cuda", &fused_tensor_prods_example_cuda, "fused_tensor_prods_example_cuda(x_0, x_1, x_2, W_000, W_011, W_101, W_110, W_220, W_222, W_211, P_000, P_110, P_220, P_011, P_101, P_211, P_222)");
+  m.def("fused_tensor_prods_example_cuda", &fused_tensor_prods_example_cuda, "fused_tensor_prods_example_cuda(x_0, x_1, x_2, P_000, left_000, P_011, left_011, P_101, left_101, P_110, left_110, P_220, left_220, P_222, left_222, P_211, left_211)");
+  m.def("fused_tensor_prods_example_backward_cuda", &fused_tensor_prods_example_backward_cuda, "fused_tensor_prods_example_backward_cuda(dy_0, dy_1, dy_2, P_000, left_000, P_011, left_011, P_101, left_101, P_110, left_110, P_220, left_220, P_222, left_222, P_211, left_211)");
+  m.def("fused_tensor_prods_example_backleft_cuda", &fused_tensor_prods_example_backleft_cuda, "fused_tensor_prods_example_backleft_cuda(x_0, x_1, x_2, dy_0, dy_1, dy_2, P_000, P_011, P_101, P_110, P_220, P_222, P_211)");
+  m.def("fused_tensor_prods_example_wtsback_cuda", &fused_tensor_prods_example_wtsback_cuda, "fused_tensor_prods_example_wtsback_cuda(x_0, x_1, x_2, dy_0, dy_1, dy_2, left_000, left_011, left_101, left_110, left_220, left_222, left_211)");
 }
 
