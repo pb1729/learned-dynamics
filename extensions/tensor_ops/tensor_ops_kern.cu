@@ -8,7 +8,8 @@ __global__ void tensorLinearKern( // <<<(gridDim.x, gridDim.y), (WARPSZ)>>>
     const float* W,
     const float* x,
     float* __restrict__ out,
-    int batch, int dim_in, int dim_out
+    int batch, int dim_in, int dim_out,
+    int stride_W_0, int stride_W_1
 ) {
     for (int idx_batch = blockIdx.y; idx_batch < batch; idx_batch += gridDim.y) {
         for (int idx_out = blockIdx.x; idx_out < dim_out; idx_out += gridDim.x) {
@@ -19,7 +20,7 @@ __global__ void tensorLinearKern( // <<<(gridDim.x, gridDim.y), (WARPSZ)>>>
             }
             // matmul
             for (int idx_in = threadIdx.x; idx_in < dim_in; idx_in += blockDim.x) {
-                float W_oi = W[idx_out*dim_in + idx_in];
+                float W_oi = W[idx_out*stride_W_0 + idx_in*stride_W_1];
                 for (int i = 0; i < inds_dim; i++) {
                     accum[i] += W_oi*x[(idx_batch*dim_in + idx_in)*inds_dim + i];
                 }
@@ -76,11 +77,13 @@ void tensorLinear(
     const float* W,
     const float* x,
     float* out,
-    int batch, int dim_in, int dim_out
+    int batch, int dim_in, int dim_out,
+    int stride_W_0, int stride_W_1
 ) {
     tensorLinearKern<inds_dim><<<dim3(dim_out, batch), WARPSZ>>>(
         W, x, out,
-        batch, dim_in, dim_out);
+        batch, dim_in, dim_out,
+        stride_W_0, stride_W_1);
 }
 
 template<int inds_dim>
@@ -97,12 +100,9 @@ void tensorLinearBackward(
 
 
 // Compiler wants us to tell it in advance which ones we're going to need.
-template void tensorLinear<1>(const float*, const float*, float*, int, int, int);
-template void tensorLinear<3>(const float*, const float*, float*, int, int, int);
-template void tensorLinear<9>(const float*, const float*, float*, int, int, int);
+template void tensorLinear<1>(const float*, const float*, float*, int, int, int, int, int);
+template void tensorLinear<3>(const float*, const float*, float*, int, int, int, int, int);
+template void tensorLinear<9>(const float*, const float*, float*, int, int, int, int, int);
 template void tensorLinearBackward<1>(const float*, const float*, float*, int, int, int);
 template void tensorLinearBackward<3>(const float*, const float*, float*, int, int, int);
 template void tensorLinearBackward<9>(const float*, const float*, float*, int, int, int);
-
-
-

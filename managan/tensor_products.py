@@ -3,39 +3,13 @@ from itertools import permutations
 import torch
 import torch.nn as nn
 
-from tensor_ops_cuda import tensor_linear, tensor_linear_backward
+from tensor_ops_cuda import tensor_linear
 
 from .utils import must_be, prod
 from .layers_common import VecLinear
 
 
-class _TensLinearCuda(torch.autograd.Function):
-  """ tensor activation function with a sigmoid shape """
-  @staticmethod
-  def forward(ctx, inds, W, x):
-    """ W: (dim_out, dim_in)
-        x: (..., dim_in, (3,)^inds) """
-    ctx.save_for_backward(W, x)
-    dim_out, dim_in = W.shape
-    *rest, must_be[dim_in] = x.shape[:len(x.shape) - inds]
-    ctx.tens_linear_shapedata = (inds, rest, dim_in, dim_out)
-    if prod(rest) == 0: # special handling for zero-size tensors
-      return torch.zeros(*rest, dim_out, *[3]*inds, device=x.device)
-    return tensor_linear(inds, W, x.reshape(prod(rest), dim_in, 3**inds)).reshape(*rest, dim_out, *[3]*inds)
-  @staticmethod
-  def backward(ctx, grad_output):
-    inds, rest, dim_in, dim_out = ctx.tens_linear_shapedata
-    W, x = ctx.saved_tensors
-    if prod(rest) == 0: # special handling for zero-size tensors
-      return None, torch.zeros_like(W), torch.zeros_like(x)
-    WT = W.detach().transpose(0, 1).contiguous()
-    dout = grad_output.reshape(prod(rest), dim_out, 3**inds).contiguous()
-    dx = tensor_linear(inds, WT, dout).reshape(*rest, dim_in, *[3]*inds)
-    dW = tensor_linear_backward(inds, x.reshape(prod(rest), dim_in, 3**inds), dout)
-    return None, dW, dx
-
-
-class TensLinear(nn.Module):
+class _TensLinearCompilable(nn.Module):
   def __init__(self, inds, dim_in, dim_out):
     super().__init__()
     self.W = nn.Parameter(torch.empty(dim_out, dim_in))
@@ -47,10 +21,20 @@ class TensLinear(nn.Module):
     _, fan_in = self.W.shape
     nn.init.normal_(self.W, std=fan_in**-0.5)
   def forward(self, x):
-    if x.is_cuda:
-      return _TensLinearCuda.apply(self.inds, self.W, x.contiguous())
-    else:
-      return torch.einsum(self.einsum_str, self.W, x)
+    return torch.einsum(self.einsum_str, self.W, x)
+
+class TensLinear(nn.Module):
+  """ Linear layer for arbitrary tensor activations. """
+  def __init__(self, inds, dim_in, dim_out):
+    super().__init__()
+    self.W = nn.Parameter(torch.empty(dim_out, dim_in))
+    self.inds = inds
+    self.self_init()
+  def self_init(self):
+    _, fan_in = self.W.shape
+    nn.init.normal_(self.W, std=fan_in**-0.5)
+  def forward(self, x):
+    return tensor_linear(self.inds, self.W, x.contiguous())
 
 
 # define the Levi-Civita symbol {
@@ -265,7 +249,7 @@ if __name__ == "__main__":
   print("This is ε_ijk:")
   print(ε_ijk)
   print("Comparing CPU and GPU versions of TensLinear")
-  from utils import avg_relative_diff
+  from .utils import avg_relative_diff
   batch = 10
   nodes = 10
   dim_in = 100
@@ -273,23 +257,23 @@ if __name__ == "__main__":
   for inds in range(3):
     print(f"Testing for inds={inds}")
     # setup layers
-    lin_cpu = TensLinear(inds, dim_in, dim_out)
-    lin_gpu = TensLinear(inds, dim_in, dim_out).to("cuda")
+    lin_base = _TensLinearCompilable(inds, dim_in, dim_out).to("cuda")
+    lin_cuda = _TensLinearCuda(inds, dim_in, dim_out)
     with torch.no_grad():
-      lin_gpu.W.copy_(lin_cpu.W.to("cuda"))
+      lin_cuda.W.copy_(lin_base.W)
     # setup inputs
-    x_cpu = torch.randn(batch, nodes, dim_in, *[3]*inds, requires_grad=True)
-    with torch.no_grad():
-      x_gpu = x_cpu.to("cuda")
-    x_gpu.requires_grad = True
-    dy_cpu = torch.randn(batch, nodes, dim_out, *[3]*inds)
-    dy_gpu = dy_cpu.to("cuda")
+    x = torch.randn(batch, nodes, dim_in, *[3]*inds, requires_grad=True, device="cuda")
+    x.requires_grad = True
+    dy = torch.randn(batch, nodes, dim_out, *[3]*inds, device="cuda")
     # run both!
-    y_cpu = lin_cpu(x_cpu)
-    y_cpu.backward(dy_cpu)
-    y_gpu = lin_gpu(x_gpu)
-    y_gpu.backward(dy_gpu)
+    y_base = lin_base(x)
+    y_base.backward(dy)
+    x_grad_base = x.grad
+    x.grad = None
+    y_cuda = lin_cuda(x)
+    y_cuda.backward(dy)
+    x_grad_cuda = x.grad
     # compare!
-    print("y", avg_relative_diff(y_cpu.to("cuda"), y_gpu))
-    print("dx", avg_relative_diff(x_cpu.grad.to("cuda"), x_gpu.grad))
-    print("dW", avg_relative_diff(lin_cpu.W.grad.to("cuda"), lin_gpu.W.grad))
+    print("y", avg_relative_diff(y_base, y_cuda))
+    print("dx", avg_relative_diff(x_grad_base, x_grad_cuda))
+    print("dW", avg_relative_diff(lin_base.W.grad, lin_cuda.W.grad))

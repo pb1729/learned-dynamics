@@ -1,6 +1,6 @@
+#include <cstdint>
 #include <torch/extension.h>
 #include <cuda_runtime.h>
-#include <stdio.h>
 
 
 #define CHECK_CUDA(x) TORCH_CHECK(x.device().is_cuda(), #x " must be a CUDA tensor")
@@ -14,7 +14,8 @@ void tensorLinear(
     const float* W,
     const float* x,
     float* out,
-    int batch, int dim_in, int dim_out
+    int batch, int dim_in, int dim_out,
+    int stride_W_0, int stride_W_1
 );
 
 template<int inds_dim>
@@ -27,99 +28,150 @@ void tensorLinearBackward(
 
 
 // C++ interface
-torch::Tensor tensor_linear(int inds, const torch::Tensor& W, const torch::Tensor& x) {
-    CHECK_INPUT(W);
-    CHECK_INPUT(x);
-    // run kernel on same device as input tensors
-    at::Device device = W.device();
-    cudaSetDevice(device.index());
-    // dimension checks:
-    TORCH_CHECK(W.dim() == 2, "expected W to be a matrix (2 dims)");
-    int dim_out = W.size(0);
-    int dim_in  = W.size(1);
-    TORCH_CHECK(x.dim() == 3 && x.size(1) == dim_in, "expected x to have shape (batch, dim_in, inds_dim)");
-    int batch = x.size(0);
-    int passed_dim_inds = x.size(2);
-    if (inds == 0) { // TODO: should we fall back to a regular torch linear here?
-        TORCH_CHECK(passed_dim_inds == 1, "last dim of x should be 3^inds");
-        torch::Tensor ans = torch::empty({batch, dim_out, 1}, torch::dtype(torch::kFloat32).device(device));
-        tensorLinear<1>(
-            reinterpret_cast<float*>(W.data_ptr<float>()),
-            reinterpret_cast<float*>(x.data_ptr<float>()),
-            reinterpret_cast<float*>(ans.data_ptr<float>()),
-            batch, dim_in, dim_out);
-        return ans;
+struct TensorLinearAutogradFn : public torch::autograd::Function<TensorLinearAutogradFn> {
+    static torch::Tensor forward(
+        torch::autograd::AutogradContext *ctx,
+        int64_t inds,
+        const torch::Tensor &W, const torch::Tensor &x
+    ) {
+        // setup and tensor saving
+        CHECK_CUDA(W);
+        CHECK_INPUT(x);
+        ctx->saved_data["inds"] = inds;
+        ctx->save_for_backward({W, x});
+        // run kernel on same device as input tensors
+        at::Device device = W.device();
+        cudaSetDevice(device.index());
+        // shape checks
+        TORCH_CHECK(W.dim() == 2, "expected W to be a matrix (2 dims)");
+        int64_t dim_out = W.size(0);
+        int64_t dim_in  = W.size(1);
+        int64_t stride_W_0 = W.stride(0);
+        int64_t stride_W_1 = W.stride(1);
+        std::vector<int64_t> y_shape = x.sizes().vec();
+        int64_t batch_dims = y_shape.size() - (1 + inds);
+        TORCH_CHECK(batch_dims >= 0, "x has too few dims");
+        TORCH_CHECK(y_shape[batch_dims] == dim_in, "channel dim size mismatch for x");
+        for (int64_t i = batch_dims + inds; i > batch_dims; i--) {
+            TORCH_CHECK(y_shape[i] == 3, "expected tensor index dim to be 3d for input x");
+        }
+        int64_t batch = 1;
+        for (int64_t i = 0; i < batch_dims; i++) {
+            batch *= y_shape[i];
+        }
+        // run the kernel
+        y_shape[batch_dims] = dim_out; // output channel dimension may be different
+        torch::Tensor y = torch::empty(y_shape, torch::dtype(torch::kFloat32).device(device));
+        if (batch == 0) { // handle case where input tensor has zero size
+            return y;
+        }
+        switch (inds) {
+            case 0:
+                tensorLinear<1>(
+                    reinterpret_cast<float*>(W.data_ptr<float>()),
+                    reinterpret_cast<float*>(x.data_ptr<float>()),
+                    reinterpret_cast<float*>(y.data_ptr<float>()),
+                    batch, dim_in, dim_out, stride_W_0, stride_W_1);
+                return y;
+            case 1:
+                tensorLinear<3>(
+                    reinterpret_cast<float*>(W.data_ptr<float>()),
+                    reinterpret_cast<float*>(x.data_ptr<float>()),
+                    reinterpret_cast<float*>(y.data_ptr<float>()),
+                    batch, dim_in, dim_out, stride_W_0, stride_W_1);
+                return y;
+            case 2:
+                tensorLinear<9>(
+                    reinterpret_cast<float*>(W.data_ptr<float>()),
+                    reinterpret_cast<float*>(x.data_ptr<float>()),
+                    reinterpret_cast<float*>(y.data_ptr<float>()),
+                    batch, dim_in, dim_out, stride_W_0, stride_W_1);
+                return y;
+            default:
+                TORCH_CHECK(false, "tensor_linear currently only supports a number of indices up to 2. go edit the code to add more (easy with copy/paste).");
+        }
     }
-    if (inds == 1) {
-        TORCH_CHECK(passed_dim_inds == 3, "last dim of x should be 3^inds");
-        torch::Tensor ans = torch::empty({batch, dim_out, 3}, torch::dtype(torch::kFloat32).device(device));
-        tensorLinear<3>(
-            reinterpret_cast<float*>(W.data_ptr<float>()),
-            reinterpret_cast<float*>(x.data_ptr<float>()),
-            reinterpret_cast<float*>(ans.data_ptr<float>()),
-            batch, dim_in, dim_out);
-        return ans;
+
+    static torch::autograd::variable_list backward(
+        torch::autograd::AutogradContext *ctx,
+        torch::autograd::variable_list grad_outputs
+    ) {
+        // recall saved info
+        auto saved = ctx->get_saved_variables();
+        auto W = saved[0];
+        auto x = saved[1];
+        int64_t inds = ctx->saved_data["inds"].toInt();
+        auto dy = grad_outputs[0].contiguous();
+        // run kernel on same device as input tensors
+        at::Device device = x.device();
+        cudaSetDevice(device.index());
+        // shape checks:
+        int64_t dim_out = W.size(0);
+        int64_t dim_in  = W.size(1);
+        int64_t stride_W_0 = W.stride(0);
+        int64_t stride_W_1 = W.stride(1);
+        TORCH_CHECK(x.dim() == dy.dim(), "input tensors should have same number of dims");
+        int batch_dims = x.dim() - (1 + inds);
+        TORCH_CHECK(batch_dims >= 0, "x has too few dims");
+        for (int i = batch_dims + inds; i > batch_dims; i--) {
+            TORCH_CHECK(x.size(i) == 3, "expected tensor index dim to be 3d for input x");
+            TORCH_CHECK(dy.size(i) == 3, "expected tensor index dim to be 3d for input dy");
+        }
+        int batch = 1;
+        for (int i = 0; i < batch_dims; i++) {
+            batch *= x.size(i);
+            TORCH_CHECK(x.size(i) == dy.size(i), "batch dims must have the same size")
+        }
+        TORCH_CHECK(x.size(batch_dims) == dim_in);
+        TORCH_CHECK(dy.size(batch_dims) == dim_out);
+        torch::Tensor dW = torch::empty({dim_out, dim_in}, torch::dtype(torch::kFloat32).device(device));
+        torch::Tensor dx = torch::empty(x.sizes(), torch::dtype(torch::kFloat32).device(device));
+        switch (inds) {
+            case 0:
+                tensorLinearBackward<1>( // compute dW
+                    reinterpret_cast<float*>(x.data_ptr<float>()),
+                    reinterpret_cast<float*>(dy.data_ptr<float>()),
+                    reinterpret_cast<float*>(dW.data_ptr<float>()),
+                    batch, dim_in, dim_out);
+                tensorLinear<1>( // compute dx
+                    reinterpret_cast<float*>(W.data_ptr<float>()),
+                    reinterpret_cast<float*>(dy.data_ptr<float>()),
+                    reinterpret_cast<float*>(dx.data_ptr<float>()),
+                    batch, dim_out, dim_in, stride_W_1, stride_W_0); // dim_in/out and strides swapped to use W.T for backward pass!
+                return {torch::Tensor(), dW, dx};
+            case 1:
+                tensorLinearBackward<3>( // compute dW
+                    reinterpret_cast<float*>(x.data_ptr<float>()),
+                    reinterpret_cast<float*>(dy.data_ptr<float>()),
+                    reinterpret_cast<float*>(dW.data_ptr<float>()),
+                    batch, dim_in, dim_out);
+                tensorLinear<3>( // compute dx
+                    reinterpret_cast<float*>(W.data_ptr<float>()),
+                    reinterpret_cast<float*>(dy.data_ptr<float>()),
+                    reinterpret_cast<float*>(dx.data_ptr<float>()),
+                    batch, dim_out, dim_in, stride_W_1, stride_W_0); // dim_in/out and strides swapped to use W.T for backward pass!
+                return {torch::Tensor(), dW, dx};
+            case 2:
+                tensorLinearBackward<9>( // compute dW
+                    reinterpret_cast<float*>(x.data_ptr<float>()),
+                    reinterpret_cast<float*>(dy.data_ptr<float>()),
+                    reinterpret_cast<float*>(dW.data_ptr<float>()),
+                    batch, dim_in, dim_out);
+                tensorLinear<9>( // compute dx
+                    reinterpret_cast<float*>(W.data_ptr<float>()),
+                    reinterpret_cast<float*>(dy.data_ptr<float>()),
+                    reinterpret_cast<float*>(dx.data_ptr<float>()),
+                    batch, dim_out, dim_in, stride_W_1, stride_W_0); // dim_in/out and strides swapped to use W.T for backward pass!
+                return {torch::Tensor(), dW, dx};
+            default:
+                TORCH_CHECK(false, "tensor_linear_backward currently only supports a number of indices up to 2. go edit the code to add more (easy with copy/paste).");
+        }
     }
-    if (inds == 2) {
-        TORCH_CHECK(passed_dim_inds == 9, "last dim of x should be 3^inds");
-        torch::Tensor ans = torch::empty({batch, dim_out, 9}, torch::dtype(torch::kFloat32).device(device));
-        tensorLinear<9>(
-            reinterpret_cast<float*>(W.data_ptr<float>()),
-            reinterpret_cast<float*>(x.data_ptr<float>()),
-            reinterpret_cast<float*>(ans.data_ptr<float>()),
-            batch, dim_in, dim_out);
-        return ans;
-    }
-    // otherwise:
-    TORCH_CHECK(false, "tensorLinear currently only supports a number of indices up to 2. go edit the code to add more (easy with copy/paste).");
-}
+};
 
 
-torch::Tensor tensor_linear_backward(int inds, const torch::Tensor& x, const torch::Tensor& dout) {
-    CHECK_INPUT(x);
-    CHECK_INPUT(dout);
-    // run kernel on same device as input tensors
-    at::Device device = x.device();
-    cudaSetDevice(device.index());
-    // dimension checks:
-    TORCH_CHECK(x.dim() == 3, "expected x to have shape (batch, dim_in, inds_dim)");
-    int batch = x.size(0);
-    int dim_in = x.size(1);
-    int passed_dim_inds = x.size(2);
-    TORCH_CHECK(dout.dim() == 3 && dout.size(0) == batch && dout.size(2) == passed_dim_inds, "dout dim mismatch");
-    int dim_out  = dout.size(1);
-    if (inds == 0) { // TODO: should we fall back to a regular torch linear here?
-        TORCH_CHECK(passed_dim_inds == 1, "last dim of x should be 3^inds");
-        torch::Tensor dW = torch::empty({dim_out, dim_in}, torch::dtype(torch::kFloat32).device(device));
-        tensorLinearBackward<1>(
-            reinterpret_cast<float*>(x.data_ptr<float>()),
-            reinterpret_cast<float*>(dout.data_ptr<float>()),
-            reinterpret_cast<float*>(dW.data_ptr<float>()),
-            batch, dim_in, dim_out);
-        return dW;
-    }
-    if (inds == 1) { // TODO: should we fall back to a regular torch linear here?
-        TORCH_CHECK(passed_dim_inds == 3, "last dim of x should be 3^inds");
-        torch::Tensor dW = torch::empty({dim_out, dim_in}, torch::dtype(torch::kFloat32).device(device));
-        tensorLinearBackward<3>(
-            reinterpret_cast<float*>(x.data_ptr<float>()),
-            reinterpret_cast<float*>(dout.data_ptr<float>()),
-            reinterpret_cast<float*>(dW.data_ptr<float>()),
-            batch, dim_in, dim_out);
-        return dW;
-    }
-    if (inds == 2) { // TODO: should we fall back to a regular torch linear here?
-        TORCH_CHECK(passed_dim_inds == 9, "last dim of x should be 3^inds");
-        torch::Tensor dW = torch::empty({dim_out, dim_in}, torch::dtype(torch::kFloat32).device(device));
-        tensorLinearBackward<9>(
-            reinterpret_cast<float*>(x.data_ptr<float>()),
-            reinterpret_cast<float*>(dout.data_ptr<float>()),
-            reinterpret_cast<float*>(dW.data_ptr<float>()),
-            batch, dim_in, dim_out);
-        return dW;
-    }
-    // otherwise:
-    TORCH_CHECK(false, "tensor_linear_backward currently only supports a number of indices up to 2. go edit the code to add more (easy with copy/paste).");
+torch::Tensor tensor_linear(int64_t inds, const torch::Tensor &W, const torch::Tensor &x) {
+    return TensorLinearAutogradFn::apply(inds, W, x);
 }
 
 
@@ -127,5 +179,4 @@ torch::Tensor tensor_linear_backward(int inds, const torch::Tensor& x, const tor
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("tensor_linear", &tensor_linear, "Apply linear operation to a tensor with inds indices in 3 dimensions.");
-    m.def("tensor_linear_backward", &tensor_linear_backward, "Backwards part of tensor_linear to compute dW.");
 }
