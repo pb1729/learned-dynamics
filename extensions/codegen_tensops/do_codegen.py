@@ -1,9 +1,10 @@
 from codegen import *
 
 
-function_pairs = [tensor_prods("fused_tensor_prods_example", [0, 1, 2], [0, 1, 2], [(0, 0, 0), (0, 1, 1), (1, 0, 1), (1, 1, 0), (2, 2, 0), (2, 2, 2), (2, 1, 1)], 8)]
+function_groups = [tensor_prods("fused_tensor_prods_example", [0, 1, 2], [0, 1, 2],
+  [(0, 0, 0), (0, 1, 1), (1, 0, 1), (1, 1, 0), (2, 2, 0), (2, 2, 2), (2, 1, 1), (1, 1, 1), (2, 1, 2)], 8)]
 functions = []
-for fns in function_pairs:
+for fns in function_groups:
   for fn in fns:
     functions.append(fn)
 

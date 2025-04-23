@@ -10,26 +10,26 @@
 
 void fused_tensor_prods_example(
     int batch, int dim_l, int dim_0, int dim_1, int dim_2,
-    const float* x_0, const float* x_1, const float* x_2, const float* P_000, const float* left_000, const float* P_011, const float* left_011, const float* P_101, const float* left_101, const float* P_110, const float* left_110, const float* P_220, const float* left_220, const float* P_222, const float* left_222, const float* P_211, const float* left_211,
+    const float* x_0, const float* x_1, const float* x_2, const float* P_000, const float* left_000, const float* P_011, const float* left_011, const float* P_101, const float* left_101, const float* P_110, const float* left_110, const float* P_220, const float* left_220, const float* P_222, const float* left_222, const float* P_211, const float* left_211, const float* P_111, const float* left_111, const float* P_212, const float* left_212,
     float* y_0, float* y_1, float* y_2);
 
 void fused_tensor_prods_example_backward(
     int batch, int dim_l, int dim_0, int dim_1, int dim_2,
-    const float* dy_0, const float* dy_1, const float* dy_2, const float* P_000, const float* left_000, const float* P_011, const float* left_011, const float* P_101, const float* left_101, const float* P_110, const float* left_110, const float* P_220, const float* left_220, const float* P_222, const float* left_222, const float* P_211, const float* left_211,
+    const float* dy_0, const float* dy_1, const float* dy_2, const float* P_000, const float* left_000, const float* P_011, const float* left_011, const float* P_101, const float* left_101, const float* P_110, const float* left_110, const float* P_220, const float* left_220, const float* P_222, const float* left_222, const float* P_211, const float* left_211, const float* P_111, const float* left_111, const float* P_212, const float* left_212,
     float* dx_0, float* dx_1, float* dx_2);
 
 void fused_tensor_prods_example_backleft(
     int batch, int dim_l, int dim_0, int dim_1, int dim_2,
-    const float* x_0, const float* x_1, const float* x_2, const float* dy_0, const float* dy_1, const float* dy_2, const float* P_000, const float* P_011, const float* P_101, const float* P_110, const float* P_220, const float* P_222, const float* P_211,
-    float* dleft_000, float* dleft_011, float* dleft_101, float* dleft_110, float* dleft_220, float* dleft_222, float* dleft_211);
+    const float* x_0, const float* x_1, const float* x_2, const float* dy_0, const float* dy_1, const float* dy_2, const float* P_000, const float* P_011, const float* P_101, const float* P_110, const float* P_220, const float* P_222, const float* P_211, const float* P_111, const float* P_212,
+    float* dleft_000, float* dleft_011, float* dleft_101, float* dleft_110, float* dleft_220, float* dleft_222, float* dleft_211, float* dleft_111, float* dleft_212);
 
 void fused_tensor_prods_example_wtsback(
     int batch, int dim_l, int dim_0, int dim_1, int dim_2,
-    const float* x_0, const float* x_1, const float* x_2, const float* dy_0, const float* dy_1, const float* dy_2, const float* left_000, const float* left_011, const float* left_101, const float* left_110, const float* left_220, const float* left_222, const float* left_211,
-    float* dP_000, float* dP_011, float* dP_101, float* dP_110, float* dP_220, float* dP_222, float* dP_211);
+    const float* x_0, const float* x_1, const float* x_2, const float* dy_0, const float* dy_1, const float* dy_2, const float* left_000, const float* left_011, const float* left_101, const float* left_110, const float* left_220, const float* left_222, const float* left_211, const float* left_111, const float* left_212,
+    float* dP_000, float* dP_011, float* dP_101, float* dP_110, float* dP_220, float* dP_222, float* dP_211, float* dP_111, float* dP_212);
 
 std::vector<at::Tensor> fused_tensor_prods_example_cuda(
-    const at::Tensor& x_0, const at::Tensor& x_1, const at::Tensor& x_2, const at::Tensor& P_000, const at::Tensor& left_000, const at::Tensor& P_011, const at::Tensor& left_011, const at::Tensor& P_101, const at::Tensor& left_101, const at::Tensor& P_110, const at::Tensor& left_110, const at::Tensor& P_220, const at::Tensor& left_220, const at::Tensor& P_222, const at::Tensor& left_222, const at::Tensor& P_211, const at::Tensor& left_211) {
+    const at::Tensor& x_0, const at::Tensor& x_1, const at::Tensor& x_2, const at::Tensor& P_000, const at::Tensor& left_000, const at::Tensor& P_011, const at::Tensor& left_011, const at::Tensor& P_101, const at::Tensor& left_101, const at::Tensor& P_110, const at::Tensor& left_110, const at::Tensor& P_220, const at::Tensor& left_220, const at::Tensor& P_222, const at::Tensor& left_222, const at::Tensor& P_211, const at::Tensor& left_211, const at::Tensor& P_111, const at::Tensor& left_111, const at::Tensor& P_212, const at::Tensor& left_212) {
   CHECK_INPUT(x_0);
   CHECK_INPUT(x_1);
   CHECK_INPUT(x_2);
@@ -47,6 +47,10 @@ std::vector<at::Tensor> fused_tensor_prods_example_cuda(
   CHECK_INPUT(left_222);
   CHECK_INPUT(P_211);
   CHECK_INPUT(left_211);
+  CHECK_INPUT(P_111);
+  CHECK_INPUT(left_111);
+  CHECK_INPUT(P_212);
+  CHECK_INPUT(left_212);
   at::Device device = x_0.device();
   cudaSetDevice(device.index()); // run kernel on same device as input tensors
   TORCH_CHECK(x_0.dim() == 2, "x_0 has wrong number of axes");
@@ -118,18 +122,35 @@ std::vector<at::Tensor> fused_tensor_prods_example_cuda(
   TORCH_CHECK(left_211.size(1) == dim_l, "left_211: expected axis 1 to have size dim_l");
   TORCH_CHECK(left_211.size(2) == 3, "left_211: expected axis 2 to have size 3");
   TORCH_CHECK(left_211.size(3) == 3, "left_211: expected axis 3 to have size 3");
+  TORCH_CHECK(P_111.dim() == 3, "P_111 has wrong number of axes");
+  TORCH_CHECK(P_111.size(0) == dim_1, "P_111: expected axis 0 to have size dim_1");
+  TORCH_CHECK(P_111.size(1) == dim_l, "P_111: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_111.size(2) == dim_1, "P_111: expected axis 2 to have size dim_1");
+  TORCH_CHECK(left_111.dim() == 3, "left_111 has wrong number of axes");
+  TORCH_CHECK(left_111.size(0) == batch, "left_111: expected axis 0 to have size batch");
+  TORCH_CHECK(left_111.size(1) == dim_l, "left_111: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_111.size(2) == 3, "left_111: expected axis 2 to have size 3");
+  TORCH_CHECK(P_212.dim() == 3, "P_212 has wrong number of axes");
+  TORCH_CHECK(P_212.size(0) == dim_2, "P_212: expected axis 0 to have size dim_2");
+  TORCH_CHECK(P_212.size(1) == dim_l, "P_212: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_212.size(2) == dim_1, "P_212: expected axis 2 to have size dim_1");
+  TORCH_CHECK(left_212.dim() == 4, "left_212 has wrong number of axes");
+  TORCH_CHECK(left_212.size(0) == batch, "left_212: expected axis 0 to have size batch");
+  TORCH_CHECK(left_212.size(1) == dim_l, "left_212: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_212.size(2) == 3, "left_212: expected axis 2 to have size 3");
+  TORCH_CHECK(left_212.size(3) == 3, "left_212: expected axis 3 to have size 3");
   at::Tensor y_0 = torch::empty({batch, dim_0}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor y_1 = torch::empty({batch, dim_1, 3}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor y_2 = torch::empty({batch, dim_2, 3, 3}, torch::dtype(torch::kFloat32).device(device));
   fused_tensor_prods_example(
       batch, dim_l, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()),
+      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()), reinterpret_cast<float*>(P_111.data_ptr<float>()), reinterpret_cast<float*>(left_111.data_ptr<float>()), reinterpret_cast<float*>(P_212.data_ptr<float>()), reinterpret_cast<float*>(left_212.data_ptr<float>()),
       reinterpret_cast<float*>(y_0.data_ptr<float>()), reinterpret_cast<float*>(y_1.data_ptr<float>()), reinterpret_cast<float*>(y_2.data_ptr<float>()));
   return {y_0, y_1, y_2};
 }
 
 std::vector<at::Tensor> fused_tensor_prods_example_backward_cuda(
-    const at::Tensor& dy_0, const at::Tensor& dy_1, const at::Tensor& dy_2, const at::Tensor& P_000, const at::Tensor& left_000, const at::Tensor& P_011, const at::Tensor& left_011, const at::Tensor& P_101, const at::Tensor& left_101, const at::Tensor& P_110, const at::Tensor& left_110, const at::Tensor& P_220, const at::Tensor& left_220, const at::Tensor& P_222, const at::Tensor& left_222, const at::Tensor& P_211, const at::Tensor& left_211) {
+    const at::Tensor& dy_0, const at::Tensor& dy_1, const at::Tensor& dy_2, const at::Tensor& P_000, const at::Tensor& left_000, const at::Tensor& P_011, const at::Tensor& left_011, const at::Tensor& P_101, const at::Tensor& left_101, const at::Tensor& P_110, const at::Tensor& left_110, const at::Tensor& P_220, const at::Tensor& left_220, const at::Tensor& P_222, const at::Tensor& left_222, const at::Tensor& P_211, const at::Tensor& left_211, const at::Tensor& P_111, const at::Tensor& left_111, const at::Tensor& P_212, const at::Tensor& left_212) {
   CHECK_INPUT(dy_0);
   CHECK_INPUT(dy_1);
   CHECK_INPUT(dy_2);
@@ -147,6 +168,10 @@ std::vector<at::Tensor> fused_tensor_prods_example_backward_cuda(
   CHECK_INPUT(left_222);
   CHECK_INPUT(P_211);
   CHECK_INPUT(left_211);
+  CHECK_INPUT(P_111);
+  CHECK_INPUT(left_111);
+  CHECK_INPUT(P_212);
+  CHECK_INPUT(left_212);
   at::Device device = dy_0.device();
   cudaSetDevice(device.index()); // run kernel on same device as input tensors
   TORCH_CHECK(dy_0.dim() == 2, "dy_0 has wrong number of axes");
@@ -218,18 +243,35 @@ std::vector<at::Tensor> fused_tensor_prods_example_backward_cuda(
   TORCH_CHECK(left_211.size(1) == dim_l, "left_211: expected axis 1 to have size dim_l");
   TORCH_CHECK(left_211.size(2) == 3, "left_211: expected axis 2 to have size 3");
   TORCH_CHECK(left_211.size(3) == 3, "left_211: expected axis 3 to have size 3");
+  TORCH_CHECK(P_111.dim() == 3, "P_111 has wrong number of axes");
+  TORCH_CHECK(P_111.size(0) == dim_1, "P_111: expected axis 0 to have size dim_1");
+  TORCH_CHECK(P_111.size(1) == dim_l, "P_111: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_111.size(2) == dim_1, "P_111: expected axis 2 to have size dim_1");
+  TORCH_CHECK(left_111.dim() == 3, "left_111 has wrong number of axes");
+  TORCH_CHECK(left_111.size(0) == batch, "left_111: expected axis 0 to have size batch");
+  TORCH_CHECK(left_111.size(1) == dim_l, "left_111: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_111.size(2) == 3, "left_111: expected axis 2 to have size 3");
+  TORCH_CHECK(P_212.dim() == 3, "P_212 has wrong number of axes");
+  TORCH_CHECK(P_212.size(0) == dim_2, "P_212: expected axis 0 to have size dim_2");
+  TORCH_CHECK(P_212.size(1) == dim_l, "P_212: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_212.size(2) == dim_1, "P_212: expected axis 2 to have size dim_1");
+  TORCH_CHECK(left_212.dim() == 4, "left_212 has wrong number of axes");
+  TORCH_CHECK(left_212.size(0) == batch, "left_212: expected axis 0 to have size batch");
+  TORCH_CHECK(left_212.size(1) == dim_l, "left_212: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_212.size(2) == 3, "left_212: expected axis 2 to have size 3");
+  TORCH_CHECK(left_212.size(3) == 3, "left_212: expected axis 3 to have size 3");
   at::Tensor dx_0 = torch::empty({batch, dim_0}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dx_1 = torch::empty({batch, dim_1, 3}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dx_2 = torch::empty({batch, dim_2, 3, 3}, torch::dtype(torch::kFloat32).device(device));
   fused_tensor_prods_example_backward(
       batch, dim_l, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()),
+      reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()), reinterpret_cast<float*>(P_111.data_ptr<float>()), reinterpret_cast<float*>(left_111.data_ptr<float>()), reinterpret_cast<float*>(P_212.data_ptr<float>()), reinterpret_cast<float*>(left_212.data_ptr<float>()),
       reinterpret_cast<float*>(dx_0.data_ptr<float>()), reinterpret_cast<float*>(dx_1.data_ptr<float>()), reinterpret_cast<float*>(dx_2.data_ptr<float>()));
   return {dx_0, dx_1, dx_2};
 }
 
 std::vector<at::Tensor> fused_tensor_prods_example_backleft_cuda(
-    const at::Tensor& x_0, const at::Tensor& x_1, const at::Tensor& x_2, const at::Tensor& dy_0, const at::Tensor& dy_1, const at::Tensor& dy_2, const at::Tensor& P_000, const at::Tensor& P_011, const at::Tensor& P_101, const at::Tensor& P_110, const at::Tensor& P_220, const at::Tensor& P_222, const at::Tensor& P_211) {
+    const at::Tensor& x_0, const at::Tensor& x_1, const at::Tensor& x_2, const at::Tensor& dy_0, const at::Tensor& dy_1, const at::Tensor& dy_2, const at::Tensor& P_000, const at::Tensor& P_011, const at::Tensor& P_101, const at::Tensor& P_110, const at::Tensor& P_220, const at::Tensor& P_222, const at::Tensor& P_211, const at::Tensor& P_111, const at::Tensor& P_212) {
   CHECK_INPUT(x_0);
   CHECK_INPUT(x_1);
   CHECK_INPUT(x_2);
@@ -243,6 +285,8 @@ std::vector<at::Tensor> fused_tensor_prods_example_backleft_cuda(
   CHECK_INPUT(P_220);
   CHECK_INPUT(P_222);
   CHECK_INPUT(P_211);
+  CHECK_INPUT(P_111);
+  CHECK_INPUT(P_212);
   at::Device device = x_0.device();
   cudaSetDevice(device.index()); // run kernel on same device as input tensors
   TORCH_CHECK(x_0.dim() == 2, "x_0 has wrong number of axes");
@@ -297,6 +341,14 @@ std::vector<at::Tensor> fused_tensor_prods_example_backleft_cuda(
   TORCH_CHECK(P_211.size(0) == dim_1, "P_211: expected axis 0 to have size dim_1");
   TORCH_CHECK(P_211.size(1) == dim_l, "P_211: expected axis 1 to have size dim_l");
   TORCH_CHECK(P_211.size(2) == dim_1, "P_211: expected axis 2 to have size dim_1");
+  TORCH_CHECK(P_111.dim() == 3, "P_111 has wrong number of axes");
+  TORCH_CHECK(P_111.size(0) == dim_1, "P_111: expected axis 0 to have size dim_1");
+  TORCH_CHECK(P_111.size(1) == dim_l, "P_111: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_111.size(2) == dim_1, "P_111: expected axis 2 to have size dim_1");
+  TORCH_CHECK(P_212.dim() == 3, "P_212 has wrong number of axes");
+  TORCH_CHECK(P_212.size(0) == dim_2, "P_212: expected axis 0 to have size dim_2");
+  TORCH_CHECK(P_212.size(1) == dim_l, "P_212: expected axis 1 to have size dim_l");
+  TORCH_CHECK(P_212.size(2) == dim_1, "P_212: expected axis 2 to have size dim_1");
   at::Tensor dleft_000 = torch::empty({batch, dim_l}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dleft_011 = torch::empty({batch, dim_l}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dleft_101 = torch::empty({batch, dim_l, 3}, torch::dtype(torch::kFloat32).device(device));
@@ -304,15 +356,17 @@ std::vector<at::Tensor> fused_tensor_prods_example_backleft_cuda(
   at::Tensor dleft_220 = torch::empty({batch, dim_l, 3, 3}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dleft_222 = torch::empty({batch, dim_l, 3, 3}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dleft_211 = torch::empty({batch, dim_l, 3, 3}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dleft_111 = torch::empty({batch, dim_l, 3}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dleft_212 = torch::empty({batch, dim_l, 3, 3}, torch::dtype(torch::kFloat32).device(device));
   fused_tensor_prods_example_backleft(
       batch, dim_l, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()),
-      reinterpret_cast<float*>(dleft_000.data_ptr<float>()), reinterpret_cast<float*>(dleft_011.data_ptr<float>()), reinterpret_cast<float*>(dleft_101.data_ptr<float>()), reinterpret_cast<float*>(dleft_110.data_ptr<float>()), reinterpret_cast<float*>(dleft_220.data_ptr<float>()), reinterpret_cast<float*>(dleft_222.data_ptr<float>()), reinterpret_cast<float*>(dleft_211.data_ptr<float>()));
-  return {dleft_000, dleft_011, dleft_101, dleft_110, dleft_220, dleft_222, dleft_211};
+      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()), reinterpret_cast<float*>(P_111.data_ptr<float>()), reinterpret_cast<float*>(P_212.data_ptr<float>()),
+      reinterpret_cast<float*>(dleft_000.data_ptr<float>()), reinterpret_cast<float*>(dleft_011.data_ptr<float>()), reinterpret_cast<float*>(dleft_101.data_ptr<float>()), reinterpret_cast<float*>(dleft_110.data_ptr<float>()), reinterpret_cast<float*>(dleft_220.data_ptr<float>()), reinterpret_cast<float*>(dleft_222.data_ptr<float>()), reinterpret_cast<float*>(dleft_211.data_ptr<float>()), reinterpret_cast<float*>(dleft_111.data_ptr<float>()), reinterpret_cast<float*>(dleft_212.data_ptr<float>()));
+  return {dleft_000, dleft_011, dleft_101, dleft_110, dleft_220, dleft_222, dleft_211, dleft_111, dleft_212};
 }
 
 std::vector<at::Tensor> fused_tensor_prods_example_wtsback_cuda(
-    const at::Tensor& x_0, const at::Tensor& x_1, const at::Tensor& x_2, const at::Tensor& dy_0, const at::Tensor& dy_1, const at::Tensor& dy_2, const at::Tensor& left_000, const at::Tensor& left_011, const at::Tensor& left_101, const at::Tensor& left_110, const at::Tensor& left_220, const at::Tensor& left_222, const at::Tensor& left_211) {
+    const at::Tensor& x_0, const at::Tensor& x_1, const at::Tensor& x_2, const at::Tensor& dy_0, const at::Tensor& dy_1, const at::Tensor& dy_2, const at::Tensor& left_000, const at::Tensor& left_011, const at::Tensor& left_101, const at::Tensor& left_110, const at::Tensor& left_220, const at::Tensor& left_222, const at::Tensor& left_211, const at::Tensor& left_111, const at::Tensor& left_212) {
   CHECK_INPUT(x_0);
   CHECK_INPUT(x_1);
   CHECK_INPUT(x_2);
@@ -326,6 +380,8 @@ std::vector<at::Tensor> fused_tensor_prods_example_wtsback_cuda(
   CHECK_INPUT(left_220);
   CHECK_INPUT(left_222);
   CHECK_INPUT(left_211);
+  CHECK_INPUT(left_111);
+  CHECK_INPUT(left_212);
   at::Device device = x_0.device();
   cudaSetDevice(device.index()); // run kernel on same device as input tensors
   TORCH_CHECK(x_0.dim() == 2, "x_0 has wrong number of axes");
@@ -381,6 +437,15 @@ std::vector<at::Tensor> fused_tensor_prods_example_wtsback_cuda(
   TORCH_CHECK(left_211.size(1) == dim_l, "left_211: expected axis 1 to have size dim_l");
   TORCH_CHECK(left_211.size(2) == 3, "left_211: expected axis 2 to have size 3");
   TORCH_CHECK(left_211.size(3) == 3, "left_211: expected axis 3 to have size 3");
+  TORCH_CHECK(left_111.dim() == 3, "left_111 has wrong number of axes");
+  TORCH_CHECK(left_111.size(0) == batch, "left_111: expected axis 0 to have size batch");
+  TORCH_CHECK(left_111.size(1) == dim_l, "left_111: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_111.size(2) == 3, "left_111: expected axis 2 to have size 3");
+  TORCH_CHECK(left_212.dim() == 4, "left_212 has wrong number of axes");
+  TORCH_CHECK(left_212.size(0) == batch, "left_212: expected axis 0 to have size batch");
+  TORCH_CHECK(left_212.size(1) == dim_l, "left_212: expected axis 1 to have size dim_l");
+  TORCH_CHECK(left_212.size(2) == 3, "left_212: expected axis 2 to have size 3");
+  TORCH_CHECK(left_212.size(3) == 3, "left_212: expected axis 3 to have size 3");
   at::Tensor dP_000 = torch::empty({dim_0, dim_l, dim_0}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dP_011 = torch::empty({dim_1, dim_l, dim_1}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dP_101 = torch::empty({dim_1, dim_l, dim_0}, torch::dtype(torch::kFloat32).device(device));
@@ -388,17 +453,19 @@ std::vector<at::Tensor> fused_tensor_prods_example_wtsback_cuda(
   at::Tensor dP_220 = torch::empty({dim_0, dim_l, dim_2}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dP_222 = torch::empty({dim_2, dim_l, dim_2}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dP_211 = torch::empty({dim_1, dim_l, dim_1}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dP_111 = torch::empty({dim_1, dim_l, dim_1}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dP_212 = torch::empty({dim_2, dim_l, dim_1}, torch::dtype(torch::kFloat32).device(device));
   fused_tensor_prods_example_wtsback(
       batch, dim_l, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()),
-      reinterpret_cast<float*>(dP_000.data_ptr<float>()), reinterpret_cast<float*>(dP_011.data_ptr<float>()), reinterpret_cast<float*>(dP_101.data_ptr<float>()), reinterpret_cast<float*>(dP_110.data_ptr<float>()), reinterpret_cast<float*>(dP_220.data_ptr<float>()), reinterpret_cast<float*>(dP_222.data_ptr<float>()), reinterpret_cast<float*>(dP_211.data_ptr<float>()));
-  return {dP_000, dP_011, dP_101, dP_110, dP_220, dP_222, dP_211};
+      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()), reinterpret_cast<float*>(left_111.data_ptr<float>()), reinterpret_cast<float*>(left_212.data_ptr<float>()),
+      reinterpret_cast<float*>(dP_000.data_ptr<float>()), reinterpret_cast<float*>(dP_011.data_ptr<float>()), reinterpret_cast<float*>(dP_101.data_ptr<float>()), reinterpret_cast<float*>(dP_110.data_ptr<float>()), reinterpret_cast<float*>(dP_220.data_ptr<float>()), reinterpret_cast<float*>(dP_222.data_ptr<float>()), reinterpret_cast<float*>(dP_211.data_ptr<float>()), reinterpret_cast<float*>(dP_111.data_ptr<float>()), reinterpret_cast<float*>(dP_212.data_ptr<float>()));
+  return {dP_000, dP_011, dP_101, dP_110, dP_220, dP_222, dP_211, dP_111, dP_212};
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-  m.def("fused_tensor_prods_example_cuda", &fused_tensor_prods_example_cuda, "fused_tensor_prods_example_cuda(x_0, x_1, x_2, P_000, left_000, P_011, left_011, P_101, left_101, P_110, left_110, P_220, left_220, P_222, left_222, P_211, left_211)");
-  m.def("fused_tensor_prods_example_backward_cuda", &fused_tensor_prods_example_backward_cuda, "fused_tensor_prods_example_backward_cuda(dy_0, dy_1, dy_2, P_000, left_000, P_011, left_011, P_101, left_101, P_110, left_110, P_220, left_220, P_222, left_222, P_211, left_211)");
-  m.def("fused_tensor_prods_example_backleft_cuda", &fused_tensor_prods_example_backleft_cuda, "fused_tensor_prods_example_backleft_cuda(x_0, x_1, x_2, dy_0, dy_1, dy_2, P_000, P_011, P_101, P_110, P_220, P_222, P_211)");
-  m.def("fused_tensor_prods_example_wtsback_cuda", &fused_tensor_prods_example_wtsback_cuda, "fused_tensor_prods_example_wtsback_cuda(x_0, x_1, x_2, dy_0, dy_1, dy_2, left_000, left_011, left_101, left_110, left_220, left_222, left_211)");
+  m.def("fused_tensor_prods_example_cuda", &fused_tensor_prods_example_cuda, "fused_tensor_prods_example_cuda(x_0, x_1, x_2, P_000, left_000, P_011, left_011, P_101, left_101, P_110, left_110, P_220, left_220, P_222, left_222, P_211, left_211, P_111, left_111, P_212, left_212)");
+  m.def("fused_tensor_prods_example_backward_cuda", &fused_tensor_prods_example_backward_cuda, "fused_tensor_prods_example_backward_cuda(dy_0, dy_1, dy_2, P_000, left_000, P_011, left_011, P_101, left_101, P_110, left_110, P_220, left_220, P_222, left_222, P_211, left_211, P_111, left_111, P_212, left_212)");
+  m.def("fused_tensor_prods_example_backleft_cuda", &fused_tensor_prods_example_backleft_cuda, "fused_tensor_prods_example_backleft_cuda(x_0, x_1, x_2, dy_0, dy_1, dy_2, P_000, P_011, P_101, P_110, P_220, P_222, P_211, P_111, P_212)");
+  m.def("fused_tensor_prods_example_wtsback_cuda", &fused_tensor_prods_example_wtsback_cuda, "fused_tensor_prods_example_wtsback_cuda(x_0, x_1, x_2, dy_0, dy_1, dy_2, left_000, left_011, left_101, left_110, left_220, left_222, left_211, left_111, left_212)");
 }
 

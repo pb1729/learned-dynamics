@@ -1,4 +1,5 @@
 from typing_extensions import List, Tuple
+from itertools import product
 
 
 PRELUDE_CPP = """
@@ -41,6 +42,16 @@ def at(indices, shape):
     return f"[{index_last}]"
   *shape_rest, dim_last = shape
   return f"[({at(indices_rest, shape_rest)[1:-1]})*{dim_last} + {index_last}]"
+
+def flat_tensidx(indices):
+  """ like at, but specifically for tensors (all dimensions are 3), and with static integer indices """
+  if len(indices) == 0: return 0
+  *indices_rest, index_last = indices
+  return index_last + 3*flat_tensidx(indices_rest)
+
+def tensidx_iter(inds):
+  return product(*[range(3) for i in range(inds)])
+
 
 def ilabel(*inds):
   return "_" + "".join([str(i) for i in inds])
@@ -258,32 +269,62 @@ def prodlabel(prod):
   return f"_{prod[0]}{prod[1]}{prod[2]}"
 
 
-
-def gen_tensprod(tens_sizes, prod, leftref, rightref, outref, result=2):
+def sign(perm):
+  """ computes the sign of a permutation """
+  ans = 1
+  for i in range(len(perm)):
+    for j in range(i):
+      if perm[i] == perm[j]: return 0
+      if perm[i] < perm[j]: ans *= -1
+  return ans
+def gen_tensprod(tens_sizes, prod, leftref, rightref, outref, result=2, chiral=None):
   """ codegen for an individual tensor product. result (0, 1, or 2) shows which thing is our output.
-      (indexes into [left, right, out].) if result is None, then we contract all 3 inputs into a scalar. """
+      (indexes into [left, right, out].) if result is None, then we contract all 3 inputs into a scalar.
+      If chiral is True, we contract 2 indices with the Levi-Civita tensor to produce 1, indead of
+      contracting 2 indices with each other to produce 0, as ususal. We only support having exactly
+      one such "chiral contraction" for now. If chiral is None, we guess what it should be. """
+  if chiral is None: # guess whether it's chiral based on parity of prod
+    return gen_tensprod(tens_sizes, prod, leftref, rightref, outref, result=result, chiral=(sum(prod) % 2 == 1))
+  # actual implementation:
+  chirals = 1 if chiral else 0
   inds_l, inds_r, inds_o = prod
   label = prodlabel(prod)
-  double_n_reduces = (inds_l + inds_r - inds_o)
-  assert double_n_reduces % 2 == 0, f"tensor product {inds_l}, {inds_r} -> {inds_o} has incorrect parity"
+  double_n_reduces = (inds_l + inds_r + chirals - inds_o)
+  assert double_n_reduces % 2 == 0, f"tensor product {inds_l}, {inds_r}{', 3' if chiral else ''} -> {inds_o} has incorrect parity"
   n_reduces = double_n_reduces//2
-  assert 0 <= n_reduces <= min(inds_l, inds_r), f"tensor product {inds_l}, {inds_r} -> {inds_o} is impossible"
+  assert 0 <= n_reduces <= min(inds_l, inds_r), f"tensor product {inds_l}, {inds_r}{', 3' if chiral else ''} -> {inds_o} is impossible"
+  if chiral:
+    assert 1 == chirals <= n_reduces, f"tensor product {inds_l}, {inds_r}, 3 -> {inds_o} has insufficient reduces for its number of levi-civita tensors"
   ref_triplets = {}
-  for i_out in range(tens_sizes[inds_o]):
-    tsz_reduce = tens_sizes[n_reduces]
-    free_tsz_right = tens_sizes[inds_r]//tsz_reduce
-    for j in range(tsz_reduce):
-      i_left = (i_out//free_tsz_right)*tsz_reduce + j
-      i_right = (i_out % free_tsz_right)*tsz_reduce + j
-      ref_triplets[(i_left, i_right, i_out)] = [
-          leftref.tensidx(i_left, tens_sizes[inds_l]),
-          rightref.tensidx(i_right, tens_sizes[inds_r]),
-          outref.tensidx(i_out, tens_sizes[inds_o])
-        ]
+  coeffs = {}
+  left_keeps = inds_l - n_reduces
+  for i in tensidx_iter(inds_o - chirals):
+    for j in tensidx_iter(n_reduces - chirals):
+      for k_o in tensidx_iter(chirals):
+        for k_l in tensidx_iter(chirals):
+          for k_r in tensidx_iter(chirals):
+            i_left = i[:left_keeps] + j + k_l
+            i_right = i[left_keeps:] + j + k_r
+            i_out = i + k_o
+            tup = flat_tensidx(i_left), flat_tensidx(i_right), flat_tensidx(i_out)
+            ref_triplets[tup] = [
+                leftref.tensidx(tup[0], tens_sizes[inds_l]),
+                rightref.tensidx(tup[1], tens_sizes[inds_r]),
+                outref.tensidx(tup[2], tens_sizes[inds_o]),
+              ]
+            if chiral:
+              coeffs[tup] = sign(k_l + k_r + k_o)
+            else:
+              coeffs[tup] = 1
   if result is None:
     ans = " + ".join([
-      "*".join(ref_triplets[tup])
+      (
+        "*".join(ref_triplets[tup])
+        if coeffs[tup] == 1 else
+        f"({coeffs[tup]})*" + "*".join(ref_triplets[tup])
+      )
       for tup in ref_triplets
+      if coeffs[tup] != 0
     ])
     return f"({ans})"
   else:
@@ -292,9 +333,11 @@ def gen_tensprod(tens_sizes, prod, leftref, rightref, outref, result=2):
       assignment_var = None
       assignment_val = []
       for tup in ref_triplets:
-        if tup[result] == i:
+        if tup[result] == i and coeffs[tup] != 0:
           ref_triplet = ref_triplets[tup]
           prod = "*".join(ref_triplet[:result] + ref_triplet[result + 1:])
+          if coeffs[tup] != 1:
+            prod = f"({coeffs[tup]})*" + prod
           assignment_val.append(prod)
           if assignment_var is None:
             assignment_var = ref_triplet[result]
