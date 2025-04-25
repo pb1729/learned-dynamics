@@ -58,17 +58,19 @@ class FusedTensorProdsFunction(torch.autograd.Function):
         return (dx_0, dx_1, dx_2, dP_000, dleft_000, dP_011, dleft_011, dP_101, dleft_101, dP_110, dleft_110, dP_220, dleft_220, dP_222, dleft_222, dP_211, dleft_211, dP_111, dleft_111, dP_212, dleft_212)
 
 def ckernel(x_0, x_1, x_2, W_000, P_000, W_011, P_011, W_101, P_101, W_110, P_110, W_220, P_220, W_222, P_222, W_211, P_211, W_111, P_111, W_212, P_212):
-  W_0 = torch.cat([W_000, W_011], dim=0)
-  W_1 = torch.cat([W_101, W_110, W_111], dim=0)
-  W_2 = torch.cat([W_220, W_222, W_211, W_212], dim=0)
-  left_000, left_011 = torch.split(tensor_linear(0, W_0, x_0), dim_l, dim=-1)
-  left_101, left_110, left_111 = torch.split(tensor_linear(1, W_1, x_1), dim_l, dim=-2)
-  left_220, left_222, left_211, left_212 = torch.split(tensor_linear(2, W_2, x_2), dim_l, dim=-3)
+  left_000 = tensor_linear(0, W_000, x_0)
+  left_011 = tensor_linear(0, W_011, x_0)
+  left_101 = tensor_linear(1, W_101, x_1)
+  left_110 = tensor_linear(1, W_110, x_1)
+  left_111 = tensor_linear(1, W_111, x_1)
+  left_220 = tensor_linear(2, W_220, x_2)
+  left_222 = tensor_linear(2, W_222, x_2)
+  left_211 = tensor_linear(2, W_211, x_2)
+  left_212 = tensor_linear(2, W_212, x_2)
   return FusedTensorProdsFunction.apply(x_0, x_1, x_2, P_000, left_000, P_011, left_011, P_101, left_101, P_110, left_110, P_220, left_220, P_222, left_222, P_211, left_211, P_111, left_111, P_212, left_212)
 
 
-#batch = 120
-batch = 1
+batch = 10
 dim_0 = 32
 dim_1 = 24
 dim_2 = 16

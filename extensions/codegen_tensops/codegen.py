@@ -535,7 +535,6 @@ def gen_wtb_tensor_prods(input_indsset: List[int], output_indsset: List[int], pr
     code.append("    }")
     code.append("  }")
     code.append("}")
-  # TODO: finish writing this...
   return V, "\n".join(code)
 
 
@@ -589,6 +588,8 @@ def tensor_prods(name: str, input_indsset: List[int], output_indsset: List[int],
   for prod in prods:
     inds_l, inds_r, inds_o = prod
     label = prodlabel(prod)
+    assert inds_l in input_indsset and inds_r in input_indsset, "left or right indices outside of input set"
+    assert inds_o in output_indsset, "out indices outside of output set"
     tens_params_fwd.append(f"P{label}")
     tens_params_bwd.append(f"P{label}")
     tens_params_blf.append(f"P{label}")
@@ -618,13 +619,15 @@ def tensor_prods(name: str, input_indsset: List[int], output_indsset: List[int],
   )
 
 
-def bindings(functions):
+def bindings(functions, extra_bindings=None):
+  if extra_bindings is None: extra_bindings = []
   return "\n".join([
     "PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {",
     *tab([
       function.get_binding()
       for function in functions
     ]),
+    *tab(extra_bindings),
     "}"])
 
 
