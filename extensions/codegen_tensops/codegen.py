@@ -538,7 +538,7 @@ def gen_wtb_tensor_prods(input_indsset: List[int], output_indsset: List[int], pr
   return V, "\n".join(code)
 
 
-def tensor_prods(name: str, input_indsset: List[int], output_indsset: List[int], prods: List[Tuple[int, int, int]], dim_l: int):
+def tensor_prods(name: str, input_indsset: List[int], output_indsset: List[int], prods: List[Tuple[int, int, int]]):
   """ Generate code for a fused kernel that does many kinds of tensor products at once.
       We also generate a corresponding backwards kernel at the same time.
       name: name to be assigned to the generated function

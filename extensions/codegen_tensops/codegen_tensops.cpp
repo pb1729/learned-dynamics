@@ -546,7 +546,7 @@ std::vector<at::Tensor> fused_tensor_prods_example_wtsback_cuda(
 
 std::vector<at::Tensor> ant16_o0_cuda(
     const at::Tensor& x_0, const at::Tensor& x_1, const at::Tensor& x_2, const at::Tensor& P_000, const at::Tensor& left_000, const at::Tensor& P_110, const at::Tensor& left_110, const at::Tensor& P_220, const at::Tensor& left_220) {
-  /*CHECK_INPUT(x_0);
+  CHECK_INPUT(x_0);
   CHECK_INPUT(x_1);
   CHECK_INPUT(x_2);
   CHECK_INPUT(P_000);
@@ -554,25 +554,25 @@ std::vector<at::Tensor> ant16_o0_cuda(
   CHECK_INPUT(P_110);
   CHECK_INPUT(left_110);
   CHECK_INPUT(P_220);
-  CHECK_INPUT(left_220);*/
+  CHECK_INPUT(left_220);
   at::Device device = x_0.device();
-  /*cudaSetDevice(device.index()); // run kernel on same device as input tensors
-  TORCH_CHECK(x_0.dim() == 2, "x_0 has wrong number of axes");*/
+  cudaSetDevice(device.index()); // run kernel on same device as input tensors
+  TORCH_CHECK(x_0.dim() == 2, "x_0 has wrong number of axes");
   int batch = x_0.size(0);
   int dim_0 = x_0.size(1);
-  /*TORCH_CHECK(x_1.dim() == 3, "x_1 has wrong number of axes");
-  TORCH_CHECK(x_1.size(0) == batch, "x_1: expected axis 0 to have size batch");*/
+  TORCH_CHECK(x_1.dim() == 3, "x_1 has wrong number of axes");
+  TORCH_CHECK(x_1.size(0) == batch, "x_1: expected axis 0 to have size batch");
   int dim_1 = x_1.size(1);
-  /*TORCH_CHECK(x_1.size(2) == 3, "x_1: expected axis 2 to have size 3");
+  TORCH_CHECK(x_1.size(2) == 3, "x_1: expected axis 2 to have size 3");
   TORCH_CHECK(x_2.dim() == 4, "x_2 has wrong number of axes");
-  TORCH_CHECK(x_2.size(0) == batch, "x_2: expected axis 0 to have size batch");*/
+  TORCH_CHECK(x_2.size(0) == batch, "x_2: expected axis 0 to have size batch");
   int dim_2 = x_2.size(1);
-  /*TORCH_CHECK(x_2.size(2) == 3, "x_2: expected axis 2 to have size 3");
+  TORCH_CHECK(x_2.size(2) == 3, "x_2: expected axis 2 to have size 3");
   TORCH_CHECK(x_2.size(3) == 3, "x_2: expected axis 3 to have size 3");
   TORCH_CHECK(P_000.dim() == 3, "P_000 has wrong number of axes");
-  TORCH_CHECK(P_000.size(0) == dim_0, "P_000: expected axis 0 to have size dim_0");*/
+  TORCH_CHECK(P_000.size(0) == dim_0, "P_000: expected axis 0 to have size dim_0");
   int dim_l = P_000.size(1);
-  /*TORCH_CHECK(P_000.size(2) == dim_0, "P_000: expected axis 2 to have size dim_0");
+  TORCH_CHECK(P_000.size(2) == dim_0, "P_000: expected axis 2 to have size dim_0");
   TORCH_CHECK(left_000.dim() == 2, "left_000 has wrong number of axes");
   TORCH_CHECK(left_000.size(0) == batch, "left_000: expected axis 0 to have size batch");
   TORCH_CHECK(left_000.size(1) == dim_l, "left_000: expected axis 1 to have size dim_l");
@@ -592,7 +592,7 @@ std::vector<at::Tensor> ant16_o0_cuda(
   TORCH_CHECK(left_220.size(0) == batch, "left_220: expected axis 0 to have size batch");
   TORCH_CHECK(left_220.size(1) == dim_l, "left_220: expected axis 1 to have size dim_l");
   TORCH_CHECK(left_220.size(2) == 3, "left_220: expected axis 2 to have size 3");
-  TORCH_CHECK(left_220.size(3) == 3, "left_220: expected axis 3 to have size 3");*/
+  TORCH_CHECK(left_220.size(3) == 3, "left_220: expected axis 3 to have size 3");
   at::Tensor y_0 = torch::empty({batch, dim_0}, torch::dtype(torch::kFloat32).device(device));
   ant16_o0(
       batch, dim_l, dim_0, dim_1, dim_2,
@@ -1427,3 +1427,4 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("ant16_oc_wtsback_cuda", &ant16_oc_wtsback_cuda, "ant16_oc_wtsback_cuda(x_1, x_2, dy_1, dy_2, left_111, left_212)");
   m.def("set_kern_attributes", &set_kern_attributes, "call this to initialize the module!");
 }
+
