@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+from PIL import Image
 
 from atoms_display import launch_atom_display
 
@@ -39,6 +40,10 @@ def main(args):
   display = launch_atom_display(atomic_nums, clean_for_display(state))
   i = 0
   while True:
+    if args.saveframes_dir is not None:
+      np_img = display.get_current_screen()
+      image = Image.fromarray(np_img, "RGB")
+      image.save(f"{args.saveframes_dir}/{i}.png")
     if args.printevery is not None and i % args.printevery == 0:
       print(i)
     i += 1
@@ -63,4 +68,5 @@ if __name__ == "__main__":
   parser.add_argument("--startlinear", dest="startlinear", action="store_true")
   parser.add_argument("--override", dest="override", type=str, default=None)
   parser.add_argument("--printevery", dest="printevery", type=int, default=None)
+  parser.add_argument("--saveframes_dir", dest="saveframes_dir", type=str, default=None)
   main(parser.parse_args())
