@@ -224,10 +224,12 @@ std::vector<at::Tensor> fused_tensor_prods_example_cuda(
   at::Tensor y_0 = torch::empty({batch, dim_0}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor y_1 = torch::empty({batch, dim_1, 3}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor y_2 = torch::empty({batch, dim_2, 3, 3}, torch::dtype(torch::kFloat32).device(device));
-  fused_tensor_prods_example(
-      batch, dim_l, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()), reinterpret_cast<float*>(P_111.data_ptr<float>()), reinterpret_cast<float*>(left_111.data_ptr<float>()), reinterpret_cast<float*>(P_212.data_ptr<float>()), reinterpret_cast<float*>(left_212.data_ptr<float>()),
-      reinterpret_cast<float*>(y_0.data_ptr<float>()), reinterpret_cast<float*>(y_1.data_ptr<float>()), reinterpret_cast<float*>(y_2.data_ptr<float>()));
+  if (batch > 0) {
+    fused_tensor_prods_example(
+        batch, dim_l, dim_0, dim_1, dim_2,
+        reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()), reinterpret_cast<float*>(P_111.data_ptr<float>()), reinterpret_cast<float*>(left_111.data_ptr<float>()), reinterpret_cast<float*>(P_212.data_ptr<float>()), reinterpret_cast<float*>(left_212.data_ptr<float>()),
+        reinterpret_cast<float*>(y_0.data_ptr<float>()), reinterpret_cast<float*>(y_1.data_ptr<float>()), reinterpret_cast<float*>(y_2.data_ptr<float>()));
+  }
   return {y_0, y_1, y_2};
 }
 
@@ -345,10 +347,12 @@ std::vector<at::Tensor> fused_tensor_prods_example_backward_cuda(
   at::Tensor dx_0 = torch::empty({batch, dim_0}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dx_1 = torch::empty({batch, dim_1, 3}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dx_2 = torch::empty({batch, dim_2, 3, 3}, torch::dtype(torch::kFloat32).device(device));
-  fused_tensor_prods_example_backward(
-      batch, dim_l, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()), reinterpret_cast<float*>(P_111.data_ptr<float>()), reinterpret_cast<float*>(left_111.data_ptr<float>()), reinterpret_cast<float*>(P_212.data_ptr<float>()), reinterpret_cast<float*>(left_212.data_ptr<float>()),
-      reinterpret_cast<float*>(dx_0.data_ptr<float>()), reinterpret_cast<float*>(dx_1.data_ptr<float>()), reinterpret_cast<float*>(dx_2.data_ptr<float>()));
+  if (batch > 0) {
+    fused_tensor_prods_example_backward(
+        batch, dim_l, dim_0, dim_1, dim_2,
+        reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()), reinterpret_cast<float*>(P_111.data_ptr<float>()), reinterpret_cast<float*>(left_111.data_ptr<float>()), reinterpret_cast<float*>(P_212.data_ptr<float>()), reinterpret_cast<float*>(left_212.data_ptr<float>()),
+        reinterpret_cast<float*>(dx_0.data_ptr<float>()), reinterpret_cast<float*>(dx_1.data_ptr<float>()), reinterpret_cast<float*>(dx_2.data_ptr<float>()));
+  }
   return {dx_0, dx_1, dx_2};
 }
 
@@ -440,10 +444,12 @@ std::vector<at::Tensor> fused_tensor_prods_example_backleft_cuda(
   at::Tensor dleft_211 = torch::empty({batch, dim_l, 3, 3}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dleft_111 = torch::empty({batch, dim_l, 3}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dleft_212 = torch::empty({batch, dim_l, 3, 3}, torch::dtype(torch::kFloat32).device(device));
-  fused_tensor_prods_example_backleft(
-      batch, dim_l, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()), reinterpret_cast<float*>(P_111.data_ptr<float>()), reinterpret_cast<float*>(P_212.data_ptr<float>()),
-      reinterpret_cast<float*>(dleft_000.data_ptr<float>()), reinterpret_cast<float*>(dleft_011.data_ptr<float>()), reinterpret_cast<float*>(dleft_101.data_ptr<float>()), reinterpret_cast<float*>(dleft_110.data_ptr<float>()), reinterpret_cast<float*>(dleft_220.data_ptr<float>()), reinterpret_cast<float*>(dleft_222.data_ptr<float>()), reinterpret_cast<float*>(dleft_211.data_ptr<float>()), reinterpret_cast<float*>(dleft_111.data_ptr<float>()), reinterpret_cast<float*>(dleft_212.data_ptr<float>()));
+  if (batch > 0) {
+    fused_tensor_prods_example_backleft(
+        batch, dim_l, dim_0, dim_1, dim_2,
+        reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()), reinterpret_cast<float*>(P_111.data_ptr<float>()), reinterpret_cast<float*>(P_212.data_ptr<float>()),
+        reinterpret_cast<float*>(dleft_000.data_ptr<float>()), reinterpret_cast<float*>(dleft_011.data_ptr<float>()), reinterpret_cast<float*>(dleft_101.data_ptr<float>()), reinterpret_cast<float*>(dleft_110.data_ptr<float>()), reinterpret_cast<float*>(dleft_220.data_ptr<float>()), reinterpret_cast<float*>(dleft_222.data_ptr<float>()), reinterpret_cast<float*>(dleft_211.data_ptr<float>()), reinterpret_cast<float*>(dleft_111.data_ptr<float>()), reinterpret_cast<float*>(dleft_212.data_ptr<float>()));
+  }
   return {dleft_000, dleft_011, dleft_101, dleft_110, dleft_220, dleft_222, dleft_211, dleft_111, dleft_212};
 }
 
@@ -537,10 +543,22 @@ std::vector<at::Tensor> fused_tensor_prods_example_wtsback_cuda(
   at::Tensor dP_211 = torch::empty({dim_1, dim_l, dim_1}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dP_111 = torch::empty({dim_1, dim_l, dim_1}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dP_212 = torch::empty({dim_2, dim_l, dim_1}, torch::dtype(torch::kFloat32).device(device));
-  fused_tensor_prods_example_wtsback(
-      batch, dim_l, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()), reinterpret_cast<float*>(left_111.data_ptr<float>()), reinterpret_cast<float*>(left_212.data_ptr<float>()),
-      reinterpret_cast<float*>(dP_000.data_ptr<float>()), reinterpret_cast<float*>(dP_011.data_ptr<float>()), reinterpret_cast<float*>(dP_101.data_ptr<float>()), reinterpret_cast<float*>(dP_110.data_ptr<float>()), reinterpret_cast<float*>(dP_220.data_ptr<float>()), reinterpret_cast<float*>(dP_222.data_ptr<float>()), reinterpret_cast<float*>(dP_211.data_ptr<float>()), reinterpret_cast<float*>(dP_111.data_ptr<float>()), reinterpret_cast<float*>(dP_212.data_ptr<float>()));
+  if (batch > 0) {
+    fused_tensor_prods_example_wtsback(
+        batch, dim_l, dim_0, dim_1, dim_2,
+        reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()), reinterpret_cast<float*>(left_111.data_ptr<float>()), reinterpret_cast<float*>(left_212.data_ptr<float>()),
+        reinterpret_cast<float*>(dP_000.data_ptr<float>()), reinterpret_cast<float*>(dP_011.data_ptr<float>()), reinterpret_cast<float*>(dP_101.data_ptr<float>()), reinterpret_cast<float*>(dP_110.data_ptr<float>()), reinterpret_cast<float*>(dP_220.data_ptr<float>()), reinterpret_cast<float*>(dP_222.data_ptr<float>()), reinterpret_cast<float*>(dP_211.data_ptr<float>()), reinterpret_cast<float*>(dP_111.data_ptr<float>()), reinterpret_cast<float*>(dP_212.data_ptr<float>()));
+  } else {
+    dP_000.zero_();
+    dP_011.zero_();
+    dP_101.zero_();
+    dP_110.zero_();
+    dP_220.zero_();
+    dP_222.zero_();
+    dP_211.zero_();
+    dP_111.zero_();
+    dP_212.zero_();
+  }
   return {dP_000, dP_011, dP_101, dP_110, dP_220, dP_222, dP_211, dP_111, dP_212};
 }
 
@@ -594,10 +612,12 @@ std::vector<at::Tensor> ant16_o0_cuda(
   TORCH_CHECK(left_220.size(2) == 3, "left_220: expected axis 2 to have size 3");
   TORCH_CHECK(left_220.size(3) == 3, "left_220: expected axis 3 to have size 3");
   at::Tensor y_0 = torch::empty({batch, dim_0}, torch::dtype(torch::kFloat32).device(device));
-  ant16_o0(
-      batch, dim_l, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()),
-      reinterpret_cast<float*>(y_0.data_ptr<float>()));
+  if (batch > 0) {
+    ant16_o0(
+        batch, dim_l, dim_0, dim_1, dim_2,
+        reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()),
+        reinterpret_cast<float*>(y_0.data_ptr<float>()));
+  }
   return {y_0};
 }
 
@@ -642,10 +662,12 @@ std::vector<at::Tensor> ant16_o0_backward_cuda(
   at::Tensor dx_0 = torch::empty({batch, dim_0}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dx_1 = torch::empty({batch, dim_1, 3}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dx_2 = torch::empty({batch, dim_2, 3, 3}, torch::dtype(torch::kFloat32).device(device));
-  ant16_o0_backward(
-      batch, dim_l, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()),
-      reinterpret_cast<float*>(dx_0.data_ptr<float>()), reinterpret_cast<float*>(dx_1.data_ptr<float>()), reinterpret_cast<float*>(dx_2.data_ptr<float>()));
+  if (batch > 0) {
+    ant16_o0_backward(
+        batch, dim_l, dim_0, dim_1, dim_2,
+        reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()),
+        reinterpret_cast<float*>(dx_0.data_ptr<float>()), reinterpret_cast<float*>(dx_1.data_ptr<float>()), reinterpret_cast<float*>(dx_2.data_ptr<float>()));
+  }
   return {dx_0, dx_1, dx_2};
 }
 
@@ -690,10 +712,12 @@ std::vector<at::Tensor> ant16_o0_backleft_cuda(
   at::Tensor dleft_000 = torch::empty({batch, dim_l}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dleft_110 = torch::empty({batch, dim_l, 3}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dleft_220 = torch::empty({batch, dim_l, 3, 3}, torch::dtype(torch::kFloat32).device(device));
-  ant16_o0_backleft(
-      batch, dim_l, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()),
-      reinterpret_cast<float*>(dleft_000.data_ptr<float>()), reinterpret_cast<float*>(dleft_110.data_ptr<float>()), reinterpret_cast<float*>(dleft_220.data_ptr<float>()));
+  if (batch > 0) {
+    ant16_o0_backleft(
+        batch, dim_l, dim_0, dim_1, dim_2,
+        reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(P_000.data_ptr<float>()), reinterpret_cast<float*>(P_110.data_ptr<float>()), reinterpret_cast<float*>(P_220.data_ptr<float>()),
+        reinterpret_cast<float*>(dleft_000.data_ptr<float>()), reinterpret_cast<float*>(dleft_110.data_ptr<float>()), reinterpret_cast<float*>(dleft_220.data_ptr<float>()));
+  }
   return {dleft_000, dleft_110, dleft_220};
 }
 
@@ -738,10 +762,16 @@ std::vector<at::Tensor> ant16_o0_wtsback_cuda(
   at::Tensor dP_000 = torch::empty({dim_0, dim_l, dim_0}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dP_110 = torch::empty({dim_0, dim_l, dim_1}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dP_220 = torch::empty({dim_0, dim_l, dim_2}, torch::dtype(torch::kFloat32).device(device));
-  ant16_o0_wtsback(
-      batch, dim_l, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()),
-      reinterpret_cast<float*>(dP_000.data_ptr<float>()), reinterpret_cast<float*>(dP_110.data_ptr<float>()), reinterpret_cast<float*>(dP_220.data_ptr<float>()));
+  if (batch > 0) {
+    ant16_o0_wtsback(
+        batch, dim_l, dim_0, dim_1, dim_2,
+        reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_0.data_ptr<float>()), reinterpret_cast<float*>(left_000.data_ptr<float>()), reinterpret_cast<float*>(left_110.data_ptr<float>()), reinterpret_cast<float*>(left_220.data_ptr<float>()),
+        reinterpret_cast<float*>(dP_000.data_ptr<float>()), reinterpret_cast<float*>(dP_110.data_ptr<float>()), reinterpret_cast<float*>(dP_220.data_ptr<float>()));
+  } else {
+    dP_000.zero_();
+    dP_110.zero_();
+    dP_220.zero_();
+  }
   return {dP_000, dP_110, dP_220};
 }
 
@@ -805,10 +835,12 @@ std::vector<at::Tensor> ant16_o1_cuda(
   TORCH_CHECK(left_211.size(2) == 3, "left_211: expected axis 2 to have size 3");
   TORCH_CHECK(left_211.size(3) == 3, "left_211: expected axis 3 to have size 3");
   at::Tensor y_1 = torch::empty({batch, dim_1, 3}, torch::dtype(torch::kFloat32).device(device));
-  ant16_o1(
-      batch, dim_l, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(P_121.data_ptr<float>()), reinterpret_cast<float*>(left_121.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()),
-      reinterpret_cast<float*>(y_1.data_ptr<float>()));
+  if (batch > 0) {
+    ant16_o1(
+        batch, dim_l, dim_0, dim_1, dim_2,
+        reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(P_121.data_ptr<float>()), reinterpret_cast<float*>(left_121.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()),
+        reinterpret_cast<float*>(y_1.data_ptr<float>()));
+  }
   return {y_1};
 }
 
@@ -864,10 +896,12 @@ std::vector<at::Tensor> ant16_o1_backward_cuda(
   at::Tensor dx_0 = torch::empty({batch, dim_0}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dx_1 = torch::empty({batch, dim_1, 3}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dx_2 = torch::empty({batch, dim_2, 3, 3}, torch::dtype(torch::kFloat32).device(device));
-  ant16_o1_backward(
-      batch, dim_l, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(P_121.data_ptr<float>()), reinterpret_cast<float*>(left_121.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()),
-      reinterpret_cast<float*>(dx_0.data_ptr<float>()), reinterpret_cast<float*>(dx_1.data_ptr<float>()), reinterpret_cast<float*>(dx_2.data_ptr<float>()));
+  if (batch > 0) {
+    ant16_o1_backward(
+        batch, dim_l, dim_0, dim_1, dim_2,
+        reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(P_121.data_ptr<float>()), reinterpret_cast<float*>(left_121.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()),
+        reinterpret_cast<float*>(dx_0.data_ptr<float>()), reinterpret_cast<float*>(dx_1.data_ptr<float>()), reinterpret_cast<float*>(dx_2.data_ptr<float>()));
+  }
   return {dx_0, dx_1, dx_2};
 }
 
@@ -919,10 +953,12 @@ std::vector<at::Tensor> ant16_o1_backleft_cuda(
   at::Tensor dleft_101 = torch::empty({batch, dim_l, 3}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dleft_121 = torch::empty({batch, dim_l, 3}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dleft_211 = torch::empty({batch, dim_l, 3, 3}, torch::dtype(torch::kFloat32).device(device));
-  ant16_o1_backleft(
-      batch, dim_l, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(P_121.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()),
-      reinterpret_cast<float*>(dleft_011.data_ptr<float>()), reinterpret_cast<float*>(dleft_101.data_ptr<float>()), reinterpret_cast<float*>(dleft_121.data_ptr<float>()), reinterpret_cast<float*>(dleft_211.data_ptr<float>()));
+  if (batch > 0) {
+    ant16_o1_backleft(
+        batch, dim_l, dim_0, dim_1, dim_2,
+        reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(P_011.data_ptr<float>()), reinterpret_cast<float*>(P_101.data_ptr<float>()), reinterpret_cast<float*>(P_121.data_ptr<float>()), reinterpret_cast<float*>(P_211.data_ptr<float>()),
+        reinterpret_cast<float*>(dleft_011.data_ptr<float>()), reinterpret_cast<float*>(dleft_101.data_ptr<float>()), reinterpret_cast<float*>(dleft_121.data_ptr<float>()), reinterpret_cast<float*>(dleft_211.data_ptr<float>()));
+  }
   return {dleft_011, dleft_101, dleft_121, dleft_211};
 }
 
@@ -974,10 +1010,17 @@ std::vector<at::Tensor> ant16_o1_wtsback_cuda(
   at::Tensor dP_101 = torch::empty({dim_1, dim_l, dim_0}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dP_121 = torch::empty({dim_1, dim_l, dim_2}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dP_211 = torch::empty({dim_1, dim_l, dim_1}, torch::dtype(torch::kFloat32).device(device));
-  ant16_o1_wtsback(
-      batch, dim_l, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(left_121.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()),
-      reinterpret_cast<float*>(dP_011.data_ptr<float>()), reinterpret_cast<float*>(dP_101.data_ptr<float>()), reinterpret_cast<float*>(dP_121.data_ptr<float>()), reinterpret_cast<float*>(dP_211.data_ptr<float>()));
+  if (batch > 0) {
+    ant16_o1_wtsback(
+        batch, dim_l, dim_0, dim_1, dim_2,
+        reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(left_011.data_ptr<float>()), reinterpret_cast<float*>(left_101.data_ptr<float>()), reinterpret_cast<float*>(left_121.data_ptr<float>()), reinterpret_cast<float*>(left_211.data_ptr<float>()),
+        reinterpret_cast<float*>(dP_011.data_ptr<float>()), reinterpret_cast<float*>(dP_101.data_ptr<float>()), reinterpret_cast<float*>(dP_121.data_ptr<float>()), reinterpret_cast<float*>(dP_211.data_ptr<float>()));
+  } else {
+    dP_011.zero_();
+    dP_101.zero_();
+    dP_121.zero_();
+    dP_211.zero_();
+  }
   return {dP_011, dP_101, dP_121, dP_211};
 }
 
@@ -1042,10 +1085,12 @@ std::vector<at::Tensor> ant16_o2_cuda(
   TORCH_CHECK(left_222.size(2) == 3, "left_222: expected axis 2 to have size 3");
   TORCH_CHECK(left_222.size(3) == 3, "left_222: expected axis 3 to have size 3");
   at::Tensor y_2 = torch::empty({batch, dim_2, 3, 3}, torch::dtype(torch::kFloat32).device(device));
-  ant16_o2(
-      batch, dim_l, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(P_022.data_ptr<float>()), reinterpret_cast<float*>(left_022.data_ptr<float>()), reinterpret_cast<float*>(P_202.data_ptr<float>()), reinterpret_cast<float*>(left_202.data_ptr<float>()), reinterpret_cast<float*>(P_112.data_ptr<float>()), reinterpret_cast<float*>(left_112.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()),
-      reinterpret_cast<float*>(y_2.data_ptr<float>()));
+  if (batch > 0) {
+    ant16_o2(
+        batch, dim_l, dim_0, dim_1, dim_2,
+        reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(P_022.data_ptr<float>()), reinterpret_cast<float*>(left_022.data_ptr<float>()), reinterpret_cast<float*>(P_202.data_ptr<float>()), reinterpret_cast<float*>(left_202.data_ptr<float>()), reinterpret_cast<float*>(P_112.data_ptr<float>()), reinterpret_cast<float*>(left_112.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()),
+        reinterpret_cast<float*>(y_2.data_ptr<float>()));
+  }
   return {y_2};
 }
 
@@ -1103,10 +1148,12 @@ std::vector<at::Tensor> ant16_o2_backward_cuda(
   at::Tensor dx_0 = torch::empty({batch, dim_0}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dx_1 = torch::empty({batch, dim_1, 3}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dx_2 = torch::empty({batch, dim_2, 3, 3}, torch::dtype(torch::kFloat32).device(device));
-  ant16_o2_backward(
-      batch, dim_l, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(P_022.data_ptr<float>()), reinterpret_cast<float*>(left_022.data_ptr<float>()), reinterpret_cast<float*>(P_202.data_ptr<float>()), reinterpret_cast<float*>(left_202.data_ptr<float>()), reinterpret_cast<float*>(P_112.data_ptr<float>()), reinterpret_cast<float*>(left_112.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()),
-      reinterpret_cast<float*>(dx_0.data_ptr<float>()), reinterpret_cast<float*>(dx_1.data_ptr<float>()), reinterpret_cast<float*>(dx_2.data_ptr<float>()));
+  if (batch > 0) {
+    ant16_o2_backward(
+        batch, dim_l, dim_0, dim_1, dim_2,
+        reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(P_022.data_ptr<float>()), reinterpret_cast<float*>(left_022.data_ptr<float>()), reinterpret_cast<float*>(P_202.data_ptr<float>()), reinterpret_cast<float*>(left_202.data_ptr<float>()), reinterpret_cast<float*>(P_112.data_ptr<float>()), reinterpret_cast<float*>(left_112.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()),
+        reinterpret_cast<float*>(dx_0.data_ptr<float>()), reinterpret_cast<float*>(dx_1.data_ptr<float>()), reinterpret_cast<float*>(dx_2.data_ptr<float>()));
+  }
   return {dx_0, dx_1, dx_2};
 }
 
@@ -1159,10 +1206,12 @@ std::vector<at::Tensor> ant16_o2_backleft_cuda(
   at::Tensor dleft_202 = torch::empty({batch, dim_l, 3, 3}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dleft_112 = torch::empty({batch, dim_l, 3}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dleft_222 = torch::empty({batch, dim_l, 3, 3}, torch::dtype(torch::kFloat32).device(device));
-  ant16_o2_backleft(
-      batch, dim_l, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(P_022.data_ptr<float>()), reinterpret_cast<float*>(P_202.data_ptr<float>()), reinterpret_cast<float*>(P_112.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()),
-      reinterpret_cast<float*>(dleft_022.data_ptr<float>()), reinterpret_cast<float*>(dleft_202.data_ptr<float>()), reinterpret_cast<float*>(dleft_112.data_ptr<float>()), reinterpret_cast<float*>(dleft_222.data_ptr<float>()));
+  if (batch > 0) {
+    ant16_o2_backleft(
+        batch, dim_l, dim_0, dim_1, dim_2,
+        reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(P_022.data_ptr<float>()), reinterpret_cast<float*>(P_202.data_ptr<float>()), reinterpret_cast<float*>(P_112.data_ptr<float>()), reinterpret_cast<float*>(P_222.data_ptr<float>()),
+        reinterpret_cast<float*>(dleft_022.data_ptr<float>()), reinterpret_cast<float*>(dleft_202.data_ptr<float>()), reinterpret_cast<float*>(dleft_112.data_ptr<float>()), reinterpret_cast<float*>(dleft_222.data_ptr<float>()));
+  }
   return {dleft_022, dleft_202, dleft_112, dleft_222};
 }
 
@@ -1216,10 +1265,17 @@ std::vector<at::Tensor> ant16_o2_wtsback_cuda(
   at::Tensor dP_202 = torch::empty({dim_2, dim_l, dim_0}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dP_112 = torch::empty({dim_2, dim_l, dim_1}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dP_222 = torch::empty({dim_2, dim_l, dim_2}, torch::dtype(torch::kFloat32).device(device));
-  ant16_o2_wtsback(
-      batch, dim_l, dim_0, dim_1, dim_2,
-      reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(left_022.data_ptr<float>()), reinterpret_cast<float*>(left_202.data_ptr<float>()), reinterpret_cast<float*>(left_112.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()),
-      reinterpret_cast<float*>(dP_022.data_ptr<float>()), reinterpret_cast<float*>(dP_202.data_ptr<float>()), reinterpret_cast<float*>(dP_112.data_ptr<float>()), reinterpret_cast<float*>(dP_222.data_ptr<float>()));
+  if (batch > 0) {
+    ant16_o2_wtsback(
+        batch, dim_l, dim_0, dim_1, dim_2,
+        reinterpret_cast<float*>(x_0.data_ptr<float>()), reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(left_022.data_ptr<float>()), reinterpret_cast<float*>(left_202.data_ptr<float>()), reinterpret_cast<float*>(left_112.data_ptr<float>()), reinterpret_cast<float*>(left_222.data_ptr<float>()),
+        reinterpret_cast<float*>(dP_022.data_ptr<float>()), reinterpret_cast<float*>(dP_202.data_ptr<float>()), reinterpret_cast<float*>(dP_112.data_ptr<float>()), reinterpret_cast<float*>(dP_222.data_ptr<float>()));
+  } else {
+    dP_022.zero_();
+    dP_202.zero_();
+    dP_112.zero_();
+    dP_222.zero_();
+  }
   return {dP_022, dP_202, dP_112, dP_222};
 }
 
@@ -1261,10 +1317,12 @@ std::vector<at::Tensor> ant16_oc_cuda(
   TORCH_CHECK(left_212.size(3) == 3, "left_212: expected axis 3 to have size 3");
   at::Tensor y_1 = torch::empty({batch, dim_1, 3}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor y_2 = torch::empty({batch, dim_2, 3, 3}, torch::dtype(torch::kFloat32).device(device));
-  ant16_oc(
-      batch, dim_l, dim_1, dim_2,
-      reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(P_111.data_ptr<float>()), reinterpret_cast<float*>(left_111.data_ptr<float>()), reinterpret_cast<float*>(P_212.data_ptr<float>()), reinterpret_cast<float*>(left_212.data_ptr<float>()),
-      reinterpret_cast<float*>(y_1.data_ptr<float>()), reinterpret_cast<float*>(y_2.data_ptr<float>()));
+  if (batch > 0) {
+    ant16_oc(
+        batch, dim_l, dim_1, dim_2,
+        reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(P_111.data_ptr<float>()), reinterpret_cast<float*>(left_111.data_ptr<float>()), reinterpret_cast<float*>(P_212.data_ptr<float>()), reinterpret_cast<float*>(left_212.data_ptr<float>()),
+        reinterpret_cast<float*>(y_1.data_ptr<float>()), reinterpret_cast<float*>(y_2.data_ptr<float>()));
+  }
   return {y_1, y_2};
 }
 
@@ -1306,10 +1364,12 @@ std::vector<at::Tensor> ant16_oc_backward_cuda(
   TORCH_CHECK(left_212.size(3) == 3, "left_212: expected axis 3 to have size 3");
   at::Tensor dx_1 = torch::empty({batch, dim_1, 3}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dx_2 = torch::empty({batch, dim_2, 3, 3}, torch::dtype(torch::kFloat32).device(device));
-  ant16_oc_backward(
-      batch, dim_l, dim_1, dim_2,
-      reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(P_111.data_ptr<float>()), reinterpret_cast<float*>(left_111.data_ptr<float>()), reinterpret_cast<float*>(P_212.data_ptr<float>()), reinterpret_cast<float*>(left_212.data_ptr<float>()),
-      reinterpret_cast<float*>(dx_1.data_ptr<float>()), reinterpret_cast<float*>(dx_2.data_ptr<float>()));
+  if (batch > 0) {
+    ant16_oc_backward(
+        batch, dim_l, dim_1, dim_2,
+        reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(P_111.data_ptr<float>()), reinterpret_cast<float*>(left_111.data_ptr<float>()), reinterpret_cast<float*>(P_212.data_ptr<float>()), reinterpret_cast<float*>(left_212.data_ptr<float>()),
+        reinterpret_cast<float*>(dx_1.data_ptr<float>()), reinterpret_cast<float*>(dx_2.data_ptr<float>()));
+  }
   return {dx_1, dx_2};
 }
 
@@ -1351,10 +1411,12 @@ std::vector<at::Tensor> ant16_oc_backleft_cuda(
   TORCH_CHECK(P_212.size(2) == dim_1, "P_212: expected axis 2 to have size dim_1");
   at::Tensor dleft_111 = torch::empty({batch, dim_l, 3}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dleft_212 = torch::empty({batch, dim_l, 3, 3}, torch::dtype(torch::kFloat32).device(device));
-  ant16_oc_backleft(
-      batch, dim_l, dim_1, dim_2,
-      reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(P_111.data_ptr<float>()), reinterpret_cast<float*>(P_212.data_ptr<float>()),
-      reinterpret_cast<float*>(dleft_111.data_ptr<float>()), reinterpret_cast<float*>(dleft_212.data_ptr<float>()));
+  if (batch > 0) {
+    ant16_oc_backleft(
+        batch, dim_l, dim_1, dim_2,
+        reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(P_111.data_ptr<float>()), reinterpret_cast<float*>(P_212.data_ptr<float>()),
+        reinterpret_cast<float*>(dleft_111.data_ptr<float>()), reinterpret_cast<float*>(dleft_212.data_ptr<float>()));
+  }
   return {dleft_111, dleft_212};
 }
 
@@ -1397,10 +1459,15 @@ std::vector<at::Tensor> ant16_oc_wtsback_cuda(
   TORCH_CHECK(left_212.size(3) == 3, "left_212: expected axis 3 to have size 3");
   at::Tensor dP_111 = torch::empty({dim_1, dim_l, dim_1}, torch::dtype(torch::kFloat32).device(device));
   at::Tensor dP_212 = torch::empty({dim_2, dim_l, dim_1}, torch::dtype(torch::kFloat32).device(device));
-  ant16_oc_wtsback(
-      batch, dim_l, dim_1, dim_2,
-      reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(left_111.data_ptr<float>()), reinterpret_cast<float*>(left_212.data_ptr<float>()),
-      reinterpret_cast<float*>(dP_111.data_ptr<float>()), reinterpret_cast<float*>(dP_212.data_ptr<float>()));
+  if (batch > 0) {
+    ant16_oc_wtsback(
+        batch, dim_l, dim_1, dim_2,
+        reinterpret_cast<float*>(x_1.data_ptr<float>()), reinterpret_cast<float*>(x_2.data_ptr<float>()), reinterpret_cast<float*>(dy_1.data_ptr<float>()), reinterpret_cast<float*>(dy_2.data_ptr<float>()), reinterpret_cast<float*>(left_111.data_ptr<float>()), reinterpret_cast<float*>(left_212.data_ptr<float>()),
+        reinterpret_cast<float*>(dP_111.data_ptr<float>()), reinterpret_cast<float*>(dP_212.data_ptr<float>()));
+  } else {
+    dP_111.zero_();
+    dP_212.zero_();
+  }
   return {dP_111, dP_212};
 }
 

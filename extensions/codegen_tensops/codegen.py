@@ -140,7 +140,7 @@ class Function:
       the arguments and the shared vars, this class provides methods to declare and predeclare the C++ wrapper,
       and to declare the cuda kernel. """
   def __init__(self, fnname, int_params, tens_params, tens_outputs, shapes,
-      gridsz_expr, blocksz_expr, shared_vars, chunksz_exprs, cu_body):
+      gridsz_expr, blocksz_expr, shared_vars, chunksz_exprs, cu_body, cpp_call_wrapper=(lambda x: x)):
     self.fnname = fnname
     self.int_params = int_params
     self.tens_params = tens_params
@@ -152,6 +152,7 @@ class Function:
     self.chunksz_exprs = chunksz_exprs
     self.cu_body = cu_body
     self.do_checks = True
+    self.cpp_call_wrapper = cpp_call_wrapper
   def _get_kern_int_params(self):
     # int params are slightly different for the kernel itself...
     return [
@@ -233,7 +234,7 @@ class Function:
       self._stub_cpp() + " {",
       *tab(self._checks()),
       *tab(self._output_allocs()),
-      tab(self._call()),
+      tab(self.cpp_call_wrapper(self._call())),
       f"  return {return_value};",
       "}"])
   def define(self):
@@ -412,7 +413,9 @@ def gen_fwd_tensor_prods(input_indsset: List[int], output_indsset: List[int], pr
     code.append("    }")
     code.append("  }")
   code.append("}")
-  return V, batchfor_wrap(code)
+  def call_wrapper(call):
+    return f"if (batch > 0) {{\n{tab(call)}\n}}"
+  return V, batchfor_wrap(code), call_wrapper
 
 
 def gen_bwd_tensor_prods(input_indsset: List[int], output_indsset: List[int], prods: List[Tuple[int, int, int]], tens_sizes):
@@ -475,7 +478,9 @@ def gen_bwd_tensor_prods(input_indsset: List[int], output_indsset: List[int], pr
     code.append("    }")
     code.append("  }")
   code.append("}")
-  return V, batchfor_wrap(code)
+  def call_wrapper(call):
+    return f"if (batch > 0) {{\n{tab(call)}\n}}"
+  return V, batchfor_wrap(code), call_wrapper
 
 
 def gen_blf_tensor_prods(input_indsset: List[int], output_indsset: List[int], prods: List[Tuple[int, int, int]], tens_sizes):
@@ -509,7 +514,9 @@ def gen_blf_tensor_prods(input_indsset: List[int], output_indsset: List[int], pr
       code.append(f"    dleft{label}{dleft_index} = accum{label}{ilabel(i)};")
     code.append("  }")
   code.append("}")
-  return V, batchfor_wrap(code)
+  def call_wrapper(call):
+    return f"if (batch > 0) {{\n{tab(call)}\n}}"
+  return V, batchfor_wrap(code), call_wrapper
 
 def gen_wtb_tensor_prods(input_indsset: List[int], output_indsset: List[int], prods: List[Tuple[int, int, int]], tens_sizes):
   code = []
@@ -535,7 +542,13 @@ def gen_wtb_tensor_prods(input_indsset: List[int], output_indsset: List[int], pr
     code.append("    }")
     code.append("  }")
     code.append("}")
-  return V, "\n".join(code)
+  def call_wrapper(call):
+    zero_lines = []
+    for prod in prods:
+      zero_lines.append(f"  dP{prodlabel(prod)}.zero_();")
+    zero_lines = "\n".join(zero_lines)
+    return f"if (batch > 0) {{\n{tab(call)}\n}} else {{\n{zero_lines}\n}}"
+  return V, "\n".join(code), call_wrapper
 
 
 def tensor_prods(name: str, input_indsset: List[int], output_indsset: List[int], prods: List[Tuple[int, int, int]]):
@@ -607,15 +620,15 @@ def tensor_prods(name: str, input_indsset: List[int], output_indsset: List[int],
     shapes_blf[f"dleft{label}"] = ("batch", "dim_l") + (3,)*inds_l
     shapes_wtb[f"left{label}"] = ("batch", "dim_l") + (3,)*inds_l
   # Now for the hard part: generating the main computational part of the kernel!
-  V_fwd, cu_fwd = gen_fwd_tensor_prods(input_indsset, output_indsset, prods, tens_sizes)
-  V_bwd, cu_bwd = gen_bwd_tensor_prods(input_indsset, output_indsset, prods, tens_sizes)
-  V_blf, cu_blf = gen_blf_tensor_prods(input_indsset, output_indsset, prods, tens_sizes)
-  V_wtb, cu_wtb = gen_wtb_tensor_prods(input_indsset, output_indsset, prods, tens_sizes)
+  V_fwd, cu_fwd, call_wrapper_fwd = gen_fwd_tensor_prods(input_indsset, output_indsset, prods, tens_sizes)
+  V_bwd, cu_bwd, call_wrapper_bwd = gen_bwd_tensor_prods(input_indsset, output_indsset, prods, tens_sizes)
+  V_blf, cu_blf, call_wrapper_blf = gen_blf_tensor_prods(input_indsset, output_indsset, prods, tens_sizes)
+  V_wtb, cu_wtb, call_wrapper_wtb = gen_wtb_tensor_prods(input_indsset, output_indsset, prods, tens_sizes)
   return (
-    Function(name, int_params, tens_params_fwd, tens_outputs_fwd, shapes_fwd, gridsz_expr, blocksz_expr, V_fwd, chunksz_exprs, cu_fwd),
-    Function(name + "_backward", int_params, tens_params_bwd, tens_outputs_bwd, shapes_bwd, gridsz_expr, blocksz_expr, V_bwd, chunksz_exprs, cu_bwd),
-    Function(name + "_backleft", int_params, tens_params_blf, tens_outputs_blf, shapes_blf, gridsz_expr, blocksz_expr, V_blf, chunksz_exprs, cu_blf),
-    Function(name + "_wtsback", int_params, tens_params_wtb, tens_outputs_wtb, shapes_wtb, gridsz_expr_wtb, blocksz_expr, V_wtb, chunksz_exprs, cu_wtb)
+    Function(name, int_params, tens_params_fwd, tens_outputs_fwd, shapes_fwd, gridsz_expr, blocksz_expr, V_fwd, chunksz_exprs, cu_fwd, call_wrapper_fwd),
+    Function(name + "_backward", int_params, tens_params_bwd, tens_outputs_bwd, shapes_bwd, gridsz_expr, blocksz_expr, V_bwd, chunksz_exprs, cu_bwd, call_wrapper_bwd),
+    Function(name + "_backleft", int_params, tens_params_blf, tens_outputs_blf, shapes_blf, gridsz_expr, blocksz_expr, V_blf, chunksz_exprs, cu_blf, call_wrapper_blf),
+    Function(name + "_wtsback", int_params, tens_params_wtb, tens_outputs_wtb, shapes_wtb, gridsz_expr_wtb, blocksz_expr, V_wtb, chunksz_exprs, cu_wtb, call_wrapper_wtb)
   )
 
 
