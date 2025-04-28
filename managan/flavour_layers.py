@@ -95,6 +95,57 @@ class ResiduesDecode(nn.Module):
     ], dim=1) # dim=1 because batch
 
 
+class SingleResidueEncodeV2(nn.Module):
+  def __init__(self, natom:int, vdim:int):
+    super().__init__()
+    self.natom = natom
+    self.lin_v = TensLinear(1, natom**2, vdim)
+  def forward(self, x:torch.Tensor):
+    """ x: (..., natom, 3)
+        ans: (..., vdim, 3) """
+    *rest, must_be[self.natom], must_be[3] = x.shape
+    delta_x = (x[..., None, :, :] - x[..., :, None, :]).reshape(*rest, self.natom**2, 3)
+    return self.lin_v(delta_x)
+
+class SingleResidueGetCenterV2(nn.Module):
+  def __init__(self, natom:int):
+    super().__init__()
+    self.lin_offset_pos = TensLinear(1, natom, 1)
+  def self_init(self):
+    with torch.no_grad():
+      self.lin_offset_pos.W.zero_()
+  def forward(self, x:torch.Tensor):
+    """ x: (..., natom, 3)
+        ans: (..., 3) """
+    return x.mean(-2) + self.lin_offset_pos(x).squeeze(-2) - self.lin_offset_pos.W.sum()
+
+class ResiduesEncodeV2(nn.Module):
+  def __init__(self, vdim:int):
+    super().__init__()
+    self.res_enc = nn.ModuleDict({
+      letter: SingleResidueEncodeV2(RES_LEN[letter], vdim)
+      for letter in letter_code
+    })
+    self.res_center = nn.ModuleDict({
+      letter: SingleResidueGetCenterV2(RES_LEN[letter])
+      for letter in letter_code
+    })
+  def forward(self, x:torch.Tensor, metadata:OpenMMMetadata):
+    """ x: (batch, atoms, 3)
+        ans: (batch, residues, 3), (batch, residues, vdim, 3) """
+    encs, centers = [], []
+    for i, letter in enumerate(metadata.seq):
+      res_i_enc = self.res_enc[letter]
+      res_i_center = self.res_center[letter]
+      natom = res_i_enc.natom
+      res_idx = metadata.residue_indices[i]
+      x_res_i = x[:, res_idx:res_idx+natom]
+      encs.append(res_i_enc(x_res_i))
+      centers.append(res_i_center(x_res_i))
+    return torch.stack(centers, dim=1), torch.stack(encs, dim=1)
+
+
+
 class ResidueEmbed(nn.Module):
   def __init__(self, adim):
     super().__init__()
