@@ -44,6 +44,32 @@ def avg_relative_diff(a, b, show_as_plot=False):
 def typsz(x:torch.Tensor):
   return ((x**2).mean()**0.5).item()
 
+# MODEL ACTIVATION SIZE PRINTER
+def turn_on_actv_size_printing(module:torch.nn.Module):
+  for name, mod in module.named_modules():
+    depth = len(name.split("."))
+    def fwd_hook(m, args, outs, curr_mod_name=name, curr_mod_depth=depth):
+      def tostr(arg):
+        if isinstance(arg, torch.Tensor):
+          return str(typsz(arg))
+        elif isinstance(arg, tuple):
+          return f"({', '.join([tostr(subarg) for subarg in arg])})"
+        else:
+          return "_"
+      if not isinstance(outs, tuple):
+        outs = outs,
+      arg_szs = ", ".join([
+        tostr(arg)
+        for arg in args
+      ])
+      out_szs = ", ".join([
+        tostr(out)
+        for out in outs
+      ])
+      print("  "*curr_mod_depth + f"{curr_mod_name}({arg_szs}) -> ({out_szs})")
+    mod.register_forward_hook(fwd_hook)
+
+
 # OTHER STUFF...
 
 class PrintTiming:
