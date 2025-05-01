@@ -144,9 +144,9 @@ class LocalMLPAndGroupNorm(nn.Module):
     self.tlm_v = TimeLinearModulation(config["t_embed_hdim"], 1, dim_v)
     self.tlm_d = TimeLinearModulation(config["t_embed_hdim"], 2, dim_d)
     self.mlp_a = torch.compile(MLP(dim_a))
-    self.gn_a = TensGroupNorm(0, dim_a, config["groups_a"])
-    self.gn_v = TensGroupNorm(1, dim_v, config["groups_v"])
-    self.gn_d = TensGroupNorm(2, dim_d, config["groups_d"])
+    self.gn_a = TensGroupNormBroken(0, dim_a, config["groups_a"])
+    self.gn_v = TensGroupNormBroken(1, dim_v, config["groups_v"])
+    self.gn_d = TensGroupNormBroken(2, dim_d, config["groups_d"])
   def forward(self, x_a, x_v, x_d, t):
     x_a, x_v, x_d = self.tlm_a(x_a, t), self.tlm_v(x_v, t), self.tlm_d(x_d, t)
     x_a = self.mlp_a(x_a)

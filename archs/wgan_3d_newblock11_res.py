@@ -222,9 +222,9 @@ class SubBlock(nn.Module):
     # submodules:
     self.linear_mix = AVDFullLinearMix(dim_a, dim_v, dim_d)
     self.tens_prods = AVDFullTensorProds(dim_a, dim_v, dim_d, config["rank"])
-    self.gn_a = TensGroupNorm(0, dim_a, config["groups_a"])
-    self.gn_v = TensGroupNorm(1, dim_v, config["groups_v"])
-    self.gn_d = TensGroupNorm(2, dim_d, config["groups_d"])
+    self.gn_a = TensGroupNormBroken(0, dim_a, config["groups_a"])
+    self.gn_v = TensGroupNormBroken(1, dim_v, config["groups_v"])
+    self.gn_d = TensGroupNormBroken(2, dim_d, config["groups_d"])
     self.convs_a = nn.Sequential(
       TensConv1d(0, dim_a, 7),
       nn.LeakyReLU(0.1),

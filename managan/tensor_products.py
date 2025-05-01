@@ -189,7 +189,9 @@ class TensSigmoid(nn.Module):
     return tens_sigmoid(self.inds, x)
 
 
-class TensGroupNorm(nn.Module):
+class TensGroupNormBroken(nn.Module):
+  """ Due to how torch.sum() handles an empty dim list, this class is broken.
+      We keep it only for backwards compatibility with previously trained models on old archs. """
   def __init__(self, inds, chan, groups, epsilon=1e-5):
     super().__init__()
     assert chan % groups == 0
@@ -206,6 +208,26 @@ class TensGroupNorm(nn.Module):
     batch, nodes, must_be[self.chan], *must_be[(3,)*self.inds] = x.shape
     x = x.reshape(batch, nodes, self.groups, -1, *[3]*self.inds)
     moment2 = (x**2).sum(self.dimtup, keepdim=True).mean([1, 3], keepdim=True) # (batch, 1, groups, 1, (1,)^inds)
+    ans = x/torch.sqrt(self.epsilon + moment2)
+    return self.gamma*ans.reshape(batch, nodes, self.chan, *[3]*self.inds)
+
+
+class TensGroupNorm(nn.Module):
+  def __init__(self, inds, chan, groups, epsilon=1e-5):
+    super().__init__()
+    assert chan % groups == 0
+    self.inds = inds
+    self.chan = chan
+    self.groups = groups
+    self.epsilon = epsilon
+    self.gamma = nn.Parameter(torch.ones(chan, *[1]*inds))
+  def forward(self, x):
+    """ note: where we write "nodes" here, we could also write "edges"
+        x: (batch, nodes, chan, (3,)^inds)
+        return: (batch, nodes, chan, (3,)^inds) """
+    batch, nodes, must_be[self.chan], *must_be[(3,)*self.inds] = x.shape
+    x = x.reshape(batch, nodes, self.groups, -1, 3**self.inds)
+    moment2 = (x**2).sum(-1, keepdim=True).mean([1, 3], keepdim=True) # (batch, 1, groups, 1, 1)
     ans = x/torch.sqrt(self.epsilon + moment2)
     return self.gamma*ans.reshape(batch, nodes, self.chan, *[3]*self.inds)
 
