@@ -312,7 +312,7 @@ class Messages(nn.Module):
     self.r0 = r0
     self.L = L
     # parameters:
-    add_tens_prod_parameters(self, dim_a, dim_v, dim_d, 8)
+    add_tens_prod_parameters(self, 128, 96, 64, 8)
     # submodules
     self.readin_a = TensLinear(0, dim_a, 128*L)
     self.readin_v = TensLinear(1, dim_v, 96*L)
@@ -320,8 +320,8 @@ class Messages(nn.Module):
     self.readout_a = TensLinear(0, 128*L, dim_a)
     self.readout_v = TensLinear(1, 96*L, dim_v)
     self.readout_d = TensLinear(2, 64*L, dim_d)
-    self.mlp_a = torch.compile(MLP(dim_a)) # MLP that we apply to edge activations
-    self.mlp_v = VectorMLP(dim_v)
+    self.mlp_a = torch.compile(MLP(128)) # MLP that we apply to edge activations
+    self.mlp_v = VectorMLP(96)
   def forward(self, graph, r_ij, x_a, x_v, x_d):
     rad_enc_ij = radial_encode_8(r_ij, self.r0)
     x_a = fuse_high_actv(0, to_high_actv(0, unfuse_low_actv(0, self.readin_a(x_a), self.L), self.L), self.L) # (L*batch, nodes, 128)
