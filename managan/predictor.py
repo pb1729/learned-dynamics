@@ -190,22 +190,6 @@ class LongModelPredictor(Predictor):
     self.framelen = model.config["framelen"]
   def shape(self):
     return self.get_base_predictor().shape()
-  '''def _long_state_to_state(self, long_state:ModelState):
-    """ long_state: (*size)(framelen, *base_shape)
-        ans: (framelen, *size)(*base_shape) """
-    size = long_state.size
-    must_be[self.framelen], *base_shape = long_state.shape
-    return ModelState(base_shape,
-      long_state.x.permute(len(size), *range(len(size)), *range(len(size) + 1, len(size) + 1 + len(base_shape))),
-      **long_state.kwargs)
-  def _state_to_long_state(self, state:ModelState):
-    """ state: (framelen, *size)(*base_shape)
-        ans: (*size)(framelen, *base_shape) """
-    must_be[self.framelen], *size = state.size
-    base_shape = state.shape
-    return ModelState((self.framelen,) + base_shape,
-      state.x.permute(*range(1, 1 + len(size)), 0, *range(len(size) + 1, len(size) + 1 + len(base_shape))),
-      **state.kwargs)'''
   def predict(self, L, state, ret=True):
     """ MUTATES state.
         state: (*size)(framelen, *base_shape)
@@ -227,8 +211,6 @@ class LongModelPredictor(Predictor):
     state = base_pred.sample_q(batch)
     size, shape = state.size, state.shape
     return base_pred.predict(self.framelen, state)
-    '''    (must_be[batch],), shape = state.size, state.shape
-    traj = base_pred.predict(self.framelen, state)'''
   def get_base_predictor(self) -> Predictor:
     return self.model.config.predictor
   def get_box(self):
