@@ -278,14 +278,14 @@ def sign(perm):
       if perm[i] == perm[j]: return 0
       if perm[i] < perm[j]: ans *= -1
   return ans
-def gen_tensprod(tens_sizes, prod, leftref, rightref, outref, result=2, chiral=None):
+def gen_tensprod(tens_sizes, prod, leftref, rightref, outref, result=2, chiral=None, accumulate=False):
   """ codegen for an individual tensor product. result (0, 1, or 2) shows which thing is our output.
       (indexes into [left, right, out].) if result is None, then we contract all 3 inputs into a scalar.
       If chiral is True, we contract 2 indices with the Levi-Civita tensor to produce 1, indead of
       contracting 2 indices with each other to produce 0, as ususal. We only support having exactly
       one such "chiral contraction" for now. If chiral is None, we guess what it should be. """
   if chiral is None: # guess whether it's chiral based on parity of prod
-    return gen_tensprod(tens_sizes, prod, leftref, rightref, outref, result=result, chiral=(sum(prod) % 2 == 1))
+    return gen_tensprod(tens_sizes, prod, leftref, rightref, outref, result=result, chiral=(sum(prod) % 2 == 1), accumulate=accumulate)
   # actual implementation:
   chirals = 1 if chiral else 0
   inds_l, inds_r, inds_o = prod
@@ -317,6 +317,7 @@ def gen_tensprod(tens_sizes, prod, leftref, rightref, outref, result=2, chiral=N
               coeffs[tup] = sign(k_l + k_r + k_o)
             else:
               coeffs[tup] = 1
+  update_operator = " += " if accumulate else " = "
   if result is None:
     ans = " + ".join([
       (
@@ -345,7 +346,7 @@ def gen_tensprod(tens_sizes, prod, leftref, rightref, outref, result=2, chiral=N
           else:
             assert ref_triplet[result] == assignment_var
       assert assignment_var is not None
-      ans.append(assignment_var + " = " + " + ".join(assignment_val) + ";")
+      ans.append(assignment_var + update_operator + " + ".join(assignment_val) + ";")
   return ans
 
 
@@ -630,6 +631,108 @@ def tensor_prods(name: str, input_indsset: List[int], output_indsset: List[int],
     Function(name + "_backleft", int_params, tens_params_blf, tens_outputs_blf, shapes_blf, gridsz_expr, blocksz_expr, V_blf, chunksz_exprs, cu_blf, call_wrapper_blf),
     Function(name + "_wtsback", int_params, tens_params_wtb, tens_outputs_wtb, shapes_wtb, gridsz_expr_wtb, blocksz_expr, V_wtb, chunksz_exprs, cu_wtb, call_wrapper_wtb)
   )
+
+
+
+def gen_fwd_tensor_prods_simple(prods, tens_sizes):
+  code = []
+  V = SharedVars()
+  code.append("for (int idx_chan = threadIdx.x; idx_chan < chan; idx_chan += blockDim.x) {")
+  for prod in prods:
+    inds_l, inds_r, inds_o = prod
+    label = prodlabel(prod)
+    code.extend(tab(
+      gen_tensprod(tens_sizes, prod,
+        IndexRef(f"l_{inds_l}", ["idx_batch", "idx_chan"], ["batch", "chan"]),
+        IndexRef(f"r_{inds_r}", ["idx_batch", "idx_chan"], ["batch", "chan"]),
+        IndexRef(f"y{label}", ["idx_batch", "idx_chan"], ["batch", "chan"]),
+        result=2)
+    ))
+  code.append("}")
+  def call_wrapper(call):
+    return f"if (batch > 0) {{\n{tab(call)}\n}}"
+  return V, batchfor_wrap(code), call_wrapper
+
+
+def gen_bwd_tensor_prods_simple(prods, tens_sizes, result):
+  code = []
+  V = SharedVars()
+  assert result in [0, 1]
+  indsset = set([prod[result] for prod in prods])
+  code.append("for (int idx_chan = threadIdx.x; idx_chan < chan; idx_chan += blockDim.x) {")
+  for inds_res in indsset:
+    for i in range(tens_sizes[inds_res]):
+      code.append(f"  float accum_{inds_res}{ilabel(i)} = 0.0;")
+  for prod in prods:
+    inds_l, inds_r, inds_o = prod
+    label = prodlabel(prod)
+    l_ref = LocalRef(f"accum_{inds_l}") if result == 0 else IndexRef(f"l_{inds_l}", ["idx_batch", "idx_chan"], ["batch", "chan"])
+    r_ref = LocalRef(f"accum_{inds_r}") if result == 1 else IndexRef(f"r_{inds_r}", ["idx_batch", "idx_chan"], ["batch", "chan"])
+    code.extend(tab(
+      gen_tensprod(tens_sizes, prod,
+        l_ref, r_ref,
+        IndexRef(f"dy{label}", ["idx_batch", "idx_chan"], ["batch", "chan"]),
+        result=result, accumulate=True)
+    ))
+  for inds_res in indsset:
+    out_var = f"dl_{inds_res}" if result==0 else f"dr_{inds_res}"
+    for i in range(tens_sizes[inds_res]):
+      out_idx = at(["idx_batch", "idx_chan", i], ["batch", "chan", tens_sizes[inds_res]])
+      code.append(f"  {out_var}{out_idx} = accum_{inds_res}{ilabel(i)};")
+  code.append("}")
+  def call_wrapper(call):
+    return f"if (batch > 0) {{\n{tab(call)}\n}}"
+  return V, batchfor_wrap(code), call_wrapper
+
+
+def tensor_prods_simple(name: str, prods: List[Tuple[int, int, int]]):
+  left_indsset = set([prod[0] for prod in prods])
+  right_indsset = set([prod[1] for prod in prods])
+  output_indsset = set([prod[2] for prod in prods])
+  indsset = left_indsset | right_indsset | output_indsset
+  tens_sizes = [3**p for p in range(max(indsset) + 1)]
+  int_params = ["batch", "chan"]
+  # shapes setup
+  shapes_fwd = {}
+  shapes_bwl = {}
+  shapes_bwr = {}
+  # define x, y params and outputs
+  tens_params_fwd = [f"l_{i}" for i in left_indsset] + [f"r_{i}" for i in right_indsset]
+  tens_params_bwl = [f"r_{i}" for i in right_indsset]
+  tens_params_bwr = [f"l_{i}" for i in left_indsset]
+  tens_outputs_bwl = [f"dl_{i}" for i in left_indsset]
+  tens_outputs_bwr = [f"dr_{i}" for i in right_indsset]
+  tens_outputs_fwd = []
+  for i in left_indsset:
+    shapes_fwd[f"l_{i}"] = ("batch", "chan") + (3,)*i
+    shapes_bwl[f"dl_{i}"] = ("batch", "chan") + (3,)*i
+    shapes_bwr[f"l_{i}"] = ("batch", "chan") + (3,)*i
+  for i in right_indsset:
+    shapes_fwd[f"r_{i}"] = ("batch", "chan") + (3,)*i
+    shapes_bwl[f"r_{i}"] = ("batch", "chan") + (3,)*i
+    shapes_bwr[f"dr_{i}"] = ("batch", "chan") + (3,)*i
+  chunksz_exprs = {}
+  gridsz_expr = "batch"
+  blocksz_expr = "WARPSZ"
+  for prod in prods:
+    inds_l, inds_r, inds_o = prod
+    label = prodlabel(prod)
+    tens_outputs_fwd.append(f"y{label}")
+    tens_params_bwl.append(f"dy{label}")
+    tens_params_bwr.append(f"dy{label}")
+    shapes_fwd[f"y{label}"] = ("batch", "chan") + (3,)*inds_o
+    shapes_bwl[f"dy{label}"] = ("batch", "chan") + (3,)*inds_o
+    shapes_bwr[f"dy{label}"] = ("batch", "chan") + (3,)*inds_o
+  V_fwd, cu_fwd, call_wrapper_fwd = gen_fwd_tensor_prods_simple(prods, tens_sizes)
+  V_bwl, cu_bwl, call_wrapper_bwl = gen_bwd_tensor_prods_simple(prods, tens_sizes, 0)
+  V_bwr, cu_bwr, call_wrapper_bwr = gen_bwd_tensor_prods_simple(prods, tens_sizes, 1)
+  return (
+    Function(name + "_fwd", int_params, tens_params_fwd, tens_outputs_fwd, shapes_fwd, gridsz_expr, blocksz_expr, V_fwd, {}, cu_fwd, call_wrapper_fwd),
+    Function(name + "_bwl", int_params, tens_params_bwl, tens_outputs_bwl, shapes_bwl, gridsz_expr, blocksz_expr, V_bwl, {}, cu_bwl, call_wrapper_bwl),
+    Function(name + "_bwr", int_params, tens_params_bwr, tens_outputs_bwr, shapes_bwr, gridsz_expr, blocksz_expr, V_bwr, {}, cu_bwr, call_wrapper_bwr),
+  )
+
+
 
 
 def bindings(functions, extra_bindings=None):

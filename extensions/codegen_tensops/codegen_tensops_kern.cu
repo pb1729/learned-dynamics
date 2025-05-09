@@ -3797,6 +3797,340 @@ void ant16_oc_wtsback(
 }
 
 
+__global__
+void bee_fwd_kern(
+    // <<<(batch), (WARPSZ)>>>
+    
+    int batch, int chan,
+    const float* l_0, const float* l_1, const float* l_2, const float* r_0, const float* r_1, const float* r_2,
+    float* __restrict__ y_000, float* __restrict__ y_110, float* __restrict__ y_220, float* __restrict__ y_011, float* __restrict__ y_101, float* __restrict__ y_121, float* __restrict__ y_211, float* __restrict__ y_022, float* __restrict__ y_202, float* __restrict__ y_112, float* __restrict__ y_222, float* __restrict__ y_111, float* __restrict__ y_212) {
+  extern __shared__ float s[];
+  for (int idx_batch = blockIdx.x; idx_batch < batch; idx_batch += gridDim.x) {
+    for (int idx_chan = threadIdx.x; idx_chan < chan; idx_chan += blockDim.x) {
+      y_000[((idx_batch)*chan + idx_chan)*1 + 0] = l_0[((idx_batch)*chan + idx_chan)*1 + 0]*r_0[((idx_batch)*chan + idx_chan)*1 + 0];
+      y_110[((idx_batch)*chan + idx_chan)*1 + 0] = l_1[((idx_batch)*chan + idx_chan)*3 + 0]*r_1[((idx_batch)*chan + idx_chan)*3 + 0] + l_1[((idx_batch)*chan + idx_chan)*3 + 1]*r_1[((idx_batch)*chan + idx_chan)*3 + 1] + l_1[((idx_batch)*chan + idx_chan)*3 + 2]*r_1[((idx_batch)*chan + idx_chan)*3 + 2];
+      y_220[((idx_batch)*chan + idx_chan)*1 + 0] = l_2[((idx_batch)*chan + idx_chan)*9 + 0]*r_2[((idx_batch)*chan + idx_chan)*9 + 0] + l_2[((idx_batch)*chan + idx_chan)*9 + 1]*r_2[((idx_batch)*chan + idx_chan)*9 + 1] + l_2[((idx_batch)*chan + idx_chan)*9 + 2]*r_2[((idx_batch)*chan + idx_chan)*9 + 2] + l_2[((idx_batch)*chan + idx_chan)*9 + 3]*r_2[((idx_batch)*chan + idx_chan)*9 + 3] + l_2[((idx_batch)*chan + idx_chan)*9 + 4]*r_2[((idx_batch)*chan + idx_chan)*9 + 4] + l_2[((idx_batch)*chan + idx_chan)*9 + 5]*r_2[((idx_batch)*chan + idx_chan)*9 + 5] + l_2[((idx_batch)*chan + idx_chan)*9 + 6]*r_2[((idx_batch)*chan + idx_chan)*9 + 6] + l_2[((idx_batch)*chan + idx_chan)*9 + 7]*r_2[((idx_batch)*chan + idx_chan)*9 + 7] + l_2[((idx_batch)*chan + idx_chan)*9 + 8]*r_2[((idx_batch)*chan + idx_chan)*9 + 8];
+      y_011[((idx_batch)*chan + idx_chan)*3 + 0] = l_0[((idx_batch)*chan + idx_chan)*1 + 0]*r_1[((idx_batch)*chan + idx_chan)*3 + 0];
+      y_011[((idx_batch)*chan + idx_chan)*3 + 1] = l_0[((idx_batch)*chan + idx_chan)*1 + 0]*r_1[((idx_batch)*chan + idx_chan)*3 + 1];
+      y_011[((idx_batch)*chan + idx_chan)*3 + 2] = l_0[((idx_batch)*chan + idx_chan)*1 + 0]*r_1[((idx_batch)*chan + idx_chan)*3 + 2];
+      y_101[((idx_batch)*chan + idx_chan)*3 + 0] = l_1[((idx_batch)*chan + idx_chan)*3 + 0]*r_0[((idx_batch)*chan + idx_chan)*1 + 0];
+      y_101[((idx_batch)*chan + idx_chan)*3 + 1] = l_1[((idx_batch)*chan + idx_chan)*3 + 1]*r_0[((idx_batch)*chan + idx_chan)*1 + 0];
+      y_101[((idx_batch)*chan + idx_chan)*3 + 2] = l_1[((idx_batch)*chan + idx_chan)*3 + 2]*r_0[((idx_batch)*chan + idx_chan)*1 + 0];
+      y_121[((idx_batch)*chan + idx_chan)*3 + 0] = l_1[((idx_batch)*chan + idx_chan)*3 + 0]*r_2[((idx_batch)*chan + idx_chan)*9 + 0] + l_1[((idx_batch)*chan + idx_chan)*3 + 1]*r_2[((idx_batch)*chan + idx_chan)*9 + 1] + l_1[((idx_batch)*chan + idx_chan)*3 + 2]*r_2[((idx_batch)*chan + idx_chan)*9 + 2];
+      y_121[((idx_batch)*chan + idx_chan)*3 + 1] = l_1[((idx_batch)*chan + idx_chan)*3 + 0]*r_2[((idx_batch)*chan + idx_chan)*9 + 3] + l_1[((idx_batch)*chan + idx_chan)*3 + 1]*r_2[((idx_batch)*chan + idx_chan)*9 + 4] + l_1[((idx_batch)*chan + idx_chan)*3 + 2]*r_2[((idx_batch)*chan + idx_chan)*9 + 5];
+      y_121[((idx_batch)*chan + idx_chan)*3 + 2] = l_1[((idx_batch)*chan + idx_chan)*3 + 0]*r_2[((idx_batch)*chan + idx_chan)*9 + 6] + l_1[((idx_batch)*chan + idx_chan)*3 + 1]*r_2[((idx_batch)*chan + idx_chan)*9 + 7] + l_1[((idx_batch)*chan + idx_chan)*3 + 2]*r_2[((idx_batch)*chan + idx_chan)*9 + 8];
+      y_211[((idx_batch)*chan + idx_chan)*3 + 0] = l_2[((idx_batch)*chan + idx_chan)*9 + 0]*r_1[((idx_batch)*chan + idx_chan)*3 + 0] + l_2[((idx_batch)*chan + idx_chan)*9 + 1]*r_1[((idx_batch)*chan + idx_chan)*3 + 1] + l_2[((idx_batch)*chan + idx_chan)*9 + 2]*r_1[((idx_batch)*chan + idx_chan)*3 + 2];
+      y_211[((idx_batch)*chan + idx_chan)*3 + 1] = l_2[((idx_batch)*chan + idx_chan)*9 + 3]*r_1[((idx_batch)*chan + idx_chan)*3 + 0] + l_2[((idx_batch)*chan + idx_chan)*9 + 4]*r_1[((idx_batch)*chan + idx_chan)*3 + 1] + l_2[((idx_batch)*chan + idx_chan)*9 + 5]*r_1[((idx_batch)*chan + idx_chan)*3 + 2];
+      y_211[((idx_batch)*chan + idx_chan)*3 + 2] = l_2[((idx_batch)*chan + idx_chan)*9 + 6]*r_1[((idx_batch)*chan + idx_chan)*3 + 0] + l_2[((idx_batch)*chan + idx_chan)*9 + 7]*r_1[((idx_batch)*chan + idx_chan)*3 + 1] + l_2[((idx_batch)*chan + idx_chan)*9 + 8]*r_1[((idx_batch)*chan + idx_chan)*3 + 2];
+      y_022[((idx_batch)*chan + idx_chan)*9 + 0] = l_0[((idx_batch)*chan + idx_chan)*1 + 0]*r_2[((idx_batch)*chan + idx_chan)*9 + 0];
+      y_022[((idx_batch)*chan + idx_chan)*9 + 1] = l_0[((idx_batch)*chan + idx_chan)*1 + 0]*r_2[((idx_batch)*chan + idx_chan)*9 + 1];
+      y_022[((idx_batch)*chan + idx_chan)*9 + 2] = l_0[((idx_batch)*chan + idx_chan)*1 + 0]*r_2[((idx_batch)*chan + idx_chan)*9 + 2];
+      y_022[((idx_batch)*chan + idx_chan)*9 + 3] = l_0[((idx_batch)*chan + idx_chan)*1 + 0]*r_2[((idx_batch)*chan + idx_chan)*9 + 3];
+      y_022[((idx_batch)*chan + idx_chan)*9 + 4] = l_0[((idx_batch)*chan + idx_chan)*1 + 0]*r_2[((idx_batch)*chan + idx_chan)*9 + 4];
+      y_022[((idx_batch)*chan + idx_chan)*9 + 5] = l_0[((idx_batch)*chan + idx_chan)*1 + 0]*r_2[((idx_batch)*chan + idx_chan)*9 + 5];
+      y_022[((idx_batch)*chan + idx_chan)*9 + 6] = l_0[((idx_batch)*chan + idx_chan)*1 + 0]*r_2[((idx_batch)*chan + idx_chan)*9 + 6];
+      y_022[((idx_batch)*chan + idx_chan)*9 + 7] = l_0[((idx_batch)*chan + idx_chan)*1 + 0]*r_2[((idx_batch)*chan + idx_chan)*9 + 7];
+      y_022[((idx_batch)*chan + idx_chan)*9 + 8] = l_0[((idx_batch)*chan + idx_chan)*1 + 0]*r_2[((idx_batch)*chan + idx_chan)*9 + 8];
+      y_202[((idx_batch)*chan + idx_chan)*9 + 0] = l_2[((idx_batch)*chan + idx_chan)*9 + 0]*r_0[((idx_batch)*chan + idx_chan)*1 + 0];
+      y_202[((idx_batch)*chan + idx_chan)*9 + 1] = l_2[((idx_batch)*chan + idx_chan)*9 + 1]*r_0[((idx_batch)*chan + idx_chan)*1 + 0];
+      y_202[((idx_batch)*chan + idx_chan)*9 + 2] = l_2[((idx_batch)*chan + idx_chan)*9 + 2]*r_0[((idx_batch)*chan + idx_chan)*1 + 0];
+      y_202[((idx_batch)*chan + idx_chan)*9 + 3] = l_2[((idx_batch)*chan + idx_chan)*9 + 3]*r_0[((idx_batch)*chan + idx_chan)*1 + 0];
+      y_202[((idx_batch)*chan + idx_chan)*9 + 4] = l_2[((idx_batch)*chan + idx_chan)*9 + 4]*r_0[((idx_batch)*chan + idx_chan)*1 + 0];
+      y_202[((idx_batch)*chan + idx_chan)*9 + 5] = l_2[((idx_batch)*chan + idx_chan)*9 + 5]*r_0[((idx_batch)*chan + idx_chan)*1 + 0];
+      y_202[((idx_batch)*chan + idx_chan)*9 + 6] = l_2[((idx_batch)*chan + idx_chan)*9 + 6]*r_0[((idx_batch)*chan + idx_chan)*1 + 0];
+      y_202[((idx_batch)*chan + idx_chan)*9 + 7] = l_2[((idx_batch)*chan + idx_chan)*9 + 7]*r_0[((idx_batch)*chan + idx_chan)*1 + 0];
+      y_202[((idx_batch)*chan + idx_chan)*9 + 8] = l_2[((idx_batch)*chan + idx_chan)*9 + 8]*r_0[((idx_batch)*chan + idx_chan)*1 + 0];
+      y_112[((idx_batch)*chan + idx_chan)*9 + 0] = l_1[((idx_batch)*chan + idx_chan)*3 + 0]*r_1[((idx_batch)*chan + idx_chan)*3 + 0];
+      y_112[((idx_batch)*chan + idx_chan)*9 + 1] = l_1[((idx_batch)*chan + idx_chan)*3 + 0]*r_1[((idx_batch)*chan + idx_chan)*3 + 1];
+      y_112[((idx_batch)*chan + idx_chan)*9 + 2] = l_1[((idx_batch)*chan + idx_chan)*3 + 0]*r_1[((idx_batch)*chan + idx_chan)*3 + 2];
+      y_112[((idx_batch)*chan + idx_chan)*9 + 3] = l_1[((idx_batch)*chan + idx_chan)*3 + 1]*r_1[((idx_batch)*chan + idx_chan)*3 + 0];
+      y_112[((idx_batch)*chan + idx_chan)*9 + 4] = l_1[((idx_batch)*chan + idx_chan)*3 + 1]*r_1[((idx_batch)*chan + idx_chan)*3 + 1];
+      y_112[((idx_batch)*chan + idx_chan)*9 + 5] = l_1[((idx_batch)*chan + idx_chan)*3 + 1]*r_1[((idx_batch)*chan + idx_chan)*3 + 2];
+      y_112[((idx_batch)*chan + idx_chan)*9 + 6] = l_1[((idx_batch)*chan + idx_chan)*3 + 2]*r_1[((idx_batch)*chan + idx_chan)*3 + 0];
+      y_112[((idx_batch)*chan + idx_chan)*9 + 7] = l_1[((idx_batch)*chan + idx_chan)*3 + 2]*r_1[((idx_batch)*chan + idx_chan)*3 + 1];
+      y_112[((idx_batch)*chan + idx_chan)*9 + 8] = l_1[((idx_batch)*chan + idx_chan)*3 + 2]*r_1[((idx_batch)*chan + idx_chan)*3 + 2];
+      y_222[((idx_batch)*chan + idx_chan)*9 + 0] = l_2[((idx_batch)*chan + idx_chan)*9 + 0]*r_2[((idx_batch)*chan + idx_chan)*9 + 0] + l_2[((idx_batch)*chan + idx_chan)*9 + 1]*r_2[((idx_batch)*chan + idx_chan)*9 + 1] + l_2[((idx_batch)*chan + idx_chan)*9 + 2]*r_2[((idx_batch)*chan + idx_chan)*9 + 2];
+      y_222[((idx_batch)*chan + idx_chan)*9 + 1] = l_2[((idx_batch)*chan + idx_chan)*9 + 0]*r_2[((idx_batch)*chan + idx_chan)*9 + 3] + l_2[((idx_batch)*chan + idx_chan)*9 + 1]*r_2[((idx_batch)*chan + idx_chan)*9 + 4] + l_2[((idx_batch)*chan + idx_chan)*9 + 2]*r_2[((idx_batch)*chan + idx_chan)*9 + 5];
+      y_222[((idx_batch)*chan + idx_chan)*9 + 2] = l_2[((idx_batch)*chan + idx_chan)*9 + 0]*r_2[((idx_batch)*chan + idx_chan)*9 + 6] + l_2[((idx_batch)*chan + idx_chan)*9 + 1]*r_2[((idx_batch)*chan + idx_chan)*9 + 7] + l_2[((idx_batch)*chan + idx_chan)*9 + 2]*r_2[((idx_batch)*chan + idx_chan)*9 + 8];
+      y_222[((idx_batch)*chan + idx_chan)*9 + 3] = l_2[((idx_batch)*chan + idx_chan)*9 + 3]*r_2[((idx_batch)*chan + idx_chan)*9 + 0] + l_2[((idx_batch)*chan + idx_chan)*9 + 4]*r_2[((idx_batch)*chan + idx_chan)*9 + 1] + l_2[((idx_batch)*chan + idx_chan)*9 + 5]*r_2[((idx_batch)*chan + idx_chan)*9 + 2];
+      y_222[((idx_batch)*chan + idx_chan)*9 + 4] = l_2[((idx_batch)*chan + idx_chan)*9 + 3]*r_2[((idx_batch)*chan + idx_chan)*9 + 3] + l_2[((idx_batch)*chan + idx_chan)*9 + 4]*r_2[((idx_batch)*chan + idx_chan)*9 + 4] + l_2[((idx_batch)*chan + idx_chan)*9 + 5]*r_2[((idx_batch)*chan + idx_chan)*9 + 5];
+      y_222[((idx_batch)*chan + idx_chan)*9 + 5] = l_2[((idx_batch)*chan + idx_chan)*9 + 3]*r_2[((idx_batch)*chan + idx_chan)*9 + 6] + l_2[((idx_batch)*chan + idx_chan)*9 + 4]*r_2[((idx_batch)*chan + idx_chan)*9 + 7] + l_2[((idx_batch)*chan + idx_chan)*9 + 5]*r_2[((idx_batch)*chan + idx_chan)*9 + 8];
+      y_222[((idx_batch)*chan + idx_chan)*9 + 6] = l_2[((idx_batch)*chan + idx_chan)*9 + 6]*r_2[((idx_batch)*chan + idx_chan)*9 + 0] + l_2[((idx_batch)*chan + idx_chan)*9 + 7]*r_2[((idx_batch)*chan + idx_chan)*9 + 1] + l_2[((idx_batch)*chan + idx_chan)*9 + 8]*r_2[((idx_batch)*chan + idx_chan)*9 + 2];
+      y_222[((idx_batch)*chan + idx_chan)*9 + 7] = l_2[((idx_batch)*chan + idx_chan)*9 + 6]*r_2[((idx_batch)*chan + idx_chan)*9 + 3] + l_2[((idx_batch)*chan + idx_chan)*9 + 7]*r_2[((idx_batch)*chan + idx_chan)*9 + 4] + l_2[((idx_batch)*chan + idx_chan)*9 + 8]*r_2[((idx_batch)*chan + idx_chan)*9 + 5];
+      y_222[((idx_batch)*chan + idx_chan)*9 + 8] = l_2[((idx_batch)*chan + idx_chan)*9 + 6]*r_2[((idx_batch)*chan + idx_chan)*9 + 6] + l_2[((idx_batch)*chan + idx_chan)*9 + 7]*r_2[((idx_batch)*chan + idx_chan)*9 + 7] + l_2[((idx_batch)*chan + idx_chan)*9 + 8]*r_2[((idx_batch)*chan + idx_chan)*9 + 8];
+      y_111[((idx_batch)*chan + idx_chan)*3 + 0] = l_1[((idx_batch)*chan + idx_chan)*3 + 1]*r_1[((idx_batch)*chan + idx_chan)*3 + 2] + (-1)*l_1[((idx_batch)*chan + idx_chan)*3 + 2]*r_1[((idx_batch)*chan + idx_chan)*3 + 1];
+      y_111[((idx_batch)*chan + idx_chan)*3 + 1] = (-1)*l_1[((idx_batch)*chan + idx_chan)*3 + 0]*r_1[((idx_batch)*chan + idx_chan)*3 + 2] + l_1[((idx_batch)*chan + idx_chan)*3 + 2]*r_1[((idx_batch)*chan + idx_chan)*3 + 0];
+      y_111[((idx_batch)*chan + idx_chan)*3 + 2] = l_1[((idx_batch)*chan + idx_chan)*3 + 0]*r_1[((idx_batch)*chan + idx_chan)*3 + 1] + (-1)*l_1[((idx_batch)*chan + idx_chan)*3 + 1]*r_1[((idx_batch)*chan + idx_chan)*3 + 0];
+      y_212[((idx_batch)*chan + idx_chan)*9 + 0] = l_2[((idx_batch)*chan + idx_chan)*9 + 1]*r_1[((idx_batch)*chan + idx_chan)*3 + 2] + (-1)*l_2[((idx_batch)*chan + idx_chan)*9 + 2]*r_1[((idx_batch)*chan + idx_chan)*3 + 1];
+      y_212[((idx_batch)*chan + idx_chan)*9 + 1] = (-1)*l_2[((idx_batch)*chan + idx_chan)*9 + 0]*r_1[((idx_batch)*chan + idx_chan)*3 + 2] + l_2[((idx_batch)*chan + idx_chan)*9 + 2]*r_1[((idx_batch)*chan + idx_chan)*3 + 0];
+      y_212[((idx_batch)*chan + idx_chan)*9 + 2] = l_2[((idx_batch)*chan + idx_chan)*9 + 0]*r_1[((idx_batch)*chan + idx_chan)*3 + 1] + (-1)*l_2[((idx_batch)*chan + idx_chan)*9 + 1]*r_1[((idx_batch)*chan + idx_chan)*3 + 0];
+      y_212[((idx_batch)*chan + idx_chan)*9 + 3] = l_2[((idx_batch)*chan + idx_chan)*9 + 4]*r_1[((idx_batch)*chan + idx_chan)*3 + 2] + (-1)*l_2[((idx_batch)*chan + idx_chan)*9 + 5]*r_1[((idx_batch)*chan + idx_chan)*3 + 1];
+      y_212[((idx_batch)*chan + idx_chan)*9 + 4] = (-1)*l_2[((idx_batch)*chan + idx_chan)*9 + 3]*r_1[((idx_batch)*chan + idx_chan)*3 + 2] + l_2[((idx_batch)*chan + idx_chan)*9 + 5]*r_1[((idx_batch)*chan + idx_chan)*3 + 0];
+      y_212[((idx_batch)*chan + idx_chan)*9 + 5] = l_2[((idx_batch)*chan + idx_chan)*9 + 3]*r_1[((idx_batch)*chan + idx_chan)*3 + 1] + (-1)*l_2[((idx_batch)*chan + idx_chan)*9 + 4]*r_1[((idx_batch)*chan + idx_chan)*3 + 0];
+      y_212[((idx_batch)*chan + idx_chan)*9 + 6] = l_2[((idx_batch)*chan + idx_chan)*9 + 7]*r_1[((idx_batch)*chan + idx_chan)*3 + 2] + (-1)*l_2[((idx_batch)*chan + idx_chan)*9 + 8]*r_1[((idx_batch)*chan + idx_chan)*3 + 1];
+      y_212[((idx_batch)*chan + idx_chan)*9 + 7] = (-1)*l_2[((idx_batch)*chan + idx_chan)*9 + 6]*r_1[((idx_batch)*chan + idx_chan)*3 + 2] + l_2[((idx_batch)*chan + idx_chan)*9 + 8]*r_1[((idx_batch)*chan + idx_chan)*3 + 0];
+      y_212[((idx_batch)*chan + idx_chan)*9 + 8] = l_2[((idx_batch)*chan + idx_chan)*9 + 6]*r_1[((idx_batch)*chan + idx_chan)*3 + 1] + (-1)*l_2[((idx_batch)*chan + idx_chan)*9 + 7]*r_1[((idx_batch)*chan + idx_chan)*3 + 0];
+    }
+  }
+}
+
+
+void bee_fwd(
+    int batch, int chan,
+    const float* l_0, const float* l_1, const float* l_2, const float* r_0, const float* r_1, const float* r_2,
+    float* y_000, float* y_110, float* y_220, float* y_011, float* y_101, float* y_121, float* y_211, float* y_022, float* y_202, float* y_112, float* y_222, float* y_111, float* y_212) {
+  
+  
+  int sharedmemsz = 0;
+  dim3 gridsz = dim3(batch);
+  dim3 blocksz = dim3(WARPSZ);
+  bee_fwd_kern<<<gridsz, blocksz, sharedmemsz*sizeof(float)>>>(
+      
+      batch, chan,
+      l_0, l_1, l_2, r_0, r_1, r_2,
+      y_000, y_110, y_220, y_011, y_101, y_121, y_211, y_022, y_202, y_112, y_222, y_111, y_212);
+  
+}
+
+
+__global__
+void bee_bwl_kern(
+    // <<<(batch), (WARPSZ)>>>
+    
+    int batch, int chan,
+    const float* r_0, const float* r_1, const float* r_2, const float* dy_000, const float* dy_110, const float* dy_220, const float* dy_011, const float* dy_101, const float* dy_121, const float* dy_211, const float* dy_022, const float* dy_202, const float* dy_112, const float* dy_222, const float* dy_111, const float* dy_212,
+    float* __restrict__ dl_0, float* __restrict__ dl_1, float* __restrict__ dl_2) {
+  extern __shared__ float s[];
+  for (int idx_batch = blockIdx.x; idx_batch < batch; idx_batch += gridDim.x) {
+    for (int idx_chan = threadIdx.x; idx_chan < chan; idx_chan += blockDim.x) {
+      float accum_0_0 = 0.0;
+      float accum_1_0 = 0.0;
+      float accum_1_1 = 0.0;
+      float accum_1_2 = 0.0;
+      float accum_2_0 = 0.0;
+      float accum_2_1 = 0.0;
+      float accum_2_2 = 0.0;
+      float accum_2_3 = 0.0;
+      float accum_2_4 = 0.0;
+      float accum_2_5 = 0.0;
+      float accum_2_6 = 0.0;
+      float accum_2_7 = 0.0;
+      float accum_2_8 = 0.0;
+      accum_0_0 += r_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_000[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_1_0 += r_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_110[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_1_1 += r_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_110[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_1_2 += r_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_110[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_2_0 += r_2[((idx_batch)*chan + idx_chan)*9 + 0]*dy_220[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_2_1 += r_2[((idx_batch)*chan + idx_chan)*9 + 1]*dy_220[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_2_2 += r_2[((idx_batch)*chan + idx_chan)*9 + 2]*dy_220[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_2_3 += r_2[((idx_batch)*chan + idx_chan)*9 + 3]*dy_220[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_2_4 += r_2[((idx_batch)*chan + idx_chan)*9 + 4]*dy_220[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_2_5 += r_2[((idx_batch)*chan + idx_chan)*9 + 5]*dy_220[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_2_6 += r_2[((idx_batch)*chan + idx_chan)*9 + 6]*dy_220[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_2_7 += r_2[((idx_batch)*chan + idx_chan)*9 + 7]*dy_220[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_2_8 += r_2[((idx_batch)*chan + idx_chan)*9 + 8]*dy_220[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_0_0 += r_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_011[((idx_batch)*chan + idx_chan)*3 + 0] + r_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_011[((idx_batch)*chan + idx_chan)*3 + 1] + r_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_011[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_1_0 += r_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_101[((idx_batch)*chan + idx_chan)*3 + 0];
+      accum_1_1 += r_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_101[((idx_batch)*chan + idx_chan)*3 + 1];
+      accum_1_2 += r_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_101[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_1_0 += r_2[((idx_batch)*chan + idx_chan)*9 + 0]*dy_121[((idx_batch)*chan + idx_chan)*3 + 0] + r_2[((idx_batch)*chan + idx_chan)*9 + 3]*dy_121[((idx_batch)*chan + idx_chan)*3 + 1] + r_2[((idx_batch)*chan + idx_chan)*9 + 6]*dy_121[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_1_1 += r_2[((idx_batch)*chan + idx_chan)*9 + 1]*dy_121[((idx_batch)*chan + idx_chan)*3 + 0] + r_2[((idx_batch)*chan + idx_chan)*9 + 4]*dy_121[((idx_batch)*chan + idx_chan)*3 + 1] + r_2[((idx_batch)*chan + idx_chan)*9 + 7]*dy_121[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_1_2 += r_2[((idx_batch)*chan + idx_chan)*9 + 2]*dy_121[((idx_batch)*chan + idx_chan)*3 + 0] + r_2[((idx_batch)*chan + idx_chan)*9 + 5]*dy_121[((idx_batch)*chan + idx_chan)*3 + 1] + r_2[((idx_batch)*chan + idx_chan)*9 + 8]*dy_121[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_2_0 += r_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_211[((idx_batch)*chan + idx_chan)*3 + 0];
+      accum_2_1 += r_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_211[((idx_batch)*chan + idx_chan)*3 + 0];
+      accum_2_2 += r_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_211[((idx_batch)*chan + idx_chan)*3 + 0];
+      accum_2_3 += r_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_211[((idx_batch)*chan + idx_chan)*3 + 1];
+      accum_2_4 += r_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_211[((idx_batch)*chan + idx_chan)*3 + 1];
+      accum_2_5 += r_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_211[((idx_batch)*chan + idx_chan)*3 + 1];
+      accum_2_6 += r_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_211[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_2_7 += r_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_211[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_2_8 += r_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_211[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_0_0 += r_2[((idx_batch)*chan + idx_chan)*9 + 0]*dy_022[((idx_batch)*chan + idx_chan)*9 + 0] + r_2[((idx_batch)*chan + idx_chan)*9 + 1]*dy_022[((idx_batch)*chan + idx_chan)*9 + 1] + r_2[((idx_batch)*chan + idx_chan)*9 + 2]*dy_022[((idx_batch)*chan + idx_chan)*9 + 2] + r_2[((idx_batch)*chan + idx_chan)*9 + 3]*dy_022[((idx_batch)*chan + idx_chan)*9 + 3] + r_2[((idx_batch)*chan + idx_chan)*9 + 4]*dy_022[((idx_batch)*chan + idx_chan)*9 + 4] + r_2[((idx_batch)*chan + idx_chan)*9 + 5]*dy_022[((idx_batch)*chan + idx_chan)*9 + 5] + r_2[((idx_batch)*chan + idx_chan)*9 + 6]*dy_022[((idx_batch)*chan + idx_chan)*9 + 6] + r_2[((idx_batch)*chan + idx_chan)*9 + 7]*dy_022[((idx_batch)*chan + idx_chan)*9 + 7] + r_2[((idx_batch)*chan + idx_chan)*9 + 8]*dy_022[((idx_batch)*chan + idx_chan)*9 + 8];
+      accum_2_0 += r_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_202[((idx_batch)*chan + idx_chan)*9 + 0];
+      accum_2_1 += r_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_202[((idx_batch)*chan + idx_chan)*9 + 1];
+      accum_2_2 += r_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_202[((idx_batch)*chan + idx_chan)*9 + 2];
+      accum_2_3 += r_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_202[((idx_batch)*chan + idx_chan)*9 + 3];
+      accum_2_4 += r_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_202[((idx_batch)*chan + idx_chan)*9 + 4];
+      accum_2_5 += r_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_202[((idx_batch)*chan + idx_chan)*9 + 5];
+      accum_2_6 += r_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_202[((idx_batch)*chan + idx_chan)*9 + 6];
+      accum_2_7 += r_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_202[((idx_batch)*chan + idx_chan)*9 + 7];
+      accum_2_8 += r_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_202[((idx_batch)*chan + idx_chan)*9 + 8];
+      accum_1_0 += r_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_112[((idx_batch)*chan + idx_chan)*9 + 0] + r_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_112[((idx_batch)*chan + idx_chan)*9 + 1] + r_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_112[((idx_batch)*chan + idx_chan)*9 + 2];
+      accum_1_1 += r_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_112[((idx_batch)*chan + idx_chan)*9 + 3] + r_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_112[((idx_batch)*chan + idx_chan)*9 + 4] + r_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_112[((idx_batch)*chan + idx_chan)*9 + 5];
+      accum_1_2 += r_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_112[((idx_batch)*chan + idx_chan)*9 + 6] + r_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_112[((idx_batch)*chan + idx_chan)*9 + 7] + r_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_112[((idx_batch)*chan + idx_chan)*9 + 8];
+      accum_2_0 += r_2[((idx_batch)*chan + idx_chan)*9 + 0]*dy_222[((idx_batch)*chan + idx_chan)*9 + 0] + r_2[((idx_batch)*chan + idx_chan)*9 + 3]*dy_222[((idx_batch)*chan + idx_chan)*9 + 1] + r_2[((idx_batch)*chan + idx_chan)*9 + 6]*dy_222[((idx_batch)*chan + idx_chan)*9 + 2];
+      accum_2_1 += r_2[((idx_batch)*chan + idx_chan)*9 + 1]*dy_222[((idx_batch)*chan + idx_chan)*9 + 0] + r_2[((idx_batch)*chan + idx_chan)*9 + 4]*dy_222[((idx_batch)*chan + idx_chan)*9 + 1] + r_2[((idx_batch)*chan + idx_chan)*9 + 7]*dy_222[((idx_batch)*chan + idx_chan)*9 + 2];
+      accum_2_2 += r_2[((idx_batch)*chan + idx_chan)*9 + 2]*dy_222[((idx_batch)*chan + idx_chan)*9 + 0] + r_2[((idx_batch)*chan + idx_chan)*9 + 5]*dy_222[((idx_batch)*chan + idx_chan)*9 + 1] + r_2[((idx_batch)*chan + idx_chan)*9 + 8]*dy_222[((idx_batch)*chan + idx_chan)*9 + 2];
+      accum_2_3 += r_2[((idx_batch)*chan + idx_chan)*9 + 0]*dy_222[((idx_batch)*chan + idx_chan)*9 + 3] + r_2[((idx_batch)*chan + idx_chan)*9 + 3]*dy_222[((idx_batch)*chan + idx_chan)*9 + 4] + r_2[((idx_batch)*chan + idx_chan)*9 + 6]*dy_222[((idx_batch)*chan + idx_chan)*9 + 5];
+      accum_2_4 += r_2[((idx_batch)*chan + idx_chan)*9 + 1]*dy_222[((idx_batch)*chan + idx_chan)*9 + 3] + r_2[((idx_batch)*chan + idx_chan)*9 + 4]*dy_222[((idx_batch)*chan + idx_chan)*9 + 4] + r_2[((idx_batch)*chan + idx_chan)*9 + 7]*dy_222[((idx_batch)*chan + idx_chan)*9 + 5];
+      accum_2_5 += r_2[((idx_batch)*chan + idx_chan)*9 + 2]*dy_222[((idx_batch)*chan + idx_chan)*9 + 3] + r_2[((idx_batch)*chan + idx_chan)*9 + 5]*dy_222[((idx_batch)*chan + idx_chan)*9 + 4] + r_2[((idx_batch)*chan + idx_chan)*9 + 8]*dy_222[((idx_batch)*chan + idx_chan)*9 + 5];
+      accum_2_6 += r_2[((idx_batch)*chan + idx_chan)*9 + 0]*dy_222[((idx_batch)*chan + idx_chan)*9 + 6] + r_2[((idx_batch)*chan + idx_chan)*9 + 3]*dy_222[((idx_batch)*chan + idx_chan)*9 + 7] + r_2[((idx_batch)*chan + idx_chan)*9 + 6]*dy_222[((idx_batch)*chan + idx_chan)*9 + 8];
+      accum_2_7 += r_2[((idx_batch)*chan + idx_chan)*9 + 1]*dy_222[((idx_batch)*chan + idx_chan)*9 + 6] + r_2[((idx_batch)*chan + idx_chan)*9 + 4]*dy_222[((idx_batch)*chan + idx_chan)*9 + 7] + r_2[((idx_batch)*chan + idx_chan)*9 + 7]*dy_222[((idx_batch)*chan + idx_chan)*9 + 8];
+      accum_2_8 += r_2[((idx_batch)*chan + idx_chan)*9 + 2]*dy_222[((idx_batch)*chan + idx_chan)*9 + 6] + r_2[((idx_batch)*chan + idx_chan)*9 + 5]*dy_222[((idx_batch)*chan + idx_chan)*9 + 7] + r_2[((idx_batch)*chan + idx_chan)*9 + 8]*dy_222[((idx_batch)*chan + idx_chan)*9 + 8];
+      accum_1_0 += (-1)*r_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_111[((idx_batch)*chan + idx_chan)*3 + 1] + r_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_111[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_1_1 += r_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_111[((idx_batch)*chan + idx_chan)*3 + 0] + (-1)*r_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_111[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_1_2 += (-1)*r_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_111[((idx_batch)*chan + idx_chan)*3 + 0] + r_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_111[((idx_batch)*chan + idx_chan)*3 + 1];
+      accum_2_0 += (-1)*r_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_212[((idx_batch)*chan + idx_chan)*9 + 1] + r_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_212[((idx_batch)*chan + idx_chan)*9 + 2];
+      accum_2_1 += r_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_212[((idx_batch)*chan + idx_chan)*9 + 0] + (-1)*r_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_212[((idx_batch)*chan + idx_chan)*9 + 2];
+      accum_2_2 += (-1)*r_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_212[((idx_batch)*chan + idx_chan)*9 + 0] + r_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_212[((idx_batch)*chan + idx_chan)*9 + 1];
+      accum_2_3 += (-1)*r_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_212[((idx_batch)*chan + idx_chan)*9 + 4] + r_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_212[((idx_batch)*chan + idx_chan)*9 + 5];
+      accum_2_4 += r_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_212[((idx_batch)*chan + idx_chan)*9 + 3] + (-1)*r_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_212[((idx_batch)*chan + idx_chan)*9 + 5];
+      accum_2_5 += (-1)*r_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_212[((idx_batch)*chan + idx_chan)*9 + 3] + r_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_212[((idx_batch)*chan + idx_chan)*9 + 4];
+      accum_2_6 += (-1)*r_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_212[((idx_batch)*chan + idx_chan)*9 + 7] + r_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_212[((idx_batch)*chan + idx_chan)*9 + 8];
+      accum_2_7 += r_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_212[((idx_batch)*chan + idx_chan)*9 + 6] + (-1)*r_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_212[((idx_batch)*chan + idx_chan)*9 + 8];
+      accum_2_8 += (-1)*r_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_212[((idx_batch)*chan + idx_chan)*9 + 6] + r_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_212[((idx_batch)*chan + idx_chan)*9 + 7];
+      dl_0[((idx_batch)*chan + idx_chan)*1 + 0] = accum_0_0;
+      dl_1[((idx_batch)*chan + idx_chan)*3 + 0] = accum_1_0;
+      dl_1[((idx_batch)*chan + idx_chan)*3 + 1] = accum_1_1;
+      dl_1[((idx_batch)*chan + idx_chan)*3 + 2] = accum_1_2;
+      dl_2[((idx_batch)*chan + idx_chan)*9 + 0] = accum_2_0;
+      dl_2[((idx_batch)*chan + idx_chan)*9 + 1] = accum_2_1;
+      dl_2[((idx_batch)*chan + idx_chan)*9 + 2] = accum_2_2;
+      dl_2[((idx_batch)*chan + idx_chan)*9 + 3] = accum_2_3;
+      dl_2[((idx_batch)*chan + idx_chan)*9 + 4] = accum_2_4;
+      dl_2[((idx_batch)*chan + idx_chan)*9 + 5] = accum_2_5;
+      dl_2[((idx_batch)*chan + idx_chan)*9 + 6] = accum_2_6;
+      dl_2[((idx_batch)*chan + idx_chan)*9 + 7] = accum_2_7;
+      dl_2[((idx_batch)*chan + idx_chan)*9 + 8] = accum_2_8;
+    }
+  }
+}
+
+
+void bee_bwl(
+    int batch, int chan,
+    const float* r_0, const float* r_1, const float* r_2, const float* dy_000, const float* dy_110, const float* dy_220, const float* dy_011, const float* dy_101, const float* dy_121, const float* dy_211, const float* dy_022, const float* dy_202, const float* dy_112, const float* dy_222, const float* dy_111, const float* dy_212,
+    float* dl_0, float* dl_1, float* dl_2) {
+  
+  
+  int sharedmemsz = 0;
+  dim3 gridsz = dim3(batch);
+  dim3 blocksz = dim3(WARPSZ);
+  bee_bwl_kern<<<gridsz, blocksz, sharedmemsz*sizeof(float)>>>(
+      
+      batch, chan,
+      r_0, r_1, r_2, dy_000, dy_110, dy_220, dy_011, dy_101, dy_121, dy_211, dy_022, dy_202, dy_112, dy_222, dy_111, dy_212,
+      dl_0, dl_1, dl_2);
+  
+}
+
+
+__global__
+void bee_bwr_kern(
+    // <<<(batch), (WARPSZ)>>>
+    
+    int batch, int chan,
+    const float* l_0, const float* l_1, const float* l_2, const float* dy_000, const float* dy_110, const float* dy_220, const float* dy_011, const float* dy_101, const float* dy_121, const float* dy_211, const float* dy_022, const float* dy_202, const float* dy_112, const float* dy_222, const float* dy_111, const float* dy_212,
+    float* __restrict__ dr_0, float* __restrict__ dr_1, float* __restrict__ dr_2) {
+  extern __shared__ float s[];
+  for (int idx_batch = blockIdx.x; idx_batch < batch; idx_batch += gridDim.x) {
+    for (int idx_chan = threadIdx.x; idx_chan < chan; idx_chan += blockDim.x) {
+      float accum_0_0 = 0.0;
+      float accum_1_0 = 0.0;
+      float accum_1_1 = 0.0;
+      float accum_1_2 = 0.0;
+      float accum_2_0 = 0.0;
+      float accum_2_1 = 0.0;
+      float accum_2_2 = 0.0;
+      float accum_2_3 = 0.0;
+      float accum_2_4 = 0.0;
+      float accum_2_5 = 0.0;
+      float accum_2_6 = 0.0;
+      float accum_2_7 = 0.0;
+      float accum_2_8 = 0.0;
+      accum_0_0 += l_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_000[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_1_0 += l_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_110[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_1_1 += l_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_110[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_1_2 += l_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_110[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_2_0 += l_2[((idx_batch)*chan + idx_chan)*9 + 0]*dy_220[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_2_1 += l_2[((idx_batch)*chan + idx_chan)*9 + 1]*dy_220[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_2_2 += l_2[((idx_batch)*chan + idx_chan)*9 + 2]*dy_220[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_2_3 += l_2[((idx_batch)*chan + idx_chan)*9 + 3]*dy_220[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_2_4 += l_2[((idx_batch)*chan + idx_chan)*9 + 4]*dy_220[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_2_5 += l_2[((idx_batch)*chan + idx_chan)*9 + 5]*dy_220[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_2_6 += l_2[((idx_batch)*chan + idx_chan)*9 + 6]*dy_220[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_2_7 += l_2[((idx_batch)*chan + idx_chan)*9 + 7]*dy_220[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_2_8 += l_2[((idx_batch)*chan + idx_chan)*9 + 8]*dy_220[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_1_0 += l_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_011[((idx_batch)*chan + idx_chan)*3 + 0];
+      accum_1_1 += l_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_011[((idx_batch)*chan + idx_chan)*3 + 1];
+      accum_1_2 += l_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_011[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_0_0 += l_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_101[((idx_batch)*chan + idx_chan)*3 + 0] + l_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_101[((idx_batch)*chan + idx_chan)*3 + 1] + l_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_101[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_2_0 += l_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_121[((idx_batch)*chan + idx_chan)*3 + 0];
+      accum_2_1 += l_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_121[((idx_batch)*chan + idx_chan)*3 + 0];
+      accum_2_2 += l_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_121[((idx_batch)*chan + idx_chan)*3 + 0];
+      accum_2_3 += l_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_121[((idx_batch)*chan + idx_chan)*3 + 1];
+      accum_2_4 += l_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_121[((idx_batch)*chan + idx_chan)*3 + 1];
+      accum_2_5 += l_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_121[((idx_batch)*chan + idx_chan)*3 + 1];
+      accum_2_6 += l_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_121[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_2_7 += l_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_121[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_2_8 += l_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_121[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_1_0 += l_2[((idx_batch)*chan + idx_chan)*9 + 0]*dy_211[((idx_batch)*chan + idx_chan)*3 + 0] + l_2[((idx_batch)*chan + idx_chan)*9 + 3]*dy_211[((idx_batch)*chan + idx_chan)*3 + 1] + l_2[((idx_batch)*chan + idx_chan)*9 + 6]*dy_211[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_1_1 += l_2[((idx_batch)*chan + idx_chan)*9 + 1]*dy_211[((idx_batch)*chan + idx_chan)*3 + 0] + l_2[((idx_batch)*chan + idx_chan)*9 + 4]*dy_211[((idx_batch)*chan + idx_chan)*3 + 1] + l_2[((idx_batch)*chan + idx_chan)*9 + 7]*dy_211[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_1_2 += l_2[((idx_batch)*chan + idx_chan)*9 + 2]*dy_211[((idx_batch)*chan + idx_chan)*3 + 0] + l_2[((idx_batch)*chan + idx_chan)*9 + 5]*dy_211[((idx_batch)*chan + idx_chan)*3 + 1] + l_2[((idx_batch)*chan + idx_chan)*9 + 8]*dy_211[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_2_0 += l_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_022[((idx_batch)*chan + idx_chan)*9 + 0];
+      accum_2_1 += l_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_022[((idx_batch)*chan + idx_chan)*9 + 1];
+      accum_2_2 += l_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_022[((idx_batch)*chan + idx_chan)*9 + 2];
+      accum_2_3 += l_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_022[((idx_batch)*chan + idx_chan)*9 + 3];
+      accum_2_4 += l_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_022[((idx_batch)*chan + idx_chan)*9 + 4];
+      accum_2_5 += l_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_022[((idx_batch)*chan + idx_chan)*9 + 5];
+      accum_2_6 += l_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_022[((idx_batch)*chan + idx_chan)*9 + 6];
+      accum_2_7 += l_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_022[((idx_batch)*chan + idx_chan)*9 + 7];
+      accum_2_8 += l_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_022[((idx_batch)*chan + idx_chan)*9 + 8];
+      accum_0_0 += l_2[((idx_batch)*chan + idx_chan)*9 + 0]*dy_202[((idx_batch)*chan + idx_chan)*9 + 0] + l_2[((idx_batch)*chan + idx_chan)*9 + 1]*dy_202[((idx_batch)*chan + idx_chan)*9 + 1] + l_2[((idx_batch)*chan + idx_chan)*9 + 2]*dy_202[((idx_batch)*chan + idx_chan)*9 + 2] + l_2[((idx_batch)*chan + idx_chan)*9 + 3]*dy_202[((idx_batch)*chan + idx_chan)*9 + 3] + l_2[((idx_batch)*chan + idx_chan)*9 + 4]*dy_202[((idx_batch)*chan + idx_chan)*9 + 4] + l_2[((idx_batch)*chan + idx_chan)*9 + 5]*dy_202[((idx_batch)*chan + idx_chan)*9 + 5] + l_2[((idx_batch)*chan + idx_chan)*9 + 6]*dy_202[((idx_batch)*chan + idx_chan)*9 + 6] + l_2[((idx_batch)*chan + idx_chan)*9 + 7]*dy_202[((idx_batch)*chan + idx_chan)*9 + 7] + l_2[((idx_batch)*chan + idx_chan)*9 + 8]*dy_202[((idx_batch)*chan + idx_chan)*9 + 8];
+      accum_1_0 += l_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_112[((idx_batch)*chan + idx_chan)*9 + 0] + l_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_112[((idx_batch)*chan + idx_chan)*9 + 3] + l_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_112[((idx_batch)*chan + idx_chan)*9 + 6];
+      accum_1_1 += l_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_112[((idx_batch)*chan + idx_chan)*9 + 1] + l_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_112[((idx_batch)*chan + idx_chan)*9 + 4] + l_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_112[((idx_batch)*chan + idx_chan)*9 + 7];
+      accum_1_2 += l_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_112[((idx_batch)*chan + idx_chan)*9 + 2] + l_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_112[((idx_batch)*chan + idx_chan)*9 + 5] + l_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_112[((idx_batch)*chan + idx_chan)*9 + 8];
+      accum_2_0 += l_2[((idx_batch)*chan + idx_chan)*9 + 0]*dy_222[((idx_batch)*chan + idx_chan)*9 + 0] + l_2[((idx_batch)*chan + idx_chan)*9 + 3]*dy_222[((idx_batch)*chan + idx_chan)*9 + 3] + l_2[((idx_batch)*chan + idx_chan)*9 + 6]*dy_222[((idx_batch)*chan + idx_chan)*9 + 6];
+      accum_2_1 += l_2[((idx_batch)*chan + idx_chan)*9 + 1]*dy_222[((idx_batch)*chan + idx_chan)*9 + 0] + l_2[((idx_batch)*chan + idx_chan)*9 + 4]*dy_222[((idx_batch)*chan + idx_chan)*9 + 3] + l_2[((idx_batch)*chan + idx_chan)*9 + 7]*dy_222[((idx_batch)*chan + idx_chan)*9 + 6];
+      accum_2_2 += l_2[((idx_batch)*chan + idx_chan)*9 + 2]*dy_222[((idx_batch)*chan + idx_chan)*9 + 0] + l_2[((idx_batch)*chan + idx_chan)*9 + 5]*dy_222[((idx_batch)*chan + idx_chan)*9 + 3] + l_2[((idx_batch)*chan + idx_chan)*9 + 8]*dy_222[((idx_batch)*chan + idx_chan)*9 + 6];
+      accum_2_3 += l_2[((idx_batch)*chan + idx_chan)*9 + 0]*dy_222[((idx_batch)*chan + idx_chan)*9 + 1] + l_2[((idx_batch)*chan + idx_chan)*9 + 3]*dy_222[((idx_batch)*chan + idx_chan)*9 + 4] + l_2[((idx_batch)*chan + idx_chan)*9 + 6]*dy_222[((idx_batch)*chan + idx_chan)*9 + 7];
+      accum_2_4 += l_2[((idx_batch)*chan + idx_chan)*9 + 1]*dy_222[((idx_batch)*chan + idx_chan)*9 + 1] + l_2[((idx_batch)*chan + idx_chan)*9 + 4]*dy_222[((idx_batch)*chan + idx_chan)*9 + 4] + l_2[((idx_batch)*chan + idx_chan)*9 + 7]*dy_222[((idx_batch)*chan + idx_chan)*9 + 7];
+      accum_2_5 += l_2[((idx_batch)*chan + idx_chan)*9 + 2]*dy_222[((idx_batch)*chan + idx_chan)*9 + 1] + l_2[((idx_batch)*chan + idx_chan)*9 + 5]*dy_222[((idx_batch)*chan + idx_chan)*9 + 4] + l_2[((idx_batch)*chan + idx_chan)*9 + 8]*dy_222[((idx_batch)*chan + idx_chan)*9 + 7];
+      accum_2_6 += l_2[((idx_batch)*chan + idx_chan)*9 + 0]*dy_222[((idx_batch)*chan + idx_chan)*9 + 2] + l_2[((idx_batch)*chan + idx_chan)*9 + 3]*dy_222[((idx_batch)*chan + idx_chan)*9 + 5] + l_2[((idx_batch)*chan + idx_chan)*9 + 6]*dy_222[((idx_batch)*chan + idx_chan)*9 + 8];
+      accum_2_7 += l_2[((idx_batch)*chan + idx_chan)*9 + 1]*dy_222[((idx_batch)*chan + idx_chan)*9 + 2] + l_2[((idx_batch)*chan + idx_chan)*9 + 4]*dy_222[((idx_batch)*chan + idx_chan)*9 + 5] + l_2[((idx_batch)*chan + idx_chan)*9 + 7]*dy_222[((idx_batch)*chan + idx_chan)*9 + 8];
+      accum_2_8 += l_2[((idx_batch)*chan + idx_chan)*9 + 2]*dy_222[((idx_batch)*chan + idx_chan)*9 + 2] + l_2[((idx_batch)*chan + idx_chan)*9 + 5]*dy_222[((idx_batch)*chan + idx_chan)*9 + 5] + l_2[((idx_batch)*chan + idx_chan)*9 + 8]*dy_222[((idx_batch)*chan + idx_chan)*9 + 8];
+      accum_1_0 += l_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_111[((idx_batch)*chan + idx_chan)*3 + 1] + (-1)*l_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_111[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_1_1 += (-1)*l_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_111[((idx_batch)*chan + idx_chan)*3 + 0] + l_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_111[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_1_2 += l_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_111[((idx_batch)*chan + idx_chan)*3 + 0] + (-1)*l_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_111[((idx_batch)*chan + idx_chan)*3 + 1];
+      accum_1_0 += l_2[((idx_batch)*chan + idx_chan)*9 + 2]*dy_212[((idx_batch)*chan + idx_chan)*9 + 1] + (-1)*l_2[((idx_batch)*chan + idx_chan)*9 + 1]*dy_212[((idx_batch)*chan + idx_chan)*9 + 2] + l_2[((idx_batch)*chan + idx_chan)*9 + 5]*dy_212[((idx_batch)*chan + idx_chan)*9 + 4] + (-1)*l_2[((idx_batch)*chan + idx_chan)*9 + 4]*dy_212[((idx_batch)*chan + idx_chan)*9 + 5] + l_2[((idx_batch)*chan + idx_chan)*9 + 8]*dy_212[((idx_batch)*chan + idx_chan)*9 + 7] + (-1)*l_2[((idx_batch)*chan + idx_chan)*9 + 7]*dy_212[((idx_batch)*chan + idx_chan)*9 + 8];
+      accum_1_1 += (-1)*l_2[((idx_batch)*chan + idx_chan)*9 + 2]*dy_212[((idx_batch)*chan + idx_chan)*9 + 0] + l_2[((idx_batch)*chan + idx_chan)*9 + 0]*dy_212[((idx_batch)*chan + idx_chan)*9 + 2] + (-1)*l_2[((idx_batch)*chan + idx_chan)*9 + 5]*dy_212[((idx_batch)*chan + idx_chan)*9 + 3] + l_2[((idx_batch)*chan + idx_chan)*9 + 3]*dy_212[((idx_batch)*chan + idx_chan)*9 + 5] + (-1)*l_2[((idx_batch)*chan + idx_chan)*9 + 8]*dy_212[((idx_batch)*chan + idx_chan)*9 + 6] + l_2[((idx_batch)*chan + idx_chan)*9 + 6]*dy_212[((idx_batch)*chan + idx_chan)*9 + 8];
+      accum_1_2 += l_2[((idx_batch)*chan + idx_chan)*9 + 1]*dy_212[((idx_batch)*chan + idx_chan)*9 + 0] + (-1)*l_2[((idx_batch)*chan + idx_chan)*9 + 0]*dy_212[((idx_batch)*chan + idx_chan)*9 + 1] + l_2[((idx_batch)*chan + idx_chan)*9 + 4]*dy_212[((idx_batch)*chan + idx_chan)*9 + 3] + (-1)*l_2[((idx_batch)*chan + idx_chan)*9 + 3]*dy_212[((idx_batch)*chan + idx_chan)*9 + 4] + l_2[((idx_batch)*chan + idx_chan)*9 + 7]*dy_212[((idx_batch)*chan + idx_chan)*9 + 6] + (-1)*l_2[((idx_batch)*chan + idx_chan)*9 + 6]*dy_212[((idx_batch)*chan + idx_chan)*9 + 7];
+      dr_0[((idx_batch)*chan + idx_chan)*1 + 0] = accum_0_0;
+      dr_1[((idx_batch)*chan + idx_chan)*3 + 0] = accum_1_0;
+      dr_1[((idx_batch)*chan + idx_chan)*3 + 1] = accum_1_1;
+      dr_1[((idx_batch)*chan + idx_chan)*3 + 2] = accum_1_2;
+      dr_2[((idx_batch)*chan + idx_chan)*9 + 0] = accum_2_0;
+      dr_2[((idx_batch)*chan + idx_chan)*9 + 1] = accum_2_1;
+      dr_2[((idx_batch)*chan + idx_chan)*9 + 2] = accum_2_2;
+      dr_2[((idx_batch)*chan + idx_chan)*9 + 3] = accum_2_3;
+      dr_2[((idx_batch)*chan + idx_chan)*9 + 4] = accum_2_4;
+      dr_2[((idx_batch)*chan + idx_chan)*9 + 5] = accum_2_5;
+      dr_2[((idx_batch)*chan + idx_chan)*9 + 6] = accum_2_6;
+      dr_2[((idx_batch)*chan + idx_chan)*9 + 7] = accum_2_7;
+      dr_2[((idx_batch)*chan + idx_chan)*9 + 8] = accum_2_8;
+    }
+  }
+}
+
+
+void bee_bwr(
+    int batch, int chan,
+    const float* l_0, const float* l_1, const float* l_2, const float* dy_000, const float* dy_110, const float* dy_220, const float* dy_011, const float* dy_101, const float* dy_121, const float* dy_211, const float* dy_022, const float* dy_202, const float* dy_112, const float* dy_222, const float* dy_111, const float* dy_212,
+    float* dr_0, float* dr_1, float* dr_2) {
+  
+  
+  int sharedmemsz = 0;
+  dim3 gridsz = dim3(batch);
+  dim3 blocksz = dim3(WARPSZ);
+  bee_bwr_kern<<<gridsz, blocksz, sharedmemsz*sizeof(float)>>>(
+      
+      batch, chan,
+      l_0, l_1, l_2, dy_000, dy_110, dy_220, dy_011, dy_101, dy_121, dy_211, dy_022, dy_202, dy_112, dy_222, dy_111, dy_212,
+      dr_0, dr_1, dr_2);
+  
+}
+
+
 void set_kern_attributes() {
   cudaFuncSetAttribute(fused_tensor_prods_example_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
   cudaFuncSetAttribute(fused_tensor_prods_example_backward_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
@@ -3818,4 +4152,7 @@ void set_kern_attributes() {
   cudaFuncSetAttribute(ant16_oc_backward_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
   cudaFuncSetAttribute(ant16_oc_backleft_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
   cudaFuncSetAttribute(ant16_oc_wtsback_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
+  cudaFuncSetAttribute(bee_fwd_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
+  cudaFuncSetAttribute(bee_bwl_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
+  cudaFuncSetAttribute(bee_bwr_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
 }
