@@ -70,6 +70,32 @@ def turn_on_actv_size_printing(module:torch.nn.Module):
     mod.register_forward_hook(fwd_hook)
 
 
+# MODEL GRADIENT SIZE PRINTER
+def turn_on_grad_size_printing(module:torch.nn.Module):
+  for name, mod in module.named_modules():
+    depth = len(name.split("."))
+    def bwd_hook(m, grad_args, grad_outs, curr_mod_name=name, curr_mod_depth=depth):
+      def tostr(arg):
+        if isinstance(arg, torch.Tensor):
+          return str(typsz(arg))
+        elif isinstance(arg, tuple):
+          return f"({', '.join([tostr(subarg) for subarg in arg])})"
+        else:
+          return "_"
+      if not isinstance(grad_outs, tuple):
+        outs = grad_outs,
+      arg_szs = ", ".join([
+        tostr(arg)
+        for arg in grad_args
+      ])
+      out_szs = ", ".join([
+        tostr(out)
+        for out in grad_outs
+      ])
+      print("  "*curr_mod_depth + f"{curr_mod_name}({arg_szs}) <- ({out_szs})")
+    mod.register_full_backward_hook(bwd_hook)
+
+
 # OTHER STUFF...
 
 class PrintTiming:
