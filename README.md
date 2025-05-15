@@ -33,8 +33,9 @@ Here we show how to create a virutalenv that has the needed packages. Work in pr
 * Extensions:
     * Go into each extension's directory under `extensions/`
     * `pip install .`
+    * This will usually work. If you're on a cluster and ssh'd into a non-gpu node, then you may get an error complaining about a lack of `$CUDA_HOME`. The fix here is to just install these extensions while logged into a gpu node. Don't forget to run `source bin/activate` again.
 * atoms-display:
-    * You only need this if your want to visualize trajectories. It depends on [pyopengl](https://pypi.org/project/PyOpenGL/).
+    * You only need this if you want to visualize trajectories. It depends on [pyopengl](https://pypi.org/project/PyOpenGL/).
     * Try this first: `pip install PyOpenGL PyOpenGL_accelerate`
     * If this results in an error like: "numpy.dtype size changed, may indicate binary incompatibility", it means that
       the version of pyopengl on pypi is out of date for the current numpy version. Fix is to just install the latest
@@ -48,4 +49,5 @@ Here we show how to create a virutalenv that has the needed packages. Work in pr
     * If you want more customization, check the docs:
       http://docs.openmm.org/latest/userguide/application/01_getting_started.html#installing-openmm
 * HOOMD:
+    * This is very optional, you probably don't want to install it.
     * Good luck: https://hoomd-blue.readthedocs.io/en/v5.0.0/getting-started.html
