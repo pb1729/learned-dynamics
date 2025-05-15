@@ -50,5 +50,6 @@ with open("codegen_tensops_kern.cu", "w") as f:
     f.write("\n\n")
   f.write("void set_kern_attributes() {\n")
   for function in functions:
-    f.write(f"  cudaFuncSetAttribute({function.fnname}_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);\n")
+    if "ant" in function.fnname: # only needed for the memory-hungry "ant" functions.
+      f.write(f"  cudaFuncSetAttribute({function.fnname}_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);\n")
   f.write("}")

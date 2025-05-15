@@ -4132,10 +4132,6 @@ void bee_bwr(
 
 
 void set_kern_attributes() {
-  cudaFuncSetAttribute(fused_tensor_prods_example_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
-  cudaFuncSetAttribute(fused_tensor_prods_example_backward_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
-  cudaFuncSetAttribute(fused_tensor_prods_example_backleft_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
-  cudaFuncSetAttribute(fused_tensor_prods_example_wtsback_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
   cudaFuncSetAttribute(ant16_o0_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
   cudaFuncSetAttribute(ant16_o0_backward_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
   cudaFuncSetAttribute(ant16_o0_backleft_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
@@ -4152,7 +4148,4 @@ void set_kern_attributes() {
   cudaFuncSetAttribute(ant16_oc_backward_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
   cudaFuncSetAttribute(ant16_oc_backleft_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
   cudaFuncSetAttribute(ant16_oc_wtsback_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
-  cudaFuncSetAttribute(bee_fwd_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
-  cudaFuncSetAttribute(bee_bwl_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
-  cudaFuncSetAttribute(bee_bwr_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
 }

@@ -9,7 +9,9 @@ from codegen_tensops_cuda import (set_kern_attributes,
 )
 
 # initialize the module (so that we have enough shared memory)
-set_kern_attributes()
+#set_kern_attributes()
+# above is currently commented because we only need it to pass wide tensors to Ant16. Since
+# the most current models use Bee, it would just result in needless incompatibility with systems with older GPUs.
 
 
 class Ant16(torch.autograd.Function):
