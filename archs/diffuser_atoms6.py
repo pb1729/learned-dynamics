@@ -41,11 +41,11 @@ def add_tens_prod_submodules(self, dim_a, dim_v, dim_d, chan):
   self.Y_111 = TensLinear(1, chan, dim_v)
   self.Y_212 = TensLinear(2, chan, dim_d)
 
-@torch.compile
+@torch.compile(dynamic=True)
 def torch_sum_3(X1:torch.Tensor, X2:torch.Tensor, X3:torch.Tensor):
   return X1 + X2 + X3
 
-@torch.compile
+@torch.compile(dynamic=True)
 def torch_sum_5(X1:torch.Tensor, X2:torch.Tensor, X3:torch.Tensor, X4:torch.Tensor, X5:torch.Tensor):
   return X1 + X2 + X3 + X4 + X5
 
