@@ -18,9 +18,9 @@ from managan.flavour_layers import ResiduesEncodeV2, ResidueAtomEmbed, LinAminoT
 from managan.predictor import ModelState
 
 
-def graph_setup(r0:float, box:Tuple[float, float, float], pos:torch.Tensor):
+def graph_setup(r0:float, box:Tuple[float, float, float], pos:torch.Tensor, neighbours_max:int=64):
   tensbox = torch.tensor(box, device="cuda")
-  graph = Graph.radius_graph(r0, box, pos)
+  graph = Graph.radius_graph(r0, box, pos, neighbours_max=neighbours_max)
   pos_src, pos_dst = edges_read(graph, pos)
   r_ij = boxwrap(tensbox, pos_dst - pos_src)
   return graph, r_ij
@@ -365,6 +365,10 @@ class Block(nn.Module):
     dim_a, dim_v, dim_d, chan = config["dim_a"], config["dim_v"], config["dim_d"], config["chan"]
     self.pos_1_mutable:bool = pos_1_mutable
     self.r0:float = config["r_cut"] # cutoff radius for atom interactions
+    if "neighbours_max" in config:
+      self.neighbours_max = config["neighbours_max"]
+    else:
+      self.neighbours_max = 64
     # submodules:
     self.embed_t = TimeEmbedding(config["t_embed_hdim"], dim_a)
     self.pos_embed = PosEmbed(dim_v)
@@ -388,10 +392,10 @@ class Block(nn.Module):
     pos_1, graph_1, r_ij_1 = pos_1_tup
     # graph setup
     if graph_0 is None: # pos_0 was modified since graph was last computed
-      graph_0, r_ij_0 = graph_setup(self.r0, box, pos_0)
+      graph_0, r_ij_0 = graph_setup(self.r0, box, pos_0, neighbours_max=self.neighbours_max)
       pos_0_tup = pos_0, graph_0, r_ij_0
     if graph_1 is None: # pos_1 was modified since graph was last computed
-      graph_1, r_ij_1 = graph_setup(self.r0, box, pos_1)
+      graph_1, r_ij_1 = graph_setup(self.r0, box, pos_1, neighbours_max=self.neighbours_max)
       pos_1_tup = pos_1, graph_1, r_ij_1
     # ACE subblock
     Δx_a, Δx_v, Δx_d = self.sub_block((
