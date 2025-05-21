@@ -448,6 +448,10 @@ class Generator(nn.Module):
   def __init__(self, config, randgen:TensorRandGen):
     super().__init__()
     self.dim_a, self.dim_v, self.dim_d = config["dim_a"], config["dim_v"], config["dim_d"]
+    self.gen_initial_noise = None
+    if "gen_initial_noise" in config:
+      self.gen_initial_noise = config["gen_initial_noise"]
+    self.randgen = randgen
     # submodules
     self.blocks = nn.Sequential(*[
       Block(config, False, randgen, pos_1_mutable=True)
@@ -458,6 +462,9 @@ class Generator(nn.Module):
     batch,          atoms,          must_be[3] = pos_0.shape
     aminos = len(metadata.seq)
     pos_0 = pos_0.contiguous()
+    pos_1 = pos_0
+    if self.gen_initial_noise is not None:
+      pos_1 = pos_1 + self.gen_initial_noise*self.randgen.randn(1, pos_0.shape[:-1])
     # run the main network
     contexttup = box, metadata
     xtup = (
@@ -469,7 +476,7 @@ class Generator(nn.Module):
       torch.zeros(batch, aminos, self.dim_v, 3, device=device),
       torch.zeros(batch, aminos, self.dim_d, 3, 3, device=device))
     pos_0_tup = pos_0, None, None
-    pos_1_tup = pos_0, None, None
+    pos_1_tup = pos_1, None, None
     tup = 0., contexttup, xtup, ytup, pos_0_tup, pos_1_tup
     tup = self.blocks(tup)
     E, contexttup, xtup, ytup, pos_0_tup, pos_1_tup = tup

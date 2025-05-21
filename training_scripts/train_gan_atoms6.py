@@ -26,6 +26,8 @@ training_run("models/%s_%s.%s.pt" % (RUN_ID, sim_name, ARCH),
       "lpen_wt": 1.0,
       "beta_1": 0., "beta_2": 0.99, "weight_decay": 0.001,
       "hinge": True, "hinge_leak": 0.1,
+      # generator settings
+      "gen_initial_noise": 7.,
       # interval stuff
       "ndiscs": 3,
       # arch params:
