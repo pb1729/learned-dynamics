@@ -9,6 +9,7 @@ from .run_visualization import TensorBoard
 from .config import Config, load, save, makenew
 from .predictor import ModelState
 from .sim_utils import OpenMMSimError
+from .statefiles import DatasetError
 
 
 def dataset_gen(config):
@@ -25,11 +26,17 @@ def dataset_gen(config):
       except RuntimeError as e:
         print("Got an error while generating training data...")
         print(e)
+        data_queue.put(None) # stop the training run
         raise e
       except OpenMMSimError as e:
         print("Got an OpenMM error while generating training data...")
         print(e.child)
         print("We will try ignoring and continuing...")
+      except DatasetError as e:
+        print("Got a dataset error while generating training data... Terminating run!")
+        print(e)
+        data_queue.put(None) # stop the training run
+        return
       else:
         data_queue.put(trajs)
       try:
@@ -70,6 +77,8 @@ def train(model, save_path):
     checkpoints = []
   for i in itertools.count():
     trajs = data_generator.send(None if i < nsteps else True)
+    if trajs is None: # None indicates we can't get more data and should end the training run!
+      break
     # main training step
     trainer.step(i, trajs)
     # save a checkpoint

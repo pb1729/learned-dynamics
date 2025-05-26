@@ -9,6 +9,10 @@ import random
 from .predictor import State, Predictor, ModelState
 
 
+class DatasetError(Exception):
+  pass
+
+
 def save_state_to_file(file:BufferedWriter, state:ModelState):
   # deconstruct state
   metadata = state.metadata
@@ -80,7 +84,8 @@ class DatasetPredictor(Predictor):
   def shape(self):
     return self._shape
   def sample_q(self, batch):
-    assert self.file_index < len(self.file_list), "out of files in dataset!"
+    if not self.file_index < len(self.file_list):
+      raise DatasetError("out of files in dataset!")
     ans = DatasetState(path.join(self.dataset_dir, self.file_list[self.file_index]))
     self.file_index += 1
     saved_batch, = ans.size
