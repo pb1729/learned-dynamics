@@ -1,4 +1,4 @@
-from typing_extensions import Tuple, List, Optional
+from typing_extensions import Tuple, List, Optional, Union
 
 import numpy as np
 import torch
@@ -279,7 +279,7 @@ class GaussELBORandgen:
         ans += 0.5*(cov + mu*mu - torch.log(cov))
       elif inds == 1:
         cov = torch.einsum("...ik,...jk->...ij", trans, trans)
-        ans += 0.5*(torch.einsum("...ii->...", cov) + (mu*mu).sum(-1) - torch.log(torch.det(trans)**2))
+        ans += 0.5*(torch.einsum("...ii->...", cov) + (mu*mu).sum(-1) - torch.log(torch.det(trans)**2 + 1e-6))
       else:
         assert False, f"Can't compute ELBO loss for {inds} indices."
     return ans
@@ -423,7 +423,7 @@ class Block(nn.Module):
   K_DISC = 0
   K_GEN = 1
   K_ENC = 2
-  def __init__(self, config:Config, kind:int, randgen:(TensorRandGen|GaussELBORandgen)):
+  def __init__(self, config:Config, kind:int, randgen:Union[None, TensorRandGen, GaussELBORandgen]):
     super().__init__()
     dim_a, dim_v, dim_d, chan = config["dim_a"], config["dim_v"], config["dim_d"], config["chan"]
     self.zdim_0, self.zdim_1 = config["zdim_0"], config["zdim_1"]
@@ -724,7 +724,8 @@ class WGAN3D:
     x_0, x_1 = x[:-1].reshape((L - 1)*batch, atoms, 3), x[1:].reshape((L - 1)*batch, atoms, 3)
     z = self.enc(x_0, x_1, self.box, metadata)
     x_dec, loss_elbo = self.dec(x_0, z, self.box, metadata)
-    loss_recons = ((x_dec - x_1)**2).sum(-1).sum(-1).mean()
+    lambda_rec = self.config["lambda_rec"] if "lambda_rec" in self.config else 1.0
+    loss_recons = lambda_rec*((x_dec - x_1)**2).sum(-1).mean()
     loss_elbo = self.config["lambda_elbo"]*loss_elbo.mean()
     loss = loss_recons + loss_elbo
     self.optim_enc.zero_grad()
@@ -760,3 +761,5 @@ class GANTrainer:
 # export model class and trainer class:
 modelclass   = WGAN3D
 trainerclass = GANTrainer
+
+
