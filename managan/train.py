@@ -80,7 +80,11 @@ def train(model, save_path):
     if trajs is None: # None indicates we can't get more data and should end the training run!
       break
     # main training step
-    trainer.step(i, trajs)
+    try:
+      trainer.step(i, trajs)
+    except Exception as e:
+      data_generator.send(True) # halt training
+      raise e
     # save a checkpoint
     if (i + 1) % config.save_every == 0:
       config.trained_for = i + 1
