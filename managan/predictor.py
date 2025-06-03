@@ -156,7 +156,8 @@ class ModelState(State):
       return None
 class ModelPredictor(Predictor):
   def __init__(self, model):
-    model.set_eval(True)
+    if hasattr(model, "set_eval"):
+      model.set_eval(True)
     self.model = model
   def shape(self):
     return self.model.config.predictor.shape()
