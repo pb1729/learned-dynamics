@@ -16,6 +16,7 @@ from .seq2pdbchain.amino_data import letter_code, structures
 from .seq2pdbchain.seq2pdbchain import pdb_chain
 from .sim_utils import RegexDict, OpenMMMetadata
 from .amino_seq_markov import generate_seq
+from .lettergen import chunked_letters
 
 
 # constants
@@ -99,6 +100,18 @@ def get_get_mutated_seq(lmin:int, lmax:int, seqs_envvar_nm:str, cutsz:int=10):
           yield long_seq
       else:
         yield seq
+  seqgen = mutated_seq_generator()
+  def get_mutated_seq():
+    return next(seqgen)
+  return get_mutated_seq
+
+def get_get_mutated_seq2(lmin:int, lmax:int, seqs_envvar_nm:str):
+  def mutated_seq_generator():
+    seqsfnm = os.environ.get(seqs_envvar_nm)
+    if seqsfnm is None:
+      raise ValueError(f"Environment variable {seqs_envvar_nm} not set")
+    for seq in chunked_letters(lmin, lmax, seqsfnm):
+      yield seq
   seqgen = mutated_seq_generator()
   def get_mutated_seq():
     return next(seqgen)
@@ -189,6 +202,7 @@ openmm_sims = RegexDict(
   # A_ sims have T at 300K. example: A_t6000_L40_m20_M60
   ("A_t%d_L%d_m%d_M%d", lambda t, L, m, M: OpenMMConfig(t, float(L), 300., get_get_random_seq(m, M), FF_DEFAULT)),
   ("B_t%d_L%d_m%d_M%d", lambda t, L, m, M: OpenMMConfig(t, float(L), 300., get_get_mutated_seq(m, M, "MANAGAN_SEQS_LOC"), FF_DEFAULT)),
+  ("C_t%d_L%d_m%d_M%d", lambda t, L, m, M: OpenMMConfig(t, float(L), 300., get_get_mutated_seq2(m, M, "MANAGAN_SEQS_LOC"), FF_DEFAULT)),
   ("SEQ_t%d_L%d_seq%Q", lambda t, L, seq: OpenMMConfig(t, float(L), 300., lambda: seq, FF_DEFAULT)),
   ("SEQ_DRY_t%d_seq%Q", lambda t, seq: OpenMMConfig(t, float("inf"), 300., lambda: seq, FF_DRY, implicit_water=True))
 )
