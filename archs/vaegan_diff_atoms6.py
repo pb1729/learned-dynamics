@@ -770,7 +770,7 @@ class WGAN3D:
     x_0, x_1 = x[:-1].reshape((L - 1)*batch, atoms, 3), x[1:].reshape((L - 1)*batch, atoms, 3)
     z = self.enc(x_0, x_1, self.box, metadata)
     x_dec, loss_elbo = self.dec(x_0, z, self.box, metadata)
-    loss_recons = ((x_dec - x_1)**2).sum(-1).sum(-1).mean()
+    loss_recons = ((x_dec - x_1)**2).sum(-1).mean()
     loss_elbo = self.config["lambda_elbo"]*loss_elbo.mean()
     loss = loss_recons + loss_elbo
     self.optim_enc.zero_grad()
