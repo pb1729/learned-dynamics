@@ -491,7 +491,7 @@ def diffuser_generate_with_epsilon(model, pos_0, metadata, steps:int):
 
 class WGAN3D:
   is_gan = True
-  def __init__(self, config):
+  def __init__(self, config:Config):
     self.randgen = TensorRandGen()
     self.config = config
     #self.discs = []
@@ -541,6 +541,8 @@ class WGAN3D:
     # turn off gradients for model params
     for param in model.dn.parameters():
       param.requires_grad = False
+    # update our config to save the same sigma_max as the model we depend on
+    self.config.arch_specific["sigma_max"] = model.config["sigma_max"]
     return model
   def train_step(self, traj_state):
     """ x: (L, batch, poly_len, 3) """
@@ -631,7 +633,8 @@ class WGAN3D:
     batch = prod(leading_dims)
     x_0 = x_0.reshape(batch, atoms, 3)
     epsilon = self.randgen.randn(1, (batch, atoms, self.config["diffusion_steps"]))
-    x_1 = self.gen(x_0, epsilon, self.box, metadata)
+    x_0_noised = self.config["sigma_max"]*self.randgen.randn(1, (batch, atoms))
+    x_1 = self.gen(x_0, x_0_noised, epsilon, self.box, metadata)
     return x_1.reshape(*leading_dims, atoms, 3)
   def predict(self, state:ModelState):
     with torch.no_grad():
