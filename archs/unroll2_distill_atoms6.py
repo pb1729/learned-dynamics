@@ -427,21 +427,6 @@ def initialize_tup(self, E, pos_0, pos_1, box, metadata):
   pos_1_tup = pos_1, None, None
   return E, contexttup, xtup, ytup, pos_0_tup, pos_1_tup
 
-'''class Discriminator(nn.Module):
-  def __init__(self, config):
-    super().__init__()
-    self.dim_a, self.dim_v, self.dim_d = config["dim_a"], config["dim_v"], config["dim_d"]
-    # submodules
-    self.blocks = nn.Sequential(*[
-      Block(config, Block.K_DISC, None)
-      for i in range(config["depth"])
-    ])
-  def forward(self, t, pos_0, pos_1, box, metadata):
-    tup = initialize_tup(self, 0., pos_0, pos_1, box, metadata)
-    tup = self.blocks(tup)
-    E, contexttup, xtup, ytup, pos_0_tup, pos_1_tup = tup
-    return E.mean(-1) # average over atoms'''
-
 class Generator(nn.Module):
   def __init__(self, config):
     super().__init__()
@@ -494,9 +479,6 @@ class WGAN3D:
   def __init__(self, config:Config):
     self.randgen = TensorRandGen()
     self.config = config
-    #self.discs = []
-    #for _ in range(config["ndiscs"]):
-    #  self.add_new_disc()
     self.gen = Generator(config).to(config.device)
     self.gen.apply(weights_init)
     assert space_dim(config) == 3
@@ -504,15 +486,8 @@ class WGAN3D:
     self.tensbox = torch.tensor(self.box, dtype=torch.float32, device="cuda")
     self.init_optim()
     self.distill_model = None
-  #def add_new_disc(self):
-  #  self.discs.append(Discriminator(self.config).to(self.config.device))
-  #  self.discs[-1].apply(weights_init)
   def init_optim(self):
     betas = (self.config["beta_1"], self.config["beta_2"])
-    '''self.sched_disc = ErrorTrackingScheduler(get_lr_fn_warmup_and_decay(
-      self.config["lr_disc"], 0.1, 128, self.config["gamma_disc"]))
-    self.optim_disc = torch.optim.AdamW(get_params_for_optim(*self.discs),
-      self.sched_disc.lr(), betas, weight_decay=self.config["weight_decay"])'''
     self.sched_gen = ErrorTrackingScheduler(get_lr_fn_warmup_and_decay(
       self.config["lr_gen"], 0.1, 128, self.config["gamma_gen"]))
     self.optim_gen = torch.optim.AdamW(get_params_for_optim(self.gen),
@@ -521,8 +496,6 @@ class WGAN3D:
   @staticmethod
   def load_from_dict(states, config):
     ans = WGAN3D(config)
-    #for disc, state_dict in zip(ans.discs, states["discs"]):
-    #  disc.load_state_dict(state_dict)
     ans.gen.load_state_dict(states["gen"])
     return ans
   @staticmethod
@@ -530,7 +503,6 @@ class WGAN3D:
     return WGAN3D(config)
   def save_to_dict(self):
     return {
-        #"discs": [disc.state_dict() for disc in self.discs],
         "gen": self.gen.state_dict(),
       }
   def load_diffuser(self):
@@ -550,74 +522,10 @@ class WGAN3D:
       self.distill_model = self.load_diffuser()
     x = traj_state.x
     L, batch, atoms, must_be[3] = x.shape
-    loss_d = 0. #self.discs_step(x, traj_state.metadata)
-    loss_g = 0. #self.gen_step(x, traj_state.metadata)
-    loss_m = self.mimic_step(x, traj_state.metadata)
+    loss = self.mimic_step(x, traj_state.metadata)
     self.step_count += 1
-    #self.sched_disc.step(self.step_count, self.optim_disc)
     self.sched_gen.step(self.step_count, self.optim_gen)
-    return loss_d, loss_g, loss_m
-  '''def discs_step(self, x, metadata):
-    """ x: (L, batch, poly_len, 3) """
-    L, batch, atoms, must_be[3] = x.shape
-    x_g = x
-    loss = 0.
-    for nsteps, disc in enumerate(self.discs, start=1):
-      x_g = self.generate(x_g[:-1], metadata)
-      x_r = x[nsteps:]
-      x_0 = x[:-nsteps]
-      loss = loss + self.disc_loss(disc,
-        x_0.reshape(batch*(L - nsteps), atoms, 3),
-        x_r.reshape(batch*(L - nsteps), atoms, 3),
-        x_g.reshape(batch*(L - nsteps), atoms, 3),
-        metadata)
-    # backprop, update
-    self.optim_disc.zero_grad()
-    loss.backward()
-    self.optim_disc.step()
-    return loss.item()
-  def disc_loss(self, disc, x_0, x_r, x_g, metadata):
-    batch,          atoms,          must_be[3] = x_0.shape
-    must_be[batch], must_be[atoms], must_be[3] = x_r.shape
-    must_be[batch], must_be[atoms], must_be[3] = x_g.shape
-    # choose noising level
-    t = torch.rand(batch, device=x_0.device)
-    sigma = self.sigma_t(t)
-    x_r = x_r + sigma[:, None, None]*torch.randn_like(x_r)
-    x_g = x_g + sigma[:, None, None]*torch.randn_like(x_g)
-    # train on real data
-    y_r = disc(t, x_0, x_r, self.box, metadata) # (batch,)
-    # train on generated data
-    y_g = disc(t, x_0, x_g, self.box, metadata) # (batch,)
-    # endpoint penalty on interpolated data
-    endpt_pen = get_endpt_pen(
-      (lambda *args: disc(t, *args)),
-      x_0, x_r, x_g, y_r, y_g, self.box, metadata,
-      self.config["lambda_wass"], self.config["lambda_l2"])
-    # overall loss
-    if self.config["hinge"]:
-      loss = torch.relu(1. + y_r).mean() + torch.relu(1. - y_g).mean() + self.config["hinge_leak"]*(y_r.mean() - y_g.mean())
-    else:
-      loss = y_r.mean() - y_g.mean()
-    return loss + endpt_pen
-  def gen_step(self, x, metadata):
-    *_, atoms, must_be[3] = x.shape
-    x_g = x
-    loss_g = 0.
-    for nsteps, disc in enumerate(self.discs, start=1):
-      x_g = self.generate(x_g[:-1], metadata)
-      x_0 = x[:-nsteps]
-      # do noising
-      t = torch.rand(*x_g.shape[:2], device=x_0.device)
-      sigma = self.sigma_t(t)
-      x_g_noised = x_g + sigma[:, :, None, None]*torch.randn_like(x_g)
-      # loss
-      y_g = disc(t.reshape(-1), x_0.reshape(-1, atoms, 3), x_g_noised.reshape(-1, atoms, 3), self.box, metadata)
-      loss_g = loss_g + y_g.mean()
-    # backprop, update
-    self.optim_dec.zero_grad() # carry over to autoenc_step
-    loss_g.backward()
-    return loss_g.item()'''
+    return loss
   def mimic_step(self, x, metadata):
     L, batch, atoms, must_be[3] = x.shape
     x_0 = x.reshape(L*batch, atoms, 3)
@@ -646,11 +554,9 @@ class GANTrainer:
     self.model = model
     self.board = board
   def step(self, i, trajs):
-    loss_d, loss_g, loss_m = self.model.train_step(trajs)
-    print(f"{i}\t ℒᴰ = {loss_d:05.6f}   \t ℒᴳ = {loss_g:05.6f}  \t ℒᴹ = {loss_m:05.6f}")
-    self.board.scalar("loss_d", i, loss_d)
-    self.board.scalar("loss_g", i, loss_g)
-    self.board.scalar("loss_m", i, loss_m)
+    loss = self.model.train_step(trajs)
+    print(f"{i}\t ℒ = {loss:05.6f}")
+    self.board.scalar("loss", i, loss)
 
 
 
