@@ -4131,6 +4131,269 @@ void bee_bwr(
 }
 
 
+__global__
+void cow_o0_fwd_kern(
+    // <<<(batch), (WARPSZ)>>>
+    
+    int batch, int chan,
+    const float* l_0, const float* l_1, const float* r_0, const float* r_1,
+    float* __restrict__ y_000, float* __restrict__ y_110) {
+  extern __shared__ float s[];
+  for (int idx_batch = blockIdx.x; idx_batch < batch; idx_batch += gridDim.x) {
+    for (int idx_chan = threadIdx.x; idx_chan < chan; idx_chan += blockDim.x) {
+      y_000[((idx_batch)*chan + idx_chan)*1 + 0] = l_0[((idx_batch)*chan + idx_chan)*1 + 0]*r_0[((idx_batch)*chan + idx_chan)*1 + 0];
+      y_110[((idx_batch)*chan + idx_chan)*1 + 0] = l_1[((idx_batch)*chan + idx_chan)*3 + 0]*r_1[((idx_batch)*chan + idx_chan)*3 + 0] + l_1[((idx_batch)*chan + idx_chan)*3 + 1]*r_1[((idx_batch)*chan + idx_chan)*3 + 1] + l_1[((idx_batch)*chan + idx_chan)*3 + 2]*r_1[((idx_batch)*chan + idx_chan)*3 + 2];
+    }
+  }
+}
+
+
+void cow_o0_fwd(
+    int batch, int chan,
+    const float* l_0, const float* l_1, const float* r_0, const float* r_1,
+    float* y_000, float* y_110) {
+  
+  
+  int sharedmemsz = 0;
+  dim3 gridsz = dim3(batch);
+  dim3 blocksz = dim3(WARPSZ);
+  cow_o0_fwd_kern<<<gridsz, blocksz, sharedmemsz*sizeof(float)>>>(
+      
+      batch, chan,
+      l_0, l_1, r_0, r_1,
+      y_000, y_110);
+  
+}
+
+
+__global__
+void cow_o0_bwl_kern(
+    // <<<(batch), (WARPSZ)>>>
+    
+    int batch, int chan,
+    const float* r_0, const float* r_1, const float* dy_000, const float* dy_110,
+    float* __restrict__ dl_0, float* __restrict__ dl_1) {
+  extern __shared__ float s[];
+  for (int idx_batch = blockIdx.x; idx_batch < batch; idx_batch += gridDim.x) {
+    for (int idx_chan = threadIdx.x; idx_chan < chan; idx_chan += blockDim.x) {
+      float accum_0_0 = 0.0;
+      float accum_1_0 = 0.0;
+      float accum_1_1 = 0.0;
+      float accum_1_2 = 0.0;
+      accum_0_0 += r_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_000[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_1_0 += r_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_110[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_1_1 += r_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_110[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_1_2 += r_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_110[((idx_batch)*chan + idx_chan)*1 + 0];
+      dl_0[((idx_batch)*chan + idx_chan)*1 + 0] = accum_0_0;
+      dl_1[((idx_batch)*chan + idx_chan)*3 + 0] = accum_1_0;
+      dl_1[((idx_batch)*chan + idx_chan)*3 + 1] = accum_1_1;
+      dl_1[((idx_batch)*chan + idx_chan)*3 + 2] = accum_1_2;
+    }
+  }
+}
+
+
+void cow_o0_bwl(
+    int batch, int chan,
+    const float* r_0, const float* r_1, const float* dy_000, const float* dy_110,
+    float* dl_0, float* dl_1) {
+  
+  
+  int sharedmemsz = 0;
+  dim3 gridsz = dim3(batch);
+  dim3 blocksz = dim3(WARPSZ);
+  cow_o0_bwl_kern<<<gridsz, blocksz, sharedmemsz*sizeof(float)>>>(
+      
+      batch, chan,
+      r_0, r_1, dy_000, dy_110,
+      dl_0, dl_1);
+  
+}
+
+
+__global__
+void cow_o0_bwr_kern(
+    // <<<(batch), (WARPSZ)>>>
+    
+    int batch, int chan,
+    const float* l_0, const float* l_1, const float* dy_000, const float* dy_110,
+    float* __restrict__ dr_0, float* __restrict__ dr_1) {
+  extern __shared__ float s[];
+  for (int idx_batch = blockIdx.x; idx_batch < batch; idx_batch += gridDim.x) {
+    for (int idx_chan = threadIdx.x; idx_chan < chan; idx_chan += blockDim.x) {
+      float accum_0_0 = 0.0;
+      float accum_1_0 = 0.0;
+      float accum_1_1 = 0.0;
+      float accum_1_2 = 0.0;
+      accum_0_0 += l_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_000[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_1_0 += l_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_110[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_1_1 += l_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_110[((idx_batch)*chan + idx_chan)*1 + 0];
+      accum_1_2 += l_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_110[((idx_batch)*chan + idx_chan)*1 + 0];
+      dr_0[((idx_batch)*chan + idx_chan)*1 + 0] = accum_0_0;
+      dr_1[((idx_batch)*chan + idx_chan)*3 + 0] = accum_1_0;
+      dr_1[((idx_batch)*chan + idx_chan)*3 + 1] = accum_1_1;
+      dr_1[((idx_batch)*chan + idx_chan)*3 + 2] = accum_1_2;
+    }
+  }
+}
+
+
+void cow_o0_bwr(
+    int batch, int chan,
+    const float* l_0, const float* l_1, const float* dy_000, const float* dy_110,
+    float* dr_0, float* dr_1) {
+  
+  
+  int sharedmemsz = 0;
+  dim3 gridsz = dim3(batch);
+  dim3 blocksz = dim3(WARPSZ);
+  cow_o0_bwr_kern<<<gridsz, blocksz, sharedmemsz*sizeof(float)>>>(
+      
+      batch, chan,
+      l_0, l_1, dy_000, dy_110,
+      dr_0, dr_1);
+  
+}
+
+
+__global__
+void cow_o1_fwd_kern(
+    // <<<(batch), (WARPSZ)>>>
+    
+    int batch, int chan,
+    const float* l_0, const float* l_1, const float* r_0, const float* r_1,
+    float* __restrict__ y_011, float* __restrict__ y_101, float* __restrict__ y_111) {
+  extern __shared__ float s[];
+  for (int idx_batch = blockIdx.x; idx_batch < batch; idx_batch += gridDim.x) {
+    for (int idx_chan = threadIdx.x; idx_chan < chan; idx_chan += blockDim.x) {
+      y_011[((idx_batch)*chan + idx_chan)*3 + 0] = l_0[((idx_batch)*chan + idx_chan)*1 + 0]*r_1[((idx_batch)*chan + idx_chan)*3 + 0];
+      y_011[((idx_batch)*chan + idx_chan)*3 + 1] = l_0[((idx_batch)*chan + idx_chan)*1 + 0]*r_1[((idx_batch)*chan + idx_chan)*3 + 1];
+      y_011[((idx_batch)*chan + idx_chan)*3 + 2] = l_0[((idx_batch)*chan + idx_chan)*1 + 0]*r_1[((idx_batch)*chan + idx_chan)*3 + 2];
+      y_101[((idx_batch)*chan + idx_chan)*3 + 0] = l_1[((idx_batch)*chan + idx_chan)*3 + 0]*r_0[((idx_batch)*chan + idx_chan)*1 + 0];
+      y_101[((idx_batch)*chan + idx_chan)*3 + 1] = l_1[((idx_batch)*chan + idx_chan)*3 + 1]*r_0[((idx_batch)*chan + idx_chan)*1 + 0];
+      y_101[((idx_batch)*chan + idx_chan)*3 + 2] = l_1[((idx_batch)*chan + idx_chan)*3 + 2]*r_0[((idx_batch)*chan + idx_chan)*1 + 0];
+      y_111[((idx_batch)*chan + idx_chan)*3 + 0] = l_1[((idx_batch)*chan + idx_chan)*3 + 1]*r_1[((idx_batch)*chan + idx_chan)*3 + 2] + (-1)*l_1[((idx_batch)*chan + idx_chan)*3 + 2]*r_1[((idx_batch)*chan + idx_chan)*3 + 1];
+      y_111[((idx_batch)*chan + idx_chan)*3 + 1] = (-1)*l_1[((idx_batch)*chan + idx_chan)*3 + 0]*r_1[((idx_batch)*chan + idx_chan)*3 + 2] + l_1[((idx_batch)*chan + idx_chan)*3 + 2]*r_1[((idx_batch)*chan + idx_chan)*3 + 0];
+      y_111[((idx_batch)*chan + idx_chan)*3 + 2] = l_1[((idx_batch)*chan + idx_chan)*3 + 0]*r_1[((idx_batch)*chan + idx_chan)*3 + 1] + (-1)*l_1[((idx_batch)*chan + idx_chan)*3 + 1]*r_1[((idx_batch)*chan + idx_chan)*3 + 0];
+    }
+  }
+}
+
+
+void cow_o1_fwd(
+    int batch, int chan,
+    const float* l_0, const float* l_1, const float* r_0, const float* r_1,
+    float* y_011, float* y_101, float* y_111) {
+  
+  
+  int sharedmemsz = 0;
+  dim3 gridsz = dim3(batch);
+  dim3 blocksz = dim3(WARPSZ);
+  cow_o1_fwd_kern<<<gridsz, blocksz, sharedmemsz*sizeof(float)>>>(
+      
+      batch, chan,
+      l_0, l_1, r_0, r_1,
+      y_011, y_101, y_111);
+  
+}
+
+
+__global__
+void cow_o1_bwl_kern(
+    // <<<(batch), (WARPSZ)>>>
+    
+    int batch, int chan,
+    const float* r_0, const float* r_1, const float* dy_011, const float* dy_101, const float* dy_111,
+    float* __restrict__ dl_0, float* __restrict__ dl_1) {
+  extern __shared__ float s[];
+  for (int idx_batch = blockIdx.x; idx_batch < batch; idx_batch += gridDim.x) {
+    for (int idx_chan = threadIdx.x; idx_chan < chan; idx_chan += blockDim.x) {
+      float accum_0_0 = 0.0;
+      float accum_1_0 = 0.0;
+      float accum_1_1 = 0.0;
+      float accum_1_2 = 0.0;
+      accum_0_0 += r_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_011[((idx_batch)*chan + idx_chan)*3 + 0] + r_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_011[((idx_batch)*chan + idx_chan)*3 + 1] + r_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_011[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_1_0 += r_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_101[((idx_batch)*chan + idx_chan)*3 + 0];
+      accum_1_1 += r_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_101[((idx_batch)*chan + idx_chan)*3 + 1];
+      accum_1_2 += r_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_101[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_1_0 += (-1)*r_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_111[((idx_batch)*chan + idx_chan)*3 + 1] + r_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_111[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_1_1 += r_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_111[((idx_batch)*chan + idx_chan)*3 + 0] + (-1)*r_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_111[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_1_2 += (-1)*r_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_111[((idx_batch)*chan + idx_chan)*3 + 0] + r_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_111[((idx_batch)*chan + idx_chan)*3 + 1];
+      dl_0[((idx_batch)*chan + idx_chan)*1 + 0] = accum_0_0;
+      dl_1[((idx_batch)*chan + idx_chan)*3 + 0] = accum_1_0;
+      dl_1[((idx_batch)*chan + idx_chan)*3 + 1] = accum_1_1;
+      dl_1[((idx_batch)*chan + idx_chan)*3 + 2] = accum_1_2;
+    }
+  }
+}
+
+
+void cow_o1_bwl(
+    int batch, int chan,
+    const float* r_0, const float* r_1, const float* dy_011, const float* dy_101, const float* dy_111,
+    float* dl_0, float* dl_1) {
+  
+  
+  int sharedmemsz = 0;
+  dim3 gridsz = dim3(batch);
+  dim3 blocksz = dim3(WARPSZ);
+  cow_o1_bwl_kern<<<gridsz, blocksz, sharedmemsz*sizeof(float)>>>(
+      
+      batch, chan,
+      r_0, r_1, dy_011, dy_101, dy_111,
+      dl_0, dl_1);
+  
+}
+
+
+__global__
+void cow_o1_bwr_kern(
+    // <<<(batch), (WARPSZ)>>>
+    
+    int batch, int chan,
+    const float* l_0, const float* l_1, const float* dy_011, const float* dy_101, const float* dy_111,
+    float* __restrict__ dr_0, float* __restrict__ dr_1) {
+  extern __shared__ float s[];
+  for (int idx_batch = blockIdx.x; idx_batch < batch; idx_batch += gridDim.x) {
+    for (int idx_chan = threadIdx.x; idx_chan < chan; idx_chan += blockDim.x) {
+      float accum_0_0 = 0.0;
+      float accum_1_0 = 0.0;
+      float accum_1_1 = 0.0;
+      float accum_1_2 = 0.0;
+      accum_1_0 += l_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_011[((idx_batch)*chan + idx_chan)*3 + 0];
+      accum_1_1 += l_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_011[((idx_batch)*chan + idx_chan)*3 + 1];
+      accum_1_2 += l_0[((idx_batch)*chan + idx_chan)*1 + 0]*dy_011[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_0_0 += l_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_101[((idx_batch)*chan + idx_chan)*3 + 0] + l_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_101[((idx_batch)*chan + idx_chan)*3 + 1] + l_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_101[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_1_0 += l_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_111[((idx_batch)*chan + idx_chan)*3 + 1] + (-1)*l_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_111[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_1_1 += (-1)*l_1[((idx_batch)*chan + idx_chan)*3 + 2]*dy_111[((idx_batch)*chan + idx_chan)*3 + 0] + l_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_111[((idx_batch)*chan + idx_chan)*3 + 2];
+      accum_1_2 += l_1[((idx_batch)*chan + idx_chan)*3 + 1]*dy_111[((idx_batch)*chan + idx_chan)*3 + 0] + (-1)*l_1[((idx_batch)*chan + idx_chan)*3 + 0]*dy_111[((idx_batch)*chan + idx_chan)*3 + 1];
+      dr_0[((idx_batch)*chan + idx_chan)*1 + 0] = accum_0_0;
+      dr_1[((idx_batch)*chan + idx_chan)*3 + 0] = accum_1_0;
+      dr_1[((idx_batch)*chan + idx_chan)*3 + 1] = accum_1_1;
+      dr_1[((idx_batch)*chan + idx_chan)*3 + 2] = accum_1_2;
+    }
+  }
+}
+
+
+void cow_o1_bwr(
+    int batch, int chan,
+    const float* l_0, const float* l_1, const float* dy_011, const float* dy_101, const float* dy_111,
+    float* dr_0, float* dr_1) {
+  
+  
+  int sharedmemsz = 0;
+  dim3 gridsz = dim3(batch);
+  dim3 blocksz = dim3(WARPSZ);
+  cow_o1_bwr_kern<<<gridsz, blocksz, sharedmemsz*sizeof(float)>>>(
+      
+      batch, chan,
+      l_0, l_1, dy_011, dy_101, dy_111,
+      dr_0, dr_1);
+  
+}
+
+
 void set_kern_attributes() {
   cudaFuncSetAttribute(ant16_o0_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);
   cudaFuncSetAttribute(ant16_o0_backward_kern, cudaFuncAttributeMaxDynamicSharedMemorySize, 101376);

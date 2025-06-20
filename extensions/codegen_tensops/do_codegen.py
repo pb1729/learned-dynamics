@@ -18,7 +18,11 @@ function_groups = [
     (0, 1, 1), (1, 0, 1), (1, 2, 1), (2, 1, 1),
     (0, 2, 2), (2, 0, 2), (1, 1, 2), (2, 2, 2),
     (1, 1, 1), (2, 1, 2)
-  ])
+  ]),
+  tensor_prods_simple("cow_o0",
+    [(0, 0, 0), (1, 1, 0)]),
+  tensor_prods_simple("cow_o1",
+    [(0, 1, 1), (1, 0, 1), (1, 1, 1)]),
 ]
 functions = []
 for fns in function_groups:

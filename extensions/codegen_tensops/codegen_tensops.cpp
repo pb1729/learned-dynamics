@@ -125,6 +125,36 @@ void bee_bwr(
     const float* l_0, const float* l_1, const float* l_2, const float* dy_000, const float* dy_110, const float* dy_220, const float* dy_011, const float* dy_101, const float* dy_121, const float* dy_211, const float* dy_022, const float* dy_202, const float* dy_112, const float* dy_222, const float* dy_111, const float* dy_212,
     float* dr_0, float* dr_1, float* dr_2);
 
+void cow_o0_fwd(
+    int batch, int chan,
+    const float* l_0, const float* l_1, const float* r_0, const float* r_1,
+    float* y_000, float* y_110);
+
+void cow_o0_bwl(
+    int batch, int chan,
+    const float* r_0, const float* r_1, const float* dy_000, const float* dy_110,
+    float* dl_0, float* dl_1);
+
+void cow_o0_bwr(
+    int batch, int chan,
+    const float* l_0, const float* l_1, const float* dy_000, const float* dy_110,
+    float* dr_0, float* dr_1);
+
+void cow_o1_fwd(
+    int batch, int chan,
+    const float* l_0, const float* l_1, const float* r_0, const float* r_1,
+    float* y_011, float* y_101, float* y_111);
+
+void cow_o1_bwl(
+    int batch, int chan,
+    const float* r_0, const float* r_1, const float* dy_011, const float* dy_101, const float* dy_111,
+    float* dl_0, float* dl_1);
+
+void cow_o1_bwr(
+    int batch, int chan,
+    const float* l_0, const float* l_1, const float* dy_011, const float* dy_101, const float* dy_111,
+    float* dr_0, float* dr_1);
+
 std::vector<at::Tensor> fused_tensor_prods_example_cuda(
     const at::Tensor& x_0, const at::Tensor& x_1, const at::Tensor& x_2, const at::Tensor& P_000, const at::Tensor& left_000, const at::Tensor& P_011, const at::Tensor& left_011, const at::Tensor& P_101, const at::Tensor& left_101, const at::Tensor& P_110, const at::Tensor& left_110, const at::Tensor& P_220, const at::Tensor& left_220, const at::Tensor& P_222, const at::Tensor& left_222, const at::Tensor& P_211, const at::Tensor& left_211, const at::Tensor& P_111, const at::Tensor& left_111, const at::Tensor& P_212, const at::Tensor& left_212) {
   CHECK_INPUT(x_0);
@@ -1738,6 +1768,215 @@ std::vector<at::Tensor> bee_bwr_cuda(
   return {dr_0, dr_1, dr_2};
 }
 
+std::vector<at::Tensor> cow_o0_fwd_cuda(
+    const at::Tensor& l_0, const at::Tensor& l_1, const at::Tensor& r_0, const at::Tensor& r_1) {
+  CHECK_INPUT(l_0);
+  CHECK_INPUT(l_1);
+  CHECK_INPUT(r_0);
+  CHECK_INPUT(r_1);
+  at::Device device = l_0.device();
+  cudaSetDevice(device.index()); // run kernel on same device as input tensors
+  TORCH_CHECK(l_0.dim() == 2, "l_0 has wrong number of axes");
+  int batch = l_0.size(0);
+  int chan = l_0.size(1);
+  TORCH_CHECK(l_1.dim() == 3, "l_1 has wrong number of axes");
+  TORCH_CHECK(l_1.size(0) == batch, "l_1: expected axis 0 to have size batch");
+  TORCH_CHECK(l_1.size(1) == chan, "l_1: expected axis 1 to have size chan");
+  TORCH_CHECK(l_1.size(2) == 3, "l_1: expected axis 2 to have size 3");
+  TORCH_CHECK(r_0.dim() == 2, "r_0 has wrong number of axes");
+  TORCH_CHECK(r_0.size(0) == batch, "r_0: expected axis 0 to have size batch");
+  TORCH_CHECK(r_0.size(1) == chan, "r_0: expected axis 1 to have size chan");
+  TORCH_CHECK(r_1.dim() == 3, "r_1 has wrong number of axes");
+  TORCH_CHECK(r_1.size(0) == batch, "r_1: expected axis 0 to have size batch");
+  TORCH_CHECK(r_1.size(1) == chan, "r_1: expected axis 1 to have size chan");
+  TORCH_CHECK(r_1.size(2) == 3, "r_1: expected axis 2 to have size 3");
+  at::Tensor y_000 = torch::empty({batch, chan}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor y_110 = torch::empty({batch, chan}, torch::dtype(torch::kFloat32).device(device));
+  if (batch > 0) {
+    cow_o0_fwd(
+        batch, chan,
+        reinterpret_cast<float*>(l_0.data_ptr<float>()), reinterpret_cast<float*>(l_1.data_ptr<float>()), reinterpret_cast<float*>(r_0.data_ptr<float>()), reinterpret_cast<float*>(r_1.data_ptr<float>()),
+        reinterpret_cast<float*>(y_000.data_ptr<float>()), reinterpret_cast<float*>(y_110.data_ptr<float>()));
+  }
+  return {y_000, y_110};
+}
+
+std::vector<at::Tensor> cow_o0_bwl_cuda(
+    const at::Tensor& r_0, const at::Tensor& r_1, const at::Tensor& dy_000, const at::Tensor& dy_110) {
+  CHECK_INPUT(r_0);
+  CHECK_INPUT(r_1);
+  CHECK_INPUT(dy_000);
+  CHECK_INPUT(dy_110);
+  at::Device device = r_0.device();
+  cudaSetDevice(device.index()); // run kernel on same device as input tensors
+  TORCH_CHECK(r_0.dim() == 2, "r_0 has wrong number of axes");
+  int batch = r_0.size(0);
+  int chan = r_0.size(1);
+  TORCH_CHECK(r_1.dim() == 3, "r_1 has wrong number of axes");
+  TORCH_CHECK(r_1.size(0) == batch, "r_1: expected axis 0 to have size batch");
+  TORCH_CHECK(r_1.size(1) == chan, "r_1: expected axis 1 to have size chan");
+  TORCH_CHECK(r_1.size(2) == 3, "r_1: expected axis 2 to have size 3");
+  TORCH_CHECK(dy_000.dim() == 2, "dy_000 has wrong number of axes");
+  TORCH_CHECK(dy_000.size(0) == batch, "dy_000: expected axis 0 to have size batch");
+  TORCH_CHECK(dy_000.size(1) == chan, "dy_000: expected axis 1 to have size chan");
+  TORCH_CHECK(dy_110.dim() == 2, "dy_110 has wrong number of axes");
+  TORCH_CHECK(dy_110.size(0) == batch, "dy_110: expected axis 0 to have size batch");
+  TORCH_CHECK(dy_110.size(1) == chan, "dy_110: expected axis 1 to have size chan");
+  at::Tensor dl_0 = torch::empty({batch, chan}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dl_1 = torch::empty({batch, chan, 3}, torch::dtype(torch::kFloat32).device(device));
+  if (batch > 0) {
+    cow_o0_bwl(
+        batch, chan,
+        reinterpret_cast<float*>(r_0.data_ptr<float>()), reinterpret_cast<float*>(r_1.data_ptr<float>()), reinterpret_cast<float*>(dy_000.data_ptr<float>()), reinterpret_cast<float*>(dy_110.data_ptr<float>()),
+        reinterpret_cast<float*>(dl_0.data_ptr<float>()), reinterpret_cast<float*>(dl_1.data_ptr<float>()));
+  }
+  return {dl_0, dl_1};
+}
+
+std::vector<at::Tensor> cow_o0_bwr_cuda(
+    const at::Tensor& l_0, const at::Tensor& l_1, const at::Tensor& dy_000, const at::Tensor& dy_110) {
+  CHECK_INPUT(l_0);
+  CHECK_INPUT(l_1);
+  CHECK_INPUT(dy_000);
+  CHECK_INPUT(dy_110);
+  at::Device device = l_0.device();
+  cudaSetDevice(device.index()); // run kernel on same device as input tensors
+  TORCH_CHECK(l_0.dim() == 2, "l_0 has wrong number of axes");
+  int batch = l_0.size(0);
+  int chan = l_0.size(1);
+  TORCH_CHECK(l_1.dim() == 3, "l_1 has wrong number of axes");
+  TORCH_CHECK(l_1.size(0) == batch, "l_1: expected axis 0 to have size batch");
+  TORCH_CHECK(l_1.size(1) == chan, "l_1: expected axis 1 to have size chan");
+  TORCH_CHECK(l_1.size(2) == 3, "l_1: expected axis 2 to have size 3");
+  TORCH_CHECK(dy_000.dim() == 2, "dy_000 has wrong number of axes");
+  TORCH_CHECK(dy_000.size(0) == batch, "dy_000: expected axis 0 to have size batch");
+  TORCH_CHECK(dy_000.size(1) == chan, "dy_000: expected axis 1 to have size chan");
+  TORCH_CHECK(dy_110.dim() == 2, "dy_110 has wrong number of axes");
+  TORCH_CHECK(dy_110.size(0) == batch, "dy_110: expected axis 0 to have size batch");
+  TORCH_CHECK(dy_110.size(1) == chan, "dy_110: expected axis 1 to have size chan");
+  at::Tensor dr_0 = torch::empty({batch, chan}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dr_1 = torch::empty({batch, chan, 3}, torch::dtype(torch::kFloat32).device(device));
+  if (batch > 0) {
+    cow_o0_bwr(
+        batch, chan,
+        reinterpret_cast<float*>(l_0.data_ptr<float>()), reinterpret_cast<float*>(l_1.data_ptr<float>()), reinterpret_cast<float*>(dy_000.data_ptr<float>()), reinterpret_cast<float*>(dy_110.data_ptr<float>()),
+        reinterpret_cast<float*>(dr_0.data_ptr<float>()), reinterpret_cast<float*>(dr_1.data_ptr<float>()));
+  }
+  return {dr_0, dr_1};
+}
+
+std::vector<at::Tensor> cow_o1_fwd_cuda(
+    const at::Tensor& l_0, const at::Tensor& l_1, const at::Tensor& r_0, const at::Tensor& r_1) {
+  CHECK_INPUT(l_0);
+  CHECK_INPUT(l_1);
+  CHECK_INPUT(r_0);
+  CHECK_INPUT(r_1);
+  at::Device device = l_0.device();
+  cudaSetDevice(device.index()); // run kernel on same device as input tensors
+  TORCH_CHECK(l_0.dim() == 2, "l_0 has wrong number of axes");
+  int batch = l_0.size(0);
+  int chan = l_0.size(1);
+  TORCH_CHECK(l_1.dim() == 3, "l_1 has wrong number of axes");
+  TORCH_CHECK(l_1.size(0) == batch, "l_1: expected axis 0 to have size batch");
+  TORCH_CHECK(l_1.size(1) == chan, "l_1: expected axis 1 to have size chan");
+  TORCH_CHECK(l_1.size(2) == 3, "l_1: expected axis 2 to have size 3");
+  TORCH_CHECK(r_0.dim() == 2, "r_0 has wrong number of axes");
+  TORCH_CHECK(r_0.size(0) == batch, "r_0: expected axis 0 to have size batch");
+  TORCH_CHECK(r_0.size(1) == chan, "r_0: expected axis 1 to have size chan");
+  TORCH_CHECK(r_1.dim() == 3, "r_1 has wrong number of axes");
+  TORCH_CHECK(r_1.size(0) == batch, "r_1: expected axis 0 to have size batch");
+  TORCH_CHECK(r_1.size(1) == chan, "r_1: expected axis 1 to have size chan");
+  TORCH_CHECK(r_1.size(2) == 3, "r_1: expected axis 2 to have size 3");
+  at::Tensor y_011 = torch::empty({batch, chan, 3}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor y_101 = torch::empty({batch, chan, 3}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor y_111 = torch::empty({batch, chan, 3}, torch::dtype(torch::kFloat32).device(device));
+  if (batch > 0) {
+    cow_o1_fwd(
+        batch, chan,
+        reinterpret_cast<float*>(l_0.data_ptr<float>()), reinterpret_cast<float*>(l_1.data_ptr<float>()), reinterpret_cast<float*>(r_0.data_ptr<float>()), reinterpret_cast<float*>(r_1.data_ptr<float>()),
+        reinterpret_cast<float*>(y_011.data_ptr<float>()), reinterpret_cast<float*>(y_101.data_ptr<float>()), reinterpret_cast<float*>(y_111.data_ptr<float>()));
+  }
+  return {y_011, y_101, y_111};
+}
+
+std::vector<at::Tensor> cow_o1_bwl_cuda(
+    const at::Tensor& r_0, const at::Tensor& r_1, const at::Tensor& dy_011, const at::Tensor& dy_101, const at::Tensor& dy_111) {
+  CHECK_INPUT(r_0);
+  CHECK_INPUT(r_1);
+  CHECK_INPUT(dy_011);
+  CHECK_INPUT(dy_101);
+  CHECK_INPUT(dy_111);
+  at::Device device = r_0.device();
+  cudaSetDevice(device.index()); // run kernel on same device as input tensors
+  TORCH_CHECK(r_0.dim() == 2, "r_0 has wrong number of axes");
+  int batch = r_0.size(0);
+  int chan = r_0.size(1);
+  TORCH_CHECK(r_1.dim() == 3, "r_1 has wrong number of axes");
+  TORCH_CHECK(r_1.size(0) == batch, "r_1: expected axis 0 to have size batch");
+  TORCH_CHECK(r_1.size(1) == chan, "r_1: expected axis 1 to have size chan");
+  TORCH_CHECK(r_1.size(2) == 3, "r_1: expected axis 2 to have size 3");
+  TORCH_CHECK(dy_011.dim() == 3, "dy_011 has wrong number of axes");
+  TORCH_CHECK(dy_011.size(0) == batch, "dy_011: expected axis 0 to have size batch");
+  TORCH_CHECK(dy_011.size(1) == chan, "dy_011: expected axis 1 to have size chan");
+  TORCH_CHECK(dy_011.size(2) == 3, "dy_011: expected axis 2 to have size 3");
+  TORCH_CHECK(dy_101.dim() == 3, "dy_101 has wrong number of axes");
+  TORCH_CHECK(dy_101.size(0) == batch, "dy_101: expected axis 0 to have size batch");
+  TORCH_CHECK(dy_101.size(1) == chan, "dy_101: expected axis 1 to have size chan");
+  TORCH_CHECK(dy_101.size(2) == 3, "dy_101: expected axis 2 to have size 3");
+  TORCH_CHECK(dy_111.dim() == 3, "dy_111 has wrong number of axes");
+  TORCH_CHECK(dy_111.size(0) == batch, "dy_111: expected axis 0 to have size batch");
+  TORCH_CHECK(dy_111.size(1) == chan, "dy_111: expected axis 1 to have size chan");
+  TORCH_CHECK(dy_111.size(2) == 3, "dy_111: expected axis 2 to have size 3");
+  at::Tensor dl_0 = torch::empty({batch, chan}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dl_1 = torch::empty({batch, chan, 3}, torch::dtype(torch::kFloat32).device(device));
+  if (batch > 0) {
+    cow_o1_bwl(
+        batch, chan,
+        reinterpret_cast<float*>(r_0.data_ptr<float>()), reinterpret_cast<float*>(r_1.data_ptr<float>()), reinterpret_cast<float*>(dy_011.data_ptr<float>()), reinterpret_cast<float*>(dy_101.data_ptr<float>()), reinterpret_cast<float*>(dy_111.data_ptr<float>()),
+        reinterpret_cast<float*>(dl_0.data_ptr<float>()), reinterpret_cast<float*>(dl_1.data_ptr<float>()));
+  }
+  return {dl_0, dl_1};
+}
+
+std::vector<at::Tensor> cow_o1_bwr_cuda(
+    const at::Tensor& l_0, const at::Tensor& l_1, const at::Tensor& dy_011, const at::Tensor& dy_101, const at::Tensor& dy_111) {
+  CHECK_INPUT(l_0);
+  CHECK_INPUT(l_1);
+  CHECK_INPUT(dy_011);
+  CHECK_INPUT(dy_101);
+  CHECK_INPUT(dy_111);
+  at::Device device = l_0.device();
+  cudaSetDevice(device.index()); // run kernel on same device as input tensors
+  TORCH_CHECK(l_0.dim() == 2, "l_0 has wrong number of axes");
+  int batch = l_0.size(0);
+  int chan = l_0.size(1);
+  TORCH_CHECK(l_1.dim() == 3, "l_1 has wrong number of axes");
+  TORCH_CHECK(l_1.size(0) == batch, "l_1: expected axis 0 to have size batch");
+  TORCH_CHECK(l_1.size(1) == chan, "l_1: expected axis 1 to have size chan");
+  TORCH_CHECK(l_1.size(2) == 3, "l_1: expected axis 2 to have size 3");
+  TORCH_CHECK(dy_011.dim() == 3, "dy_011 has wrong number of axes");
+  TORCH_CHECK(dy_011.size(0) == batch, "dy_011: expected axis 0 to have size batch");
+  TORCH_CHECK(dy_011.size(1) == chan, "dy_011: expected axis 1 to have size chan");
+  TORCH_CHECK(dy_011.size(2) == 3, "dy_011: expected axis 2 to have size 3");
+  TORCH_CHECK(dy_101.dim() == 3, "dy_101 has wrong number of axes");
+  TORCH_CHECK(dy_101.size(0) == batch, "dy_101: expected axis 0 to have size batch");
+  TORCH_CHECK(dy_101.size(1) == chan, "dy_101: expected axis 1 to have size chan");
+  TORCH_CHECK(dy_101.size(2) == 3, "dy_101: expected axis 2 to have size 3");
+  TORCH_CHECK(dy_111.dim() == 3, "dy_111 has wrong number of axes");
+  TORCH_CHECK(dy_111.size(0) == batch, "dy_111: expected axis 0 to have size batch");
+  TORCH_CHECK(dy_111.size(1) == chan, "dy_111: expected axis 1 to have size chan");
+  TORCH_CHECK(dy_111.size(2) == 3, "dy_111: expected axis 2 to have size 3");
+  at::Tensor dr_0 = torch::empty({batch, chan}, torch::dtype(torch::kFloat32).device(device));
+  at::Tensor dr_1 = torch::empty({batch, chan, 3}, torch::dtype(torch::kFloat32).device(device));
+  if (batch > 0) {
+    cow_o1_bwr(
+        batch, chan,
+        reinterpret_cast<float*>(l_0.data_ptr<float>()), reinterpret_cast<float*>(l_1.data_ptr<float>()), reinterpret_cast<float*>(dy_011.data_ptr<float>()), reinterpret_cast<float*>(dy_101.data_ptr<float>()), reinterpret_cast<float*>(dy_111.data_ptr<float>()),
+        reinterpret_cast<float*>(dr_0.data_ptr<float>()), reinterpret_cast<float*>(dr_1.data_ptr<float>()));
+  }
+  return {dr_0, dr_1};
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("fused_tensor_prods_example_cuda", &fused_tensor_prods_example_cuda, "fused_tensor_prods_example_cuda(x_0, x_1, x_2, P_000, left_000, P_011, left_011, P_101, left_101, P_110, left_110, P_220, left_220, P_222, left_222, P_211, left_211, P_111, left_111, P_212, left_212)");
   m.def("fused_tensor_prods_example_backward_cuda", &fused_tensor_prods_example_backward_cuda, "fused_tensor_prods_example_backward_cuda(dy_0, dy_1, dy_2, P_000, left_000, P_011, left_011, P_101, left_101, P_110, left_110, P_220, left_220, P_222, left_222, P_211, left_211, P_111, left_111, P_212, left_212)");
@@ -1762,6 +2001,12 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("bee_fwd_cuda", &bee_fwd_cuda, "bee_fwd_cuda(l_0, l_1, l_2, r_0, r_1, r_2)");
   m.def("bee_bwl_cuda", &bee_bwl_cuda, "bee_bwl_cuda(r_0, r_1, r_2, dy_000, dy_110, dy_220, dy_011, dy_101, dy_121, dy_211, dy_022, dy_202, dy_112, dy_222, dy_111, dy_212)");
   m.def("bee_bwr_cuda", &bee_bwr_cuda, "bee_bwr_cuda(l_0, l_1, l_2, dy_000, dy_110, dy_220, dy_011, dy_101, dy_121, dy_211, dy_022, dy_202, dy_112, dy_222, dy_111, dy_212)");
+  m.def("cow_o0_fwd_cuda", &cow_o0_fwd_cuda, "cow_o0_fwd_cuda(l_0, l_1, r_0, r_1)");
+  m.def("cow_o0_bwl_cuda", &cow_o0_bwl_cuda, "cow_o0_bwl_cuda(r_0, r_1, dy_000, dy_110)");
+  m.def("cow_o0_bwr_cuda", &cow_o0_bwr_cuda, "cow_o0_bwr_cuda(l_0, l_1, dy_000, dy_110)");
+  m.def("cow_o1_fwd_cuda", &cow_o1_fwd_cuda, "cow_o1_fwd_cuda(l_0, l_1, r_0, r_1)");
+  m.def("cow_o1_bwl_cuda", &cow_o1_bwl_cuda, "cow_o1_bwl_cuda(r_0, r_1, dy_011, dy_101, dy_111)");
+  m.def("cow_o1_bwr_cuda", &cow_o1_bwr_cuda, "cow_o1_bwr_cuda(l_0, l_1, dy_011, dy_101, dy_111)");
   m.def("set_kern_attributes", &set_kern_attributes, "call this to initialize the module!");
 }
 
