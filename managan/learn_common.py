@@ -36,6 +36,50 @@ def get_lr_fn_warmup_and_decay(base_lr:float, start_fac:float, warmup_steps:int,
   return lr_fn
 
 
+def join_dicts(*dicts):
+  ans = {}
+  for d in dicts:
+    ans.update(d)
+  return ans
+
+class GenericLossDictTrainer:
+  def __init__(self, model, board):
+    self.model = model
+    self.board = board
+  @staticmethod
+  def letters_to_superscript(s:str):
+    superscript_map = {
+      'a': 'ᵃ', 'b': 'ᵇ', 'c': 'ᶜ', 'd': 'ᵈ', 'e': 'ᵉ', 'f': 'ᶠ',
+      'g': 'ᵍ', 'h': 'ʰ', 'i': 'ⁱ', 'j': 'ʲ', 'k': 'ᵏ', 'l': 'ˡ',
+      'm': 'ᵐ', 'n': 'ⁿ', 'o': 'ᵒ', 'p': 'ᵖ', 'q': 'ᵏʷ', 'r': 'ʳ',
+      's': 'ˢ', 't': 'ᵗ', 'u': 'ᵘ', 'v': 'ᵛ', 'w': 'ʷ', 'x': 'ˣ',
+      'y': 'ʸ', 'z': 'ᶻ',
+      'A': 'ᴬ', 'B': 'ᴮ', 'C': 'ᶜ', 'D': 'ᴰ', 'E': 'ᴱ', 'F': 'ᶠ',
+      'G': 'ᴳ', 'H': 'ᴴ', 'I': 'ᴵ', 'J': 'ᴶ', 'K': 'ᴷ', 'L': 'ᴸ',
+      'M': 'ᴹ', 'N': 'ᴺ', 'O': 'ᴼ', 'P': 'ᴾ', 'Q': 'ᴷᵂ', 'R': 'ᴿ',
+      'S': 'ˢ', 'T': 'ᵀ', 'U': 'ᵁ', 'V': 'ⱽ', 'W': 'ᵂ', 'X': 'ˣ',
+      'Y': 'ʸ', 'Z': 'ᶻ'
+    }
+    return ''.join(superscript_map.get(c, c) for c in s)
+  @staticmethod
+  def key_to_printable(key):
+    return GenericLossDictTrainer.letters_to_superscript(key.replace("loss_", "ℒ"))
+  @staticmethod
+  def fixwidth_float2str(x):
+    ans = f"{x:05.6f}"
+    if ans[0] == "-":
+      return ans[:9]
+    else:
+      return " " + ans[:8]
+  def step(self, i, trajs):
+    losses = self.model.train_step(trajs)
+    loss_strs = [f"{i}\t"]
+    for key in losses:
+      self.board.scalar(key, i, losses[key])
+      loss_strs.append(f" {self.key_to_printable(key)} = {self.fixwidth_float2str(losses[key])}")
+    print("    ".join(loss_strs))
+
+
 # GAN stuff:
 def taxicab_dist(x1, x2, epsilon=0.01):
   """ x1, x2: (batch, poly_len, 3)
