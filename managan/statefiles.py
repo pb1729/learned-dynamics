@@ -67,6 +67,8 @@ class DatasetState(State):
   @property
   def metadata(self):
     return self.traj.metadata
+  def to_model_predictor_state(self):
+    return ModelState(self.shape, self.x.clone(), metadata=self.metadata)
 
 class DatasetPredictor(Predictor):
   def __init__(self, dataset_dir, stride=1):
