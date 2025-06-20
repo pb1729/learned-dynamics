@@ -34,7 +34,7 @@ def main(args):
     for i in range(max(runs[prefix]) + 1):
       with open(path.join(args.src_folder, f"{prefix}_{i}.bin"), "rb") as f_r:
         state = read_state_from_file(f_r)
-        trajs.append(state.x)
+        trajs.append(state.x[::args.stride])
         if metadata is None:
           metadata = state.metadata
           shape = state.shape
@@ -47,4 +47,5 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser(prog="dataset_chop")
   parser.add_argument("src_folder", type=str)
   parser.add_argument("dst_folder", type=str)
+  parser.add_argument("--stride", type=int, default=1)
   main(parser.parse_args())
