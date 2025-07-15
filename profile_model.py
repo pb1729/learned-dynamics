@@ -52,9 +52,8 @@ def main(args):
     modelnm = model.config.arch_name
     args.saveto = f"traces/{currtime}_{modelnm}.json"
   # get input
-  base_pred = predictor.get_base_predictor()
-  state = predictor.sample_q(args.batch)
-  inp = predictor.predict(args.length, state)
+  state = predictor.sample_q(model.config.batch if args.batch is None else args.batch)
+  inp = predictor.predict(model.config.simlen if args.length is None else args.length, state)
   for i in range(args.burnin):
     print("burn-in %d" % i)
     do_op_to_be_profiled(args, model, inp)
@@ -70,8 +69,8 @@ if __name__ == "__main__":
   from argparse import ArgumentParser
   parser = ArgumentParser(prog="profile_model")
   parser.add_argument("fpath")
-  parser.add_argument("--batch", dest="batch", type=int, default=1)
-  parser.add_argument("--length", dest="length", type=int, default=8)
+  parser.add_argument("--batch", dest="batch", type=int, default=None)
+  parser.add_argument("--length", dest="length", type=int, default=None)
   parser.add_argument("--burnin", dest="burnin", type=int, default=5)
   parser.add_argument("--saveto", dest="saveto", type=str, default=None)
   parser.add_argument("--override", dest="override", type=str, default=None)
