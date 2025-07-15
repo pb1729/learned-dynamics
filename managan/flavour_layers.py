@@ -144,6 +144,31 @@ class ResiduesEncodeV2(nn.Module):
       centers.append(res_i_center(x_res_i))
     return torch.stack(centers, dim=1), torch.stack(encs, dim=1)
 
+class ResiduesPosEncode(nn.Module):
+  def __init__(self, vdim:int):
+    super().__init__()
+    self.res_enc = nn.ModuleDict({
+      letter: SingleResidueEncodeV2(RES_LEN[letter] + 2, 16*RES_LEN[letter])
+      for letter in letter_code
+    })
+    self.readout = TensLinear(1, 16, vdim)
+  def forward(self, x:torch.Tensor, metadata:OpenMMMetadata):
+    """ x: (batch, atoms, 3)
+        ans: (batch, residues, vdim, 3) """
+    batch, atoms, must_be[3] = x.shape
+    encs = []
+    for i, letter in enumerate(metadata.seq):
+      res_i_enc = self.res_enc[letter]
+      natom = RES_LEN[letter]
+      res_idx = metadata.residue_indices[i]
+      N_next_idx = metadata.residue_indices[i + 1] if i + 1 < len(metadata.seq) else res_idx + 2
+      C_prev_idx = metadata.residue_indices[i - 1] + 2 if i - 1 >= 0 else res_idx
+      x_res_i = torch.cat([
+        x[:, N_next_idx, None], x[:, C_prev_idx, None],
+        x[:, res_idx:res_idx+natom]
+      ], dim=1)
+      encs.append(res_i_enc(x_res_i).reshape(batch, natom, 16, 3))
+    return self.readout(torch.cat(encs, dim=1))
 
 
 class ResidueEmbed(nn.Module):
@@ -320,3 +345,63 @@ class PosMix(nn.Module):
       for i, letter in enumerate(metadata.seq)
     ], dim=1)
     return x_v_atm, x_v_amn
+
+
+def aminos_reduce(x, metadata:OpenMMMetadata, mean:bool=False):
+  """ x: (batch, atoms, ...)
+      ans: (batch, aminos, ...) """
+  return torch.stack([
+    (
+      x[:, metadata.residue_indices[i]:(metadata.residue_indices[i] + RES_LEN[letter])].mean(1)
+      if mean else
+      x[:, metadata.residue_indices[i]:(metadata.residue_indices[i] + RES_LEN[letter])].sum(1)
+    )
+    for i, letter in enumerate(metadata.seq)
+  ], dim=1)
+
+def aminos_copy(x, metadata:OpenMMMetadata):
+  """ x: (batch, aminos, ...)
+      ans: (batch, atoms, ...) """
+  batch, must_be[len(metadata.seq)], *rest = x.shape
+  return torch.cat([
+    x[:, i, None].expand(batch, RES_LEN[letter], *rest)
+    for i, letter in enumerate(metadata.seq)
+  ], dim=1)
+
+class LinAtomToAminoSmall(nn.Module):
+  def __init__(self, inds:int, atom_dim:int, amino_dim:int, embed_dim:int):
+    super().__init__()
+    self.inds = inds
+    self.atom_dim = atom_dim
+    self.embed_dim = embed_dim
+    self.lin_embed = nn.Linear(embed_dim, embed_dim)
+    self.lin_in = TensLinear(inds, atom_dim, embed_dim)
+    self.lin_out = TensLinear(inds, embed_dim, amino_dim)
+  def forward(self, x, embeddings, metadata:OpenMMMetadata):
+    """ x: (batch, atoms, atom_dim, (3,)^inds)
+        embeddings: (1, atoms, embed_dim)
+        ans: (batch, aminos, amino_dim, (3,)^inds) """
+    batch,      atoms,          must_be[self.atom_dim], *must_be[(3,)*self.inds] = x.shape
+    must_be[1], must_be[atoms], must_be[self.embed_dim] = embeddings.shape
+    modulation = self.lin_embed(embeddings)
+    modulation = modulation[(...,) + (None,)*self.inds]
+    return self.lin_out(aminos_reduce(modulation*(self.lin_in(x)), metadata, mean=True))
+
+class LinAminoToAtomSmall(nn.Module):
+  def __init__(self, inds:int, amino_dim:int, atom_dim:int, embed_dim:int):
+    super().__init__()
+    self.inds = inds
+    self.amino_dim = amino_dim
+    self.embed_dim = embed_dim
+    self.lin_embed = nn.Linear(embed_dim, embed_dim)
+    self.lin_in = TensLinear(inds, amino_dim, embed_dim)
+    self.lin_out = TensLinear(inds, embed_dim, atom_dim)
+  def forward(self, x, embeddings, metadata:OpenMMMetadata):
+    """ x: (batch, aminos, amino_dim, (3,)^inds)
+        embeddings: (1, atoms, embed_dim)
+        ans: (batch, atoms, atom_dim, (3,)^inds) """
+    batch,      aminos, must_be[self.amino_dim], *must_be[(3,)*self.inds] = x.shape
+    must_be[1], atoms, must_be[self.embed_dim] = embeddings.shape
+    modulation = self.lin_embed(embeddings)
+    modulation = modulation[(...,) + (None,)*self.inds]
+    return self.lin_out(modulation*aminos_copy(self.lin_in(x), metadata))
