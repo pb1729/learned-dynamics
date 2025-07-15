@@ -10,29 +10,57 @@ from plotting_common import approx_squarish_factorize
 
 
 PSI_CRIT = 1.5
-PHI_CRIT = -2.05
+PHI_CRIT = 0.0#-2.05
 
 
 # set big font size
 matplotlib.rc("font", size=16)
 
 
-def get_angles(traj):
-  """ return Ramachandran phis and psis for a ModelState trajectory
-      VERY IMPORTANT NOTE: For a chain of N amino acids, we'll get N-1 of each angle.
-      psi: exists for aminos in range(0, N-1)
-      phi: exists for aminos in range(1, N)
-      So there are N-2 aminos with defined values of both angles, range(1, N-1). """
-  mdtrajecs = model_states_to_mdtrajs(traj)
-  phis = np.stack([
-      mdtraj.compute_phi(mdtrajec)[1]
-      for mdtrajec in mdtrajecs
-    ], axis=1) # (L, batch, npep)
-  psis = np.stack([
-      mdtraj.compute_psi(mdtrajec)[1]
-      for mdtrajec in mdtrajecs
-    ], axis=1) # (L, batch, npep)
+def get_backbone(state):
+  """ state: (..., atoms, 3)
+      x_N, x_CA, x_C: (..., aminos, 3) """
+  x = state.x_npy
+  res_inds = state.metadata.residue_indices
+  x_N = x[..., res_inds, :]
+  x_CA = x[..., res_inds + 1, :]
+  x_C = x[..., res_inds + 2, :]
+  return x_N, x_CA, x_C
+
+def get_torsion(x1, x2, x3, x4):
+  """ x1, x2, x3, x4: (..., 3) """
+  # get displacements
+  b1 = x2 - x1
+  b2 = x3 - x2
+  b3 = x4 - x3
+  # Normalize vectors
+  b1 /= np.linalg.norm(b1, axis=-1, keepdims=True)
+  b2 /= np.linalg.norm(b2, axis=-1, keepdims=True)
+  b3 /= np.linalg.norm(b3, axis=-1, keepdims=True)
+  # Calculate normal vectors to the planes
+  n1 = np.cross(b1, b2)
+  n2 = np.cross(b2, b3)
+  # Calculate the torsion angle
+  x = np.sum(n1 * n2, axis=-1)
+  y = np.sum(np.cross(n1, n2) * b2, axis=-1)
+  return np.arctan2(y, x)
+
+def get_angles(state):
+  N, CA, C = get_backbone(state)
+  # Calculate phi angles (C_prev-N-CA-C)
+  prev_C = C[:, :, :-1, :]  # C from previous residue
+  curr_N = N[:, :, 1:, :]
+  curr_CA = CA[:, :, 1:, :]
+  curr_C = C[:, :, 1:, :]
+  phis = get_torsion(prev_C, curr_N, curr_CA, curr_C)
+  # Calculate psi angles (N-CA-C-N_next)
+  curr_N = N[:, :, :-1, :]
+  curr_CA = CA[:, :, :-1, :]
+  curr_C = C[:, :, :-1, :]
+  next_N = N[:, :, 1:, :]
+  psis = get_torsion(curr_N, curr_CA, curr_C, next_N)
   return phis, psis
+
 
 def density_plot(angles):
   # psi hist
@@ -40,7 +68,7 @@ def density_plot(angles):
     phis, psis = angles[prednm]
     # cut off amino acids on the ends with only one angle:
     psis = psis[..., 1:]
-    plt.hist(psis.flatten(), bins=32, range=(-np.pi, np.pi), label=prednm, alpha=0.4)
+    plt.hist(psis.flatten(), bins=32, range=(-np.pi, np.pi), label=prednm[:20], alpha=0.4)
     #print(f"Median ψ for {prednm}: {(np.median((psis.flatten() + np.pi - PSI_CRIT) % (2*np.pi)) + np.pi + PSI_CRIT) % (2*np.pi)}")
   plt.xlabel("ψ [rad]")
   plt.ylabel("counts")
@@ -51,7 +79,7 @@ def density_plot(angles):
     phis, psis = angles[prednm]
     # cut off amino acids on the ends with only one angle:
     phis = phis[..., :-1]
-    plt.hist(phis.flatten(), bins=32, range=(-np.pi, np.pi), label=prednm, alpha=0.4)
+    plt.hist(phis.flatten(), bins=32, range=(-np.pi, np.pi), label=prednm[:20], alpha=0.4)
     #print(f"Median φ for {prednm}: {(np.median((phis.flatten() + np.pi - PHI_CRIT) % (2*np.pi)) + np.pi + PHI_CRIT) % (2*np.pi)}")
   plt.xlabel("φ [rad]")
   plt.ylabel("counts")
@@ -63,7 +91,7 @@ def density_plot(angles):
     # cut off amino acids on the ends with only one angle:
     phis = phis[..., :-1]
     psis = psis[..., 1:]
-    plt.scatter(phis.flatten(), psis.flatten(), marker=".", alpha=0.3) # label=prednm
+    plt.scatter(phis.flatten(), psis.flatten(), marker=".", alpha=0.3, label=prednm[:20])
   plt.plot([-np.pi, np.pi], [PSI_CRIT, PSI_CRIT], linestyle="-", label="ψ₀", color="black")
   plt.plot([PHI_CRIT, PHI_CRIT], [-np.pi, np.pi], linestyle="-", label="φ₀", color="red")
   plt.legend()
@@ -87,7 +115,7 @@ def many_density_plot(angles, seq):
     psis = psis[..., 1:]
     for i in range(npep - 1):
       ax = axs_flat[i]
-      ax.scatter(phis[:, :, i].flatten(), psis[:, :, i].flatten(), marker=".", label=prednm)
+      ax.scatter(phis[:, :, i].flatten(), psis[:, :, i].flatten(), marker=".", alpha=0.3, label=prednm)
   for i in range(npep - 1):
     ax = axs_flat[i]
     ax.set_xlabel(f"amino {i + 1} ({seq[i + 1]}): φ")
@@ -117,8 +145,31 @@ def psi_hopping_plot(angles):
     print(prednm, delays)
   plt.xlabel("t [steps]")
   plt.ylabel("ψ [rad]")
-  #plt.legend()
+  plt.legend()
   plt.show()
+
+def phi_hopping_plot(angles):
+  for prednm in angles:
+    phi, psi = angles[prednm]
+    phi = phi[:, :, :-1]
+    psi = psi[:, :, 1:]
+    L, must_be[1], npep = phi.shape
+    fig, axs = plt.subplots(npep, 1, figsize=(10, 3*npep), sharex=True, gridspec_kw=dict(hspace=0))
+    if npep == 1: axs = [axs] # put in a list in single case for consistency
+    for k in range(npep):
+      ax = axs[k]
+      phi_k = phi[:, 0, k]
+      psi_k = psi[:, 0, k]
+      # Create scatter plot with phi as y-value and psi determining color
+      ax.scatter(np.arange(L), phi_k,
+        c=psi_k, cmap='hsv', vmin=-np.pi, vmax=np.pi,
+        marker=".", alpha=0.4)
+      ax.set_ylabel(f"φ {k + 1}")
+      ax.set_ylim(-np.pi, np.pi)
+      if k + 1 == npep:
+        ax.set_xlabel("t [steps]")
+    fig.suptitle(prednm)
+    plt.show()
 
 def angle_tcorr(angle, angle_crit, offset_max=None):
   """ angle: (L, batch, npep)
@@ -182,6 +233,7 @@ def main(args):
     print(predictor.name)
     state = predictor.sample_q(args.batch)
     traj = predictor.predict(args.tmax, state)
+    print(traj.size, traj.shape)
     phis, psis = get_angles(traj)
     angles[predictor.name] = (phis, psis)
     print("done")
@@ -193,6 +245,8 @@ def main(args):
     many_density_plot(angles, state.metadata.seq)
   elif args.plot_type == "psi_hopping":
     psi_hopping_plot(angles)
+  elif args.plot_type == "phi_hopping":
+    phi_hopping_plot(angles)
 
 
 
@@ -202,6 +256,6 @@ if __name__ == "__main__":
   add_model_list_arg(parser) # -M and -O
   parser.add_argument("--batch", type=int, default=1)
   parser.add_argument("--tmax", type=int, default=100)
-  parser.add_argument("--plot_type", type=str, choices=["density", "tcorr", "manydensity", "psi_hopping"], default="density", help="Type of plot to generate")
+  parser.add_argument("--plot_type", type=str, choices=["density", "tcorr", "manydensity", "psi_hopping", "phi_hopping"], default="density", help="Type of plot to generate")
   parser.add_argument("--offset_max", type=int, default=None)
   main(parser.parse_args())
