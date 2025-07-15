@@ -18,11 +18,21 @@ class _MustBe:
       `batch, chan, mustbe[32], mustbe[32] = image.shape`
       `*must_be[batch, 20, 20], chan = tens.shape` """
   def __setitem__(self, key, value):
+    if isinstance(key, list): key = tuple(key)
     if isinstance(key, tuple):
       assert key == tuple(value), "must_be[%s] does not match dimension %s" % (str(key), str(value))
     else:
       assert key == value, "must_be[%d] does not match dimension %d" % (key, value)
 must_be = _MustBe()
+
+
+def expand_dim(tens, dim, size):
+  """ expand dimension dim of tens to size """
+  assert tens.shape[dim] == 1, "expect dim to be expanded to have size 1"
+  dim = (dim + len(tens.shape)) % len(tens.shape) # convert negative dim to positive
+  shape_pre = tens.shape[:dim]
+  shape_post = tens.shape[1 + dim:]
+  return tens.expand(*shape_pre, size, *shape_post)
 
 
 # TENSOR COMPARISON UTILS
