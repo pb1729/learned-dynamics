@@ -1,7 +1,7 @@
 import torch
 import importlib
 
-from .statefiles import get_dataset_predictor, get_strided_dataset_predictor
+from .statefiles import get_dataset_predictor, get_strided_dataset_predictor, get_repeated_dataset_predictor
 from .predictor import Predictor, ModelPredictor, LongModelPredictor, get_sim_predictor, get_hoomd_predictor, get_openmm_predictor
 
 
@@ -25,6 +25,8 @@ def get_predictor(predictor_spec, override_base=None):
     ans = get_dataset_predictor(rest)
   elif "stridataset" == pred_type:
     ans = get_strided_dataset_predictor(rest)
+  elif "repdataset" == pred_type:
+    ans = get_repeated_dataset_predictor(rest)
   elif "model" == pred_type: # treat "rest" as a path
     ans = ModelPredictor(load(rest, override_base))
   elif "lmodel" == pred_type: # treat "rest" as a path

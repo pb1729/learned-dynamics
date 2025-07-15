@@ -55,15 +55,18 @@ def read_predictor_params_from_file(file:BufferedReader):
 
 
 class DatasetState(State):
-  def __init__(self, fnm):
+  def __init__(self, fnm, batch=1):
     with open(fnm, "rb") as f:
       self.traj = read_state_from_file(f)
-    self.L, *self._size = self.traj.size
+    self.L, saved_batch, *rest = self.traj.size
+    self._size = (batch,) + tuple(rest)
     self._shape = self.traj.shape
+    assert batch <= saved_batch, f"requested batch {batch} cannot exceed saved batch {saved_batch}"
+    self.batch = batch
     self.t = 0
   @property
   def x(self) -> torch.Tensor:
-    return self.traj[self.t].x
+    return self.traj[self.t, :self.batch].x
   @property
   def metadata(self):
     return self.traj.metadata
@@ -71,9 +74,10 @@ class DatasetState(State):
     return ModelState(self.shape, self.x.clone(), metadata=self.metadata)
 
 class DatasetPredictor(Predictor):
-  def __init__(self, dataset_dir, stride=1):
+  def __init__(self, dataset_dir, stride=1, repeat:bool=False):
     self.dataset_dir = dataset_dir
     self.stride = stride
+    self.repeat = repeat # if True, allows repeating the dataset across multiple epochs
     with open(path.join(dataset_dir, "predictor_params.pickle"), "rb") as f:
       params = read_predictor_params_from_file(f)
     self._box = params["box"]
@@ -87,11 +91,14 @@ class DatasetPredictor(Predictor):
     return self._shape
   def sample_q(self, batch):
     if not self.file_index < len(self.file_list):
-      raise DatasetError("out of files in dataset!")
-    ans = DatasetState(path.join(self.dataset_dir, self.file_list[self.file_index]))
+      if self.repeat:
+        print("EPOCH++")
+        random.shuffle(self.file_list)
+        self.file_index = 0
+      else:
+        raise DatasetError("out of files in dataset!")
+    ans = DatasetState(path.join(self.dataset_dir, self.file_list[self.file_index]), batch)
     self.file_index += 1
-    saved_batch, = ans.size
-    assert batch == saved_batch, f"requested batch {batch} should match saved batch {saved_batch}"
     return ans
   def predict(self, L, state, ret=True):
     assert isinstance(state, DatasetState), "DatasetPredictor can only handle DatasetState's"
@@ -99,7 +106,7 @@ class DatasetPredictor(Predictor):
     t_old = state.t
     state.t += L*self.stride
     if ret:
-      return state.traj[t_old + self.stride : state.t + 1 : self.stride]
+      return state.traj[t_old + self.stride : state.t + 1 : self.stride, :state.batch]
 
 def get_dataset_predictor(spec):
   return DatasetPredictor(spec)
@@ -108,3 +115,8 @@ def get_strided_dataset_predictor(spec):
   stride, dataset_dir = spec.split("?")
   stride = int(stride)
   return DatasetPredictor(dataset_dir, stride=stride)
+
+def get_repeated_dataset_predictor(spec):
+  stride, dataset_dir = spec.split("?")
+  stride = int(stride)
+  return DatasetPredictor(dataset_dir, stride=stride, repeat=True)
