@@ -99,35 +99,47 @@ class Message(nn.Module):
     return x_a, x_v
 
 class Block(nn.Module):
-  def __init__(self, r0:float, n:int):
+  def __init__(self, r0:float, n:int, pos_mutable:bool=False):
     super().__init__()
+    self.pos_mutable = pos_mutable
+    self.r0 = r0
     self.message = Message(r0, n)
     self.message_bond = Message(r0, n)
     self.update = Update(n)
+    if self.pos_mutable:
+      self.lin_push_pos = TensLinear(1, n, 1)
   def forward(self, tup):
-    graph, r_ij, graph_bond, r_ij_bond, x_a, x_v = tup
+    pos, graph, r_ij, graph_bond, r_ij_bond, x_a, x_v, box = tup
+    if graph is None: # pos was modified since graph was last computed
+      graph, r_ij = graph_setup(self.r0, box, pos)
     dx_a, dx_v = self.message_bond(graph_bond, x_a, x_v, r_ij_bond)
     x_a, x_v = x_a + dx_a, x_v + dx_v
     dx_a, dx_v = self.message(graph, x_a, x_v, r_ij)
     x_a, x_v = x_a + dx_a, x_v + dx_v
     dx_a, dx_v = self.update(x_a, x_v)
     x_a, x_v = x_a + dx_a, x_v + dx_v
-    return graph, r_ij, graph_bond, r_ij_bond, x_a, x_v
+    if self.pos_mutable:
+      pos = pos + self.lin_push_pos(x_v).squeeze(-2)
+      graph, r_ij = None, None # invalidate previous graph and r_ij
+    return pos, graph, r_ij, graph_bond, r_ij_bond, x_a, x_v, box
 
 
 class CPaiNN(nn.Module):
-  def __init__(self, r0:float, n:int, blks:int):
+  def __init__(self, r0:float, n:int, blks:int, mutate_pos:bool=False):
     super().__init__()
     self.atom_embed = ResidueAtomEmbed(n)
     self.blocks = nn.Sequential(*[
-      Block(r0, n)
+      Block(r0, n, pos_mutable=mutate_pos)
       for i in range(blks)
     ])
-  def forward(self, graph:Graph, r_ij:torch.Tensor, graph_bond:Graph, r_ij_bond:torch.Tensor, x_a, x_v, metadata:OpenMMMetadata):
+  def forward(self,
+      pos:torch.Tensor, graph_bond:Graph, r_ij_bond:torch.Tensor,
+      x_a:torch.Tensor, x_v:torch.Tensor,
+      box, metadata:OpenMMMetadata):
     x_a = x_a + self.atom_embed(metadata)[None] # add atom embeddings
-    graph, r_ij, graph_bond, r_ij_bond, x_a, x_v = self.blocks((graph, r_ij, graph_bond, r_ij_bond, x_a, x_v))
+    pos, graph, r_ij, graph_bond, r_ij_bond, x_a, x_v, box = self.blocks((pos, None, None, graph_bond, r_ij_bond, x_a, x_v, box))
     # Note: some final processing layers removed
-    return x_a, x_v
+    return pos, x_a, x_v
 
 class TimeEmbedding(nn.Module):
   def __init__(self, hdim, outdim):
@@ -154,6 +166,17 @@ def graph_setup(r0:float, box:Tuple[float, float, float], pos:torch.Tensor):
   r_ij = boxwrap(tensbox, pos_dst - pos_src)
   return graph, r_ij
 
+class PosEmbed(nn.Module):
+  """ Embeddings of node-wise relative positions. """
+  def __init__(self, dim_v):
+    super().__init__()
+    self.lin_v = TensLinear(1, 1, dim_v)
+  def forward(self, pos_0, pos_1):
+    """ pos_0, pos_1: (batch, nodes, 3) """
+    pos_0, pos_1 = pos_0[:, :, None], pos_1[:, :, None]
+    dpos_v = 0.1*(pos_1 - pos_0)
+    return self.lin_v(dpos_v)
+
 class SE3ITO(nn.Module):
   def __init__(self, r0:float, n:int, natoms:int, blks_0:int=2, blks_1:int=5):
     super().__init__()
@@ -162,6 +185,7 @@ class SE3ITO(nn.Module):
     self.t_embed = TimeEmbedding(8, n)
     self.mlp_embed = MLP(n, n)
     self.mlp_denoise = MLP(n, n)
+    self.pos_emb = PosEmbed(n)
     self.cpainn_0 = CPaiNN(r0, n, blks_0)
     self.cpainn_1 = CPaiNN(r0, n, blks_1)
     self.v_readin = TensLinear(1, 1, n)
@@ -172,18 +196,16 @@ class SE3ITO(nn.Module):
         x1: (batch, atoms, 3) """
     x0, x1 = x0.contiguous(), x1.contiguous()
     graph_bond = get_bond_graph(x0.shape[0], metadata, x0.device)
-    graph_0, r_ij_0 = graph_setup(self.r0, box, x0)
     r_ij_bond_0 = x0.reshape(-1, 3)[graph_bond.src] - x0.reshape(-1, 3)[graph_bond.src]
-    graph_1, r_ij_1 = graph_setup(self.r0, box, x1)
-    graph_bond_1 = get_bond_graph(x1.shape[0], metadata, x1.device)
     r_ij_bond_1 = x1.reshape(-1, 3)[graph_bond.src] - x1.reshape(-1, 3)[graph_bond.src]
-    x_a = self.atom_embeddings[None].expand(graph_0.batch, -1, -1)
+    x_a = self.atom_embeddings[None].expand(x0.shape[0], -1, -1)
     x_v = self.v_readin((x1 - x0)[..., None, :])
     x_a = self.mlp_embed(x_a)
-    x_a, x_v = self.cpainn_0(graph_0, r_ij_0, graph_bond, r_ij_bond_0, x_a, x_v, metadata)
+    x0, x_a, x_v = self.cpainn_0(x0, graph_bond, r_ij_bond_0, x_a, x_v, box, metadata)
     x_a = self.mlp_denoise(x_a + self.t_embed(t)[:, None])
-    x_a, x_v = self.cpainn_1(graph_1, r_ij_1, graph_bond, r_ij_bond_1, x_a, x_v, metadata)
-    return self.readout(x_v).squeeze(-2)
+    x_v = x_v + self.pos_emb(x0, x1)
+    x1, x_a, x_v = self.cpainn_1(x1, graph_bond, r_ij_bond_1, x_a, x_v, box, metadata)
+    return self.readout(x_v).squeeze(-2), x1
 
 
 
@@ -237,6 +259,12 @@ class DiffusionDenoiser:
       group["lr"] *= lr_fac
   def sigma_t(self, t):
     return nodecay_cosine_schedule(t, self.sigma_max)
+  def _get_epsilon_pred(self, sigma, x_1_noised, nn_output):
+    """ given a noise value sigma, noised sample, and the nn output, return the combined predicted epsilon """
+    epsilon_pred, x1_pred = nn_output
+    zeta = self.config["zeta"]
+    # for combination rule, see https://arxiv.org/pdf/2202.00512 appendix D
+    return (zeta*epsilon_pred + sigma*(x_1_noised - x1_pred))/(zeta + sigma)
   def _diffuser_step(self, x, metadata):
     """ x: (L, batch, poly_len, 3) """
     L, batch, atoms, must_be[3] = x.shape
@@ -247,8 +275,14 @@ class DiffusionDenoiser:
     sigma = self.sigma_t(t)[:, None, None]
     noise = sigma*epsilon
     x_1_noised = x_1 + noise
-    epsilon_pred = self.dn(t, x_0, x_1_noised, self.box, metadata)
-    loss = ((torch.tanh(3.*sigma)*(epsilon_pred - epsilon))**2).mean()
+    epsilon_pred = self._get_epsilon_pred(sigma, x_1_noised, self.dn(t, x_0, x_1_noised, self.box, metadata))
+    if "loss_wt" not in self.config or self.config["loss_wt"] == "1":
+      loss = ((epsilon_pred - epsilon)**2).mean()
+    else:
+      if self.config["loss_wt"] == "zz_ee":
+        loss = ((self.config["zeta"]**2 + sigma**2) * (epsilon_pred - epsilon)**2).mean()
+      else:
+        assert False, f"unknown loss_wt type {self.config['loss_wt']}"
     self.optim.zero_grad()
     loss.backward()
     self.optim.step()
@@ -265,7 +299,7 @@ class DiffusionDenoiser:
       sigma_t = self.sigma_t(t)[:, None, None]
       sigma_tdec = self.sigma_t(tdec)[:, None, None]
       dsigma = torch.sqrt(sigma_t**2 - sigma_tdec**2)
-      epsilon_pred = self.dn(t, x_0, ans, self.box, metadata)
+      epsilon_pred = self._get_epsilon_pred(sigma_t, ans, self.dn(t, x_0, ans, self.box, metadata))
       ans -= (dsigma**2/sigma_t)*epsilon_pred
       epsilon = torch.randn_like(ans)
       ans += (dsigma*sigma_tdec/sigma_t)*epsilon

@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from managan.polymer_util import space_dim
-from managan.utils import must_be, prod, turn_on_actv_size_printing
+from managan.utils import must_be, prod, turn_on_actv_size_printing, turn_on_grad_size_printing
 from managan.layers_common import *
 from managan.config import Config
 from managan.tensor_products import TensLinear, TensConv1d, tens_sigmoid, TensSigmoid, TensGroupNorm, TensorRandGen
@@ -636,6 +636,7 @@ class DiffusionDenoiser:
       self.scheduler.lr_prev, betas, weight_decay=self.config["weight_decay"])
     self.step_count = 0
     #turn_on_actv_size_printing(self.dn)
+    turn_on_grad_size_printing(self.dn)
   @staticmethod
   def load_from_dict(states, config):
     ans = DiffusionDenoiser(config)

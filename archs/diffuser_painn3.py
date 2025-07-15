@@ -248,12 +248,12 @@ class DiffusionDenoiser:
     noise = sigma*epsilon
     x_1_noised = x_1 + noise
     epsilon_pred = self.dn(t, x_0, x_1_noised, self.box, metadata)
-    loss = ((torch.tanh(3.*sigma)*(epsilon_pred - epsilon))**2).mean()
+    loss = (((epsilon_pred - epsilon)*sigma/(0.4 + sigma))**2).mean()
     self.optim.zero_grad()
     loss.backward()
     self.optim.step()
     return loss.item()
-  def generate(self, x_0, metadata, steps=32):
+  def generate(self, x_0, metadata, steps=12):
     *leading_dims, atoms, must_be[3] = x_0.shape
     batch = prod(leading_dims)
     x_0 = x_0.reshape(batch, atoms, 3)

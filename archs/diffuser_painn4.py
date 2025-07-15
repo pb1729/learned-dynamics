@@ -158,7 +158,7 @@ class SE3ITO(nn.Module):
   def __init__(self, r0:float, n:int, natoms:int, blks_0:int=2, blks_1:int=5):
     super().__init__()
     self.r0 = r0
-    self.atom_embeddings = nn.Parameter(torch.randn(natoms, n))
+    self.atom_embeddings = nn.Parameter(torch.randn(natoms//3, n).repeat(3, 1))
     self.t_embed = TimeEmbedding(8, n)
     self.mlp_embed = MLP(n, n)
     self.mlp_denoise = MLP(n, n)

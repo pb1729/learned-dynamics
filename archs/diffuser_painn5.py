@@ -154,14 +154,26 @@ def graph_setup(r0:float, box:Tuple[float, float, float], pos:torch.Tensor):
   r_ij = boxwrap(tensbox, pos_dst - pos_src)
   return graph, r_ij
 
+class PosEmbed(nn.Module):
+  """ Embeddings of node-wise relative positions. """
+  def __init__(self, dim_v):
+    super().__init__()
+    self.lin_v = TensLinear(1, 1, dim_v)
+  def forward(self, pos_0, pos_1):
+    """ pos_0, pos_1: (batch, nodes, 3) """
+    pos_0, pos_1 = pos_0[:, :, None], pos_1[:, :, None]
+    dpos_v = 0.1*(pos_1 - pos_0)
+    return self.lin_v(dpos_v)
+
 class SE3ITO(nn.Module):
   def __init__(self, r0:float, n:int, natoms:int, blks_0:int=2, blks_1:int=5):
     super().__init__()
     self.r0 = r0
-    self.atom_embeddings = nn.Parameter(torch.randn(natoms, n))
+    self.atom_embeddings = nn.Parameter(torch.randn(natoms//3, n).repeat(3, 1))
     self.t_embed = TimeEmbedding(8, n)
     self.mlp_embed = MLP(n, n)
     self.mlp_denoise = MLP(n, n)
+    self.pos_emb = PosEmbed(n)
     self.cpainn_0 = CPaiNN(r0, n, blks_0)
     self.cpainn_1 = CPaiNN(r0, n, blks_1)
     self.v_readin = TensLinear(1, 1, n)
@@ -182,6 +194,7 @@ class SE3ITO(nn.Module):
     x_a = self.mlp_embed(x_a)
     x_a, x_v = self.cpainn_0(graph_0, r_ij_0, graph_bond, r_ij_bond_0, x_a, x_v, metadata)
     x_a = self.mlp_denoise(x_a + self.t_embed(t)[:, None])
+    x_v = x_v + self.pos_emb(x0, x1)
     x_a, x_v = self.cpainn_1(graph_1, r_ij_1, graph_bond, r_ij_bond_1, x_a, x_v, metadata)
     return self.readout(x_v).squeeze(-2)
 
