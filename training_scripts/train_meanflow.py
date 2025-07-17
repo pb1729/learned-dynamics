@@ -7,8 +7,8 @@ from managan.train import training_run
 
 
 SIMTYPE = "set_seqAAA_10ps_chunklen128"
-ARCH = "meanflow_painn7"
-RUN_ID = "MF10"
+ARCH = "meanflow_painn8"
+RUN_ID = "MF14"
 STRIDE = 8
 
 NSTEPS_LIST = [1024*i for i in range(1, 257)]
@@ -22,12 +22,12 @@ training_run("models/%s_%s.%s.pt" % (RUN_ID, sim_name + f"_{STRIDE}", ARCH),
     nsteps=NSTEPS_LIST,
     save_every=128,
     arch_specific={
-      "lr": 0.00003,  "lr_fac": 0.998,
+      "lr": 0.0003,  "lr_fac": 0.998,
       "beta_1": 0., "beta_2": 0.99, "weight_decay": 0.001,
       # CPaiNN stuff
       "r0": 5., "n": 128,
       "natoms": 15, # Number of atoms in AAA that are not H or OXT
       # diffuser stuff
-      "sigma_0": 7.0, # [angstrom]
-      "loss_wt": "1",
+      "sigma_0": 1.0, # [angstrom]
+      "loss_wt": "ph",
     }))
