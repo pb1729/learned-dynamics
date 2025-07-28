@@ -542,16 +542,16 @@ class DiffusionDenoiser:
     for i in range(steps):
       t = torch.tensor([t_list[i]], device=x_0.device, dtype=torch.float32)
       tdec= torch.tensor([t_list[i + 1]], device=x_0.device, dtype=torch.float32)
-      tmid = (t + tdec)/2
+      #tmid = (t + tdec)/2
       sigma_t = self.sigma_t(t)[:, None, None]
-      sigma_tmid = self.sigma_t(tmid)[:, None, None]
+      #sigma_tmid = self.sigma_t(tmid)[:, None, None]
       sigma_tdec = self.sigma_t(tdec)[:, None, None]
       dsigma = torch.sqrt(sigma_t**2 - sigma_tdec**2)
-      epsilon_pred = self._get_epsilon_pred(sigma_tmid, ans,
-        self.dn(tmid, x_0, ans, self.box, metadata))
-      ans -= (dsigma**2/sigma_tmid)*epsilon_pred
+      epsilon_pred = self._get_epsilon_pred(sigma_t, ans,
+        self.dn(t, x_0, ans, self.box, metadata))
+      ans -= (dsigma**2/sigma_t)*epsilon_pred
       epsilon = torch.randn_like(ans)
-      ans += dsigma*epsilon
+      ans += (dsigma*sigma_tdec/sigma_t)*epsilon
     return ans.reshape(*leading_dims, atoms, 3)
   def set_eval(self, bool_eval):
     if bool_eval:
