@@ -547,7 +547,7 @@ class WGAN3D:
     batch = prod(leading_dims)
     x_0 = x_0.reshape(batch, atoms, 3)
     epsilon = self.randgen.randn(1, (batch, atoms, self.config["diffusion_steps"]))
-    x_0_noised = self.config["sigma_max"]*self.randgen.randn(1, (batch, atoms))
+    x_0_noised = x_0 + self.config["sigma_max"]*self.randgen.randn(1, (batch, atoms))
     x_1 = self.gen(x_0, x_0_noised, epsilon, self.box, metadata)
     return x_1.reshape(*leading_dims, atoms, 3)
   def predict(self, state:ModelState):
