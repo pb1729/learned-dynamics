@@ -120,13 +120,14 @@ def get_get_mutated_seq2(lmin:int, lmax:int, seqs_envvar_nm:str):
 
 class OpenMMConfig:
   def __init__(self, dt:int, boxsz:float, temp:float, sample_seq:Callable[[], str], ff:ForceField,
-      implicit_water=False):
+      implicit_water=False, allow_H=False):
     self.dt = dt # number of simulation steps, in units of [0.002ps]
     self.boxsz = boxsz
     self.temp = temp
     self.sample_seq = sample_seq
     self.ff = ff
     self.implicit_water = implicit_water
+    self.allow_H = allow_H
   def _sample_pdb(self, seq):
     for _ in range(10):
       pdb = init_pdb(seq)
@@ -144,11 +145,11 @@ class OpenMMConfig:
     for res in chain.residues():
       seq.append(RES_CODE[res.name])
       residue_indices.append(len(atom_indices))
-      nonhydrogens = [atom for atom in res.atoms() if atom.element.atomic_number != 1]
-      nonhydrogens = [atom for atom in nonhydrogens if atom.name != "OXT"] # don't include OXT so amino acid sized can be uniform
+      tracked_atoms = [atom for atom in res.atoms() if (self.allow_H or atom.element.atomic_number != 1)]
+      # don't include chain-terminating atoms so that all aminos can be a consistent size
+      tracked_atoms = [atom for atom in tracked_atoms if atom.name not in ["OXT", "H2", "H3"]]
       atoms_ref = structures[res.name][0].atoms
-      for atom, atom_ref in zip(nonhydrogens, atoms_ref):
-        assert atom_ref.name.replace("N_next", "OXT") == atom.name, "atom ordering in simulation inconsistent with standard order!"
+      for atom in tracked_atoms:
         atom_indices.append(atom.index)
         atomic_nums.append(atom.element.atomic_number)
     return OpenMMMetadata("".join(seq), np.array(atomic_nums), np.array(atom_indices), np.array(residue_indices))
@@ -204,7 +205,6 @@ openmm_sims = RegexDict(
   ("B_t%d_L%d_m%d_M%d", lambda t, L, m, M: OpenMMConfig(t, float(L), 300., get_get_mutated_seq(m, M, "MANAGAN_SEQS_LOC"), FF_DEFAULT)),
   ("C_t%d_L%d_m%d_M%d", lambda t, L, m, M: OpenMMConfig(t, float(L), 300., get_get_mutated_seq2(m, M, "MANAGAN_SEQS_LOC"), FF_DEFAULT)),
   ("SEQ_t%d_L%d_seq%Q", lambda t, L, seq: OpenMMConfig(t, float(L), 300., lambda: seq, FF_DEFAULT)),
+  ("SEQH_t%d_L%d_seq%Q", lambda t, L, seq: OpenMMConfig(t, float(L), 300., lambda: seq, FF_DEFAULT, allow_H=True)),
   ("SEQ_DRY_t%d_seq%Q", lambda t, seq: OpenMMConfig(t, float("inf"), 300., lambda: seq, FF_DRY, implicit_water=True))
 )
-
-
