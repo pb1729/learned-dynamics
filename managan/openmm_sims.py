@@ -12,7 +12,7 @@ from openmm.vec3 import Vec3
 from openmm.app import PDBFile, Modeller, ForceField, Simulation, PME, NoCutoff
 from openmm.unit import Quantity, angstrom, kelvin, pico, second
 
-from .seq2pdbchain.amino_data import letter_code, structures
+from .seq2pdbchain.amino_data import letter_code
 from .seq2pdbchain.seq2pdbchain import pdb_chain
 from .sim_utils import RegexDict, OpenMMMetadata
 from .amino_seq_markov import generate_seq
@@ -148,7 +148,6 @@ class OpenMMConfig:
       tracked_atoms = [atom for atom in res.atoms() if (self.allow_H or atom.element.atomic_number != 1)]
       # don't include chain-terminating atoms so that all aminos can be a consistent size
       tracked_atoms = [atom for atom in tracked_atoms if atom.name not in ["OXT", "H2", "H3"]]
-      atoms_ref = structures[res.name][0].atoms
       for atom in tracked_atoms:
         atom_indices.append(atom.index)
         atomic_nums.append(atom.element.atomic_number)
