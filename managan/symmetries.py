@@ -15,9 +15,10 @@ class Symmetry:
         apply symmetry to a position vector """
     return p_v
   def _apply(self, tens, tens_type):
-    if tens_type is None or tens_type == "": # act trivially on non-tensor objects
+    if tens_type == "": # act trivially on non-tensor objects
       return tens
-    assert isinstance(tens_type, str), "tensor type descriptors must be either None or a string"
+    assert isinstance(tens_type, str), "tensor type descriptors must be a string"
+    assert isinstance(tens, torch.Tensor), "non-tensors must have symmetry type \"\""
     if tens_type == "p":
       return self.pos(tens)
     if tens_type[-1:] == "c":
@@ -29,7 +30,10 @@ class Symmetry:
   def apply(self, tens_list, tens_type_list):
     ans = []
     for tens, tens_type in zip(tens_list, tens_type_list):
-      ans.append(self._apply(tens, tens_type))
+      transformed = self._apply(tens, tens_type)
+      if isinstance(tens, torch.Tensor) and tens.requires_grad: # maintain leaf tensors as leaf tensors
+        transformed = transformed.detach().clone().requires_grad_()
+      ans.append(transformed)
     return ans
 
 def tensor_matrix_transform(inds:int, pos:int, x, R):
