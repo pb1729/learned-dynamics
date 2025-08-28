@@ -53,7 +53,10 @@ def main(args):
     args.saveto = f"traces/{currtime}_{modelnm}.json"
   # get input
   state = predictor.sample_q(model.config.batch if args.batch is None else args.batch)
-  inp = predictor.predict(model.config.simlen if args.length is None else args.length, state)
+  if args.inference:
+    inp = predictor.predict(1, state)
+  else:
+    inp = predictor.predict(model.config.simlen if args.length is None else args.length, state)
   for i in range(args.burnin):
     print("burn-in %d" % i)
     do_op_to_be_profiled(args, model, inp)
