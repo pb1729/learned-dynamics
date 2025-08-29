@@ -101,6 +101,48 @@ def density_plot(angles):
   plt.ylabel("ψ [rad]")
   plt.show()
 
+def heatmap_plot(angles):
+  # phi hist
+  for prednm in angles:
+    phis, psis = angles[prednm]
+    # cut off amino acids on the ends with only one angle:
+    phis = phis[..., :-1]
+    psis = psis[..., 1:]
+    # make a 2d grid for both angles and count how many datapoints are in each cell
+    nbins = 32  # Number of bins in each dimension
+    H, xedges, yedges = np.histogram2d(
+        phis.flatten(), psis.flatten(),
+        bins=nbins,
+        range=[[-np.pi, np.pi], [-np.pi, np.pi]]
+    )
+    # normalize and take logs
+    total_counts = H.sum()
+    H = (0.5*nbins/np.pi)**2 * H / total_counts
+    H = np.log(H)
+    # Create a figure
+    plt.figure(figsize=(8, 6))
+    # Plot heatmap
+    # Set NaN values in the heatmap to black
+    cmap = plt.cm.viridis.copy()
+    cmap.set_bad('black')
+    plt.imshow(
+        H.T,
+        extent=[-np.pi, np.pi, -np.pi, np.pi],
+        origin='lower',
+        aspect='auto',
+        cmap=cmap,
+        vmax=1.5,
+        vmin=np.log((0.5*nbins/np.pi)**2 / total_counts),
+    )
+    # Add colorbar and labels
+    plt.colorbar(label='ln(density)')
+    print(prednm)#plt.title(f"Ramachandran Plot - {prednm}")
+    plt.xlabel("φ [rad]")
+    plt.ylabel("ψ [rad]")
+    plt.show()
+
+
+
 def many_density_plot(angles, seq):
   for prednm in angles:
     L, batch, npep = angles[prednm][0].shape
@@ -226,6 +268,40 @@ def tcorr_plot(angles, offset_max):
   plt.show()
 
 
+def f_alpha_beta(phis, psis):
+  return np.sign(np.sin(psis - PSI_CRIT))*0.5*(1 - np.sign(np.sin(phis - PHI_CRIT)))
+
+def f_tcorr(f, offset_max=None):
+  """ f: (L, batch, npep)
+      ans: (offset_max, npep) """
+  if offset_max is None: offset_max = f.shape[0] - 1
+  return (np.stack([
+    (f**2).mean((0, 1))
+  ] + [
+    (f[offset:]*f[:-offset]).mean((0, 1))
+    for offset in range(1, offset_max)
+  ]))
+
+def fcorr_plot(angles, offset_max):
+  for prednm in angles:
+    L, batch, npep = angles[prednm][0].shape
+    break
+  assert npep - 1 == 1, "don't have plotting figured out for more residues"
+  for prednm in angles:
+    phis, psis = angles[prednm]
+    # cut off amino acids on the ends with only one angle:
+    phis = phis[..., :-1]
+    psis = psis[..., 1:]
+    must_be[L], must_be[batch], must_be[npep - 1] = phis.shape
+    must_be[L], must_be[batch], must_be[npep - 1] = psis.shape
+    f = f_alpha_beta(phis, psis)
+    tcorr = f_tcorr(f, offset_max=offset_max)
+    plt.plot(tcorr, label=prednm)
+  plt.legend()
+  plt.ylim(0., 1.)
+  plt.show()
+
+
 def main(args):
   predictors = args_to_predictor_list(args)
   angles = {}
@@ -241,12 +317,16 @@ def main(args):
     density_plot(angles)
   elif args.plot_type == "tcorr":
     tcorr_plot(angles, args.offset_max)
+  elif args.plot_type == "fcorr":
+    fcorr_plot(angles, args.offset_max)
   elif args.plot_type == "manydensity":
     many_density_plot(angles, state.metadata.seq)
   elif args.plot_type == "psi_hopping":
     psi_hopping_plot(angles)
   elif args.plot_type == "phi_hopping":
     phi_hopping_plot(angles)
+  elif args.plot_type == "heatmap":
+    heatmap_plot(angles)
 
 
 
@@ -256,6 +336,6 @@ if __name__ == "__main__":
   add_model_list_arg(parser) # -M and -O
   parser.add_argument("--batch", type=int, default=1)
   parser.add_argument("--tmax", type=int, default=100)
-  parser.add_argument("--plot_type", type=str, choices=["density", "tcorr", "manydensity", "psi_hopping", "phi_hopping"], default="density", help="Type of plot to generate")
+  parser.add_argument("--plot_type", type=str, choices=["density", "tcorr", "fcorr", "manydensity", "psi_hopping", "phi_hopping", "heatmap"], default="density", help="Type of plot to generate")
   parser.add_argument("--offset_max", type=int, default=None)
   main(parser.parse_args())
