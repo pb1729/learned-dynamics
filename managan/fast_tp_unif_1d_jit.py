@@ -11,7 +11,6 @@ from torch import nn
 import cuequivariance as cueq
 # import the fast cuda kernel stuffs, plus useful definitions
 import cuequivariance_ops_torch._ext as ext
-from cuequivariance_ops_torch.tensor_product_uniform_1d_jit import BATCH_DIM_AUTO, BATCH_DIM_BATCHED, BATCH_DIM_INDEXED, BATCH_DIM_SHARED
 
 from managan.utils import must_be, prod
 
@@ -105,7 +104,7 @@ class FastSegmentedPolynomialFromUniform1dJit(nn.Module):
       self.ops, self.num_paths, self.path_indices_start, self.path_coefficients_start, self.path_indices, self.path_coefficients)
   def forward(self, tensors: List[torch.Tensor]):
     # check shapes
-    tensors = list(tensors)
+    assert isinstance(tensors, list), "expected a list as input"
     rest = None
     for i in range(len(tensors)):
       assert tensors[i].dtype == self.math_dtype, "input has wrong dtype"

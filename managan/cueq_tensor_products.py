@@ -4,7 +4,7 @@ import torch.nn as nn
 import cuequivariance_torch as cueq_torch
 
 from .utils import must_be
-from .tp_construction_cueq import make_elementwise_tensor_product
+from .tp_construction_cueq import make_elementwise_tensor_product, make_spherical_harmonics_tensor_product
 from .fast_tp_unif_1d_jit import FastSegmentedPolynomialFromUniform1dJit
 
 
@@ -86,7 +86,8 @@ class MessageContract(nn.Module):
       nn.Linear(rank, rank))
     self.lin_0_o = nn.Linear(irreps_o0.count("0"), chan)
     self.lin_1_o = nn.Linear(irreps_o1.count("1"), chan, bias=False)
-    self.sh = cueq_torch.SphericalHarmonics([0, 1, 2], normalize=False)
+    poly_sh = make_spherical_harmonics_tensor_product([0, 1, 2])
+    self.sh = FastSegmentedPolynomialFromUniform1dJit(poly_sh, name="sh_012")
     self.tens_prod_o0 = FastSegmentedPolynomialFromUniform1dJit(poly_o0, name="messages_o0")
     self.tens_prod_o1 = FastSegmentedPolynomialFromUniform1dJit(poly_o1, name="messages_o1")
     self.rank = rank
@@ -100,7 +101,7 @@ class MessageContract(nn.Module):
     z0_j = self.lin_0_actv(z0_j)
     z1_j = self.lin_1_actv(z1_j)
     dist_emb_ij = self.dist_mlp(dist_emb_ij)
-    sh_ij = self.sh(dir_ij)
+    sh_ij, = self.sh([dir_ij])
     sh_dist_emb_ij = sh_ij[..., :, None]*dist_emb_ij[..., None, :] # (irrep, rank) ordering
     z_j = torch.cat([z0_j, _flatten_irrep(1, z1_j)], dim=-1)
     z0_o, = self.tens_prod_o0([z_j, sh_dist_emb_ij.reshape(-1, (1+3+5)*self.rank)])

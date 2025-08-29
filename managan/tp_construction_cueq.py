@@ -40,3 +40,9 @@ def make_elementwise_tensor_product(rank, prods, l_irreps=(0, 1), r_irreps=(0, 1
   tens_prod = tens_prod.flatten_modes(["i", "j", "k"])
   poly = cueq.SegmentedPolynomial.eval_last_operand(tens_prod) # last operand (operand 2) is the output
   return poly, output_irreps
+
+def make_spherical_harmonics_tensor_product(out_irreps):
+  tens_prod = cueq.descriptors.spherical_harmonics(cueq.SO3(1), out_irreps)
+  tens_prod = tens_prod.polynomial # get the SegmentedPolynomial from inside the EquivariantPolynomial
+  tens_prod = tens_prod.flatten_coefficient_modes()
+  return tens_prod
