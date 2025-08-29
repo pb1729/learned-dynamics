@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 
 from managan.backmap_to_pdb import model_states_to_mdtrajs
 from managan.utils import must_be
-from predictor_argparse_util import args_to_predictor_list, add_model_list_arg
-from plotting_common import approx_squarish_factorize
+from plotting.predictor_argparse_util import args_to_predictor_list, add_model_list_arg
+from plotting.plotting_common import approx_squarish_factorize
 
 
 PSI_CRIT = 1.5
