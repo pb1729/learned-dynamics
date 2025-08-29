@@ -10,9 +10,11 @@ class Graph:
   """ Graph class. Supports batch of graphs which each have the same number of nodes,
       but may have different connectivity. Graphs can be symmetric or directed.
       Since total number of edges may differ between graphs, edges are stored in a
-      flat tensor that indexes into a dimension of shape batch*N. """
+      flat tensor that indexes into a dimension of shape batch*N.
+      NOTE: src must be stored in increasing order """
   def __init__(self, src, dst, edge_indices, batch, nodes):
     """ src, dst: (edges)
+        edge_indices can be None, most layers don't use it
         elems are node indices in range(0, batch*nodes). forall i src[i] must be in increasing order """
     self.src = src.to(torch.int64) # torch-scatter wants int64s
     self.dst = dst.to(torch.int64) # torch-scatter wants int64s
@@ -62,6 +64,17 @@ def boxwrap(box:torch.Tensor, delta_pos:torch.Tensor):
       box: (3)
       delta_pos: (..., 3) """
   return (delta_pos + 0.5*box)%box - 0.5*box
+
+
+def expand_graph(graph:Graph, new_batch:int):
+  assert graph.batch == 1, "Graph to be expanded should have batch size 1"
+  src = graph.src[None].expand(new_batch, -1)
+  dst = graph.dst[None].expand(new_batch, -1)
+  src = src + graph.nodes*torch.arange(new_batch, device=src.device)[:, None]
+  dst = dst + graph.nodes*torch.arange(new_batch, device=dst.device)[:, None]
+  src = src.flatten()
+  dst = dst.flatten()
+  return Graph(src, dst, None, new_batch, graph.nodes)
 
 
 if __name__ == "__main__":
