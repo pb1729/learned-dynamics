@@ -2,7 +2,7 @@ import torch
 import importlib
 
 from .statefiles import get_dataset_predictor, get_strided_dataset_predictor, get_repeated_dataset_predictor
-from .predictor import Predictor, ModelPredictor, LongModelPredictor, get_openmm_predictor
+from .predictor import Predictor, ModelPredictor, get_openmm_predictor
 
 
 ARCH_PREFIX = "archs."

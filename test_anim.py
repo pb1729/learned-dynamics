@@ -6,7 +6,6 @@ from PIL import Image
 
 from atoms_display import launch_atom_display
 
-from managan.polymer_util import poly_len, space_dim
 from managan.config import get_predictor
 from managan.utils import must_be
 

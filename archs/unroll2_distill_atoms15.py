@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from managan.polymer_util import space_dim
 from managan.utils import must_be, prod, turn_on_actv_size_printing
 from managan.layers_common import *
 from managan.config import Config, load
@@ -487,7 +486,6 @@ class WGAN3D:
     self.config = config
     self.gen = Generator(config).to(config.device)
     self.gen.apply(weights_init)
-    assert space_dim(config) == 3
     self.box = config.predictor.get_box()
     self.tensbox = torch.tensor(self.box, dtype=torch.float32, device="cuda")
     self.init_optim()

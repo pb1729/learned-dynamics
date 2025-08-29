@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from managan.polymer_util import space_dim
 from managan.utils import must_be, prod
 from managan.layers_common import *
 from managan.config import Config
@@ -231,7 +230,6 @@ class Meanflow:
     self.config = config
     self.dn = SE3ITO(config["r0"], config["n"], config["natoms"]).to(config.device)
     #self.dn.apply(weights_init) # TODO: determine if this is necessary!
-    assert space_dim(config) == 3
     self.box = config.predictor.get_box()
     self.tensbox = torch.tensor(self.box, dtype=torch.float32, device="cuda")
     self.sigma_0 = config["sigma_0"]

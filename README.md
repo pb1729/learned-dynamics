@@ -21,6 +21,7 @@ Here we show how to create a virutalenv that has the needed packages. Work in pr
 * Enter a python repl and print `torch.__version__`. You'll get some version, eg. `2.5.1+cu124`.
 * `pip install torch-scatter -f https://data.pyg.org/whl/torch-2.5.1+cu124.html` where the `2.5.1+cu124` is replaced by your `torch.__version__`
 * Clone this repo into your environment and cd there. Now we install the extensions and atoms-display.
+    * After cloning, don't forget to run `git submodule update`.
 * Extensions:
     * Go into each extension's directory under `extensions/`
     * `pip install .`

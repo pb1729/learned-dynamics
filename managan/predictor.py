@@ -5,7 +5,6 @@ from typing_extensions import Self, List, Tuple
 
 from .utils import must_be, prod, batched_model_eval
 from .sim_utils import OpenMMMetadata, OpenMMSimError
-from .sims import sims
 
 
 

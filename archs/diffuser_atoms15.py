@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from managan.polymer_util import space_dim
 from managan.utils import must_be, prod, turn_on_actv_size_printing
 from managan.layers_common import *
 from managan.config import Config
@@ -471,7 +470,6 @@ class DiffusionDenoiser:
     self.config = config
     self.dn = Denoiser(config).to(config.device)
     self.dn.apply(weights_init)
-    assert space_dim(config) == 3
     self.box = config.predictor.get_box()
     self.tensbox = torch.tensor(self.box, dtype=torch.float32, device="cuda")
     self.sigma_max = config["sigma_max"]
