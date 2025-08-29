@@ -1,20 +1,11 @@
-# Koopman Operator and Large Δt Learned Approximations of the Transfer Operator
+# Large Δt Learned Approximations of the Transfer Operator
 
-
-
-## MANAGAN (MArkov Nextstate Approximation GAN)
-
-Given a stochastic system that has dynamical trajectories `x(t)`, we choose a fixed lag time `Δt`. Can we sample from the probability distribution `P(x(Δt) | x(0))`? Let's try and train a GAN for this task. If we picked a large enough `Δt`, this might be computationally much cheaper than simulating the system in the usual way. In this repo, the focus is mainly on molecular systems, in particular polymers, especially proteins in solution.
+Given a stochastic system that has dynamical trajectories `x(t)`, we choose a fixed lag time `Δt`. Can we sample from the probability distribution `P(x(Δt) | x(0))`?
 
 We need to consider symmetry:
 * Rotational symmetry implies activations in the network must correspond to representations of SO(3).
 * Translational symmetry implies that all vector activations in the network must be *differences* of positions.
 * If there is a periodic box, we must additionally be able to translate different atom positions by different integer sums of the lattice basis vectors without affecting neural network output.
-
-
-## Vampnets
-
-Vampnets are a good way to approximate a given system's Koopman operator. They're not the main focus of this repo anymore. However, we do know how to differentiably compute VAMPScore for equivariant VAMPNets. (In general, each of many features produced by the net must be some irrep of SO(3). Get in touch if you need to do this and would like us to tell you how.)
 
 
 ## Environment Setup
@@ -41,13 +32,8 @@ Here we show how to create a virutalenv that has the needed packages. Work in pr
       the version of pyopengl on pypi is out of date for the current numpy version. Fix is to just install the latest
       pyopengl from github: Clone [this](https://github.com/mcfletch/pyopengl) and follow README instructions (they are easy).
     * Having obtained pyopengl, now go the the atoms-display directory and run `pip install -e .`
-* If you want to train your own model, you'll probably need a source of simulation data. Some simulations use
-  [hoomd](https://hoomd-blue.readthedocs.io/en/v5.0.0/) or [openmm](https://openmm.org/). Installation of these packages is
-  optional, you only need a given one if you want it to generate training data.
+* If you want to train your own model, you'll probably need a source of simulation data. This uses [openmm](https://openmm.org/).
 * OpenMM:
     * Installation is probably just `pip install openmm[cuda12]`.
     * If you want more customization, check the docs:
       http://docs.openmm.org/latest/userguide/application/01_getting_started.html#installing-openmm
-* HOOMD:
-    * This is very optional, you probably don't want to install it.
-    * Good luck: https://hoomd-blue.readthedocs.io/en/v5.0.0/getting-started.html

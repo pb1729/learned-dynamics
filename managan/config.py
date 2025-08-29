@@ -2,24 +2,19 @@ import torch
 import importlib
 
 from .statefiles import get_dataset_predictor, get_strided_dataset_predictor, get_repeated_dataset_predictor
-from .predictor import Predictor, ModelPredictor, LongModelPredictor, get_sim_predictor, get_hoomd_predictor, get_openmm_predictor
+from .predictor import Predictor, ModelPredictor, LongModelPredictor, get_openmm_predictor
 
 
 ARCH_PREFIX = "archs."
 
 
 def get_predictor(predictor_spec, override_base=None):
-  """ given a specification for a predictor, construct the actual predictor.
-      for backwards compatability, if no predictor type is specified, we return a SimPredictor """
+  """ given a specification for a predictor, construct the actual predictor. """
   if ":" in predictor_spec:
     pred_type, rest = predictor_spec.split(":")
   else:
-    pred_type, rest = "sim", predictor_spec
-  if "sim" == pred_type:
-    ans = get_sim_predictor(rest)
-  elif "hoomd" == pred_type:
-    ans = get_hoomd_predictor(rest)
-  elif "openmm" == pred_type:
+    raise RuntimeError("Predictor should have a predictor type specified!")
+  if "openmm" == pred_type:
     ans = get_openmm_predictor(rest)
   elif "dataset" == pred_type:
     ans = get_dataset_predictor(rest)
@@ -29,8 +24,6 @@ def get_predictor(predictor_spec, override_base=None):
     ans = get_repeated_dataset_predictor(rest)
   elif "model" == pred_type: # treat "rest" as a path
     ans = ModelPredictor(load(rest, override_base))
-  elif "lmodel" == pred_type: # treat "rest" as a path
-    ans = LongModelPredictor(load(rest, override_base))
   elif "dummy" == pred_type:
     ans = Predictor()
   else: assert False, "unknown predictor type"

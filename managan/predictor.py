@@ -8,8 +8,6 @@ from .sim_utils import OpenMMMetadata, OpenMMSimError
 from .sims import sims
 
 
-EVAL_BATCHSZ = 1024
-
 
 def assert_shapes_compatible(base_shape, shape):
   assert len(base_shape) == len(shape), "number of dimensions does not match"
@@ -84,51 +82,6 @@ class Predictor:
     return None
 
 
-class SimState(State):
-  def __init__(self, shape, x, v):
-    size, shape = self._check_size_shape(x, shape)
-    size, shape = self._check_size_shape(x, shape, base_size=size)
-    self._x = x
-    self._v = v
-    super().__init__(size, shape)
-  @property
-  def x(self) -> torch.Tensor:
-    return self._x
-  def __getitem__(self, key):
-    return SimState(self.shape, self._x[key], self._v[key])
-  def expand(self, n, dim):
-    expand_shape = self._get_expand_shape(n, dim)
-    x_new = self._x.unsqueeze(dim)
-    v_new = self._v.unsqueeze(dim)
-    return SimState(self.shape, x_new.expand(*expand_shape).clone(), v_new.expand(*expand_shape).clone())
-  def reshape(self, *newsize):
-    return SimState(self.shape, self._reshape_tens(self._x, newsize), self._reshape_tens(self._v, newsize))
-  def to_model_predictor_state(self):
-    return ModelState(self.shape, self._x.clone()) # model predictors only use x coordinate
-class SimPredictor(Predictor):
-  def __init__(self, sim, t_eql=4):
-    self.sim = sim
-    self.t_eql = t_eql
-  def shape(self):
-    return self.sim.shape
-  def predict(self, L, state, ret=True):
-    """ MUTATES state """
-    x_in = state._x.view(prod(state.size), *state.shape) # must use view so that state is mutated
-    v_in = state._v.view(prod(state.size), *state.shape) # must use view so that state is mutated
-    traj = self.sim.generate_trajectory(x_in, v_in, L, ret=ret)
-    if ret:
-      traj = traj.transpose(0, 1) # L should come first, to match output of other predictors
-      traj = traj.reshape(L, *state.size, *state.shape) # expand back out to expected dims
-      return ModelState(state.shape, traj)
-    else:
-      return None
-  def sample_q(self, batch):
-    x, v = self.sim.sample_equilibrium(batch, self.t_eql)
-    return SimState(self.sim.shape, x, v)
-def get_sim_predictor(key):
-  return SimPredictor(sims[key])
-
-
 class ModelState(State):
   def __init__(self, shape, x, **kwargs):
     size, shape = self._check_size_shape(x, shape)
@@ -180,92 +133,6 @@ class ModelPredictor(Predictor):
     return self.model.config.predictor
   def get_box(self):
     return self.get_base_predictor().get_box()
-
-
-class LongModelPredictor(Predictor):
-  """ Like a ModelPredictor, except states consist of several states in a row.
-      We expect states to have a size,shape of (framelen, *size)(*shape)."""
-  def __init__(self, model):
-    model.set_eval(True)
-    self.model = model
-    self.framelen = model.config["framelen"]
-  def shape(self):
-    return self.get_base_predictor().shape()
-  def predict(self, L, state, ret=True):
-    """ MUTATES state.
-        state: (*size)(framelen, *base_shape)
-        NOTE: creates a normal-looking trajectory with shape (L, *base_shape) not (L, framelen, *base_shape) """
-    must_be[self.framelen], *size = state.size
-    trajectory = torch.zeros(self.framelen + L, *size, *state.shape,
-      dtype=state._x.dtype, device=state._x.device)
-    trajectory[:self.framelen] = state.x
-    with torch.no_grad():
-      for i in range(L):
-        state._x[:] = trajectory[i:(self.framelen + i)]
-        new_x = self.model.predict(state)
-        trajectory[self.framelen + i] = new_x
-      state._x[:] = trajectory[-self.framelen:]
-    if ret:
-      return ModelState(state.shape, trajectory[self.framelen:], **state.kwargs)
-  def sample_q(self, batch):
-    base_pred = self.get_base_predictor()
-    state = base_pred.sample_q(batch)
-    size, shape = state.size, state.shape
-    return base_pred.predict(self.framelen, state)
-  def get_base_predictor(self) -> Predictor:
-    return self.model.config.predictor
-  def get_box(self):
-    return self.get_base_predictor().get_box()
-
-
-try:
-  from .hoomd_sims import HoomdSim, hoomd_sims
-except ModuleNotFoundError:
-  print("Warning: import of hoomd failed, skipping.")
-  def get_hoomd_predictor(key):
-    assert False, "hoomd failed to import, so construction of predictor is impossible"
-else:
-  class HoomdState(State):
-    def __init__(self, shape, simulations):
-      self.simulations = simulations
-      super().__init__((len(simulations),), shape)
-    @staticmethod
-    def sim2pos(simulation):
-      snapshot = simulation.state.get_snapshot()
-      return snapshot.particles.position + np.array(snapshot.configuration.box[:3])*snapshot.particles.image
-    @property
-    def x(self) -> torch.Tensor:
-      return torch.tensor(self.x_npy, dtype=torch.float32, device="cuda")
-    @property
-    def x_npy(self) -> np.ndarray:
-      return np.array([self.sim2pos(sim) for sim in self.simulations])
-    def __getitem__(self, key):
-      return HoomdState(self.shape, self.simulations[key])
-    def to_model_predictor_state(self):
-      return ModelState(self.shape, self.x)
-  class HoomdPredictor(Predictor):
-    def __init__(self, hoomd_sim:HoomdSim):
-      self.hoomd_sim = hoomd_sim
-    def shape(self):
-      return (self.hoomd_sim.n_particles, 3)
-    def sample_q(self, batch) -> State:
-      return HoomdState(self.shape(), [self.hoomd_sim.sample_q() for _ in range(batch)])
-    def predict(self, L, state, ret=True):
-      """ MUTATES state """
-      if ret:
-        assert len(state.size) == 1, "multi-dimensional HoomdState's not supported"
-        trajectory = torch.zeros(L, *state.size, *state.shape, dtype=torch.float32, device="cuda")
-      for i, sim in enumerate(state.simulations):
-        for j in range(L): # probably slightly faster/more cache friendly to make this the inside loop
-          self.hoomd_sim.step(sim)
-          if ret:
-            trajectory[j, i] = torch.tensor(state.sim2pos(sim), device="cuda")
-      if ret:
-        return ModelState(state.shape, trajectory)
-    def get_box(self):
-      return self.hoomd_sim.box
-  def get_hoomd_predictor(key):
-    return HoomdPredictor(hoomd_sims[key])
 
 
 try:
